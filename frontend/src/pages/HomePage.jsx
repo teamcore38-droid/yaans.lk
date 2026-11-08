@@ -1,0 +1,342 @@
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  ChevronRight,
+  ChevronLeft,
+  Sparkles,
+  Tag,
+  Store,
+  MapPin,
+  Star,
+  ShieldCheck,
+  Truck
+} from 'lucide-react';
+import { apiRequest } from '../utils/api.js';
+import { useMarketplace } from '../context/MarketplaceContext.jsx';
+import CategoryQuadCard from '../components/CategoryQuadCard.jsx';
+import ProductCard from '../components/ProductCard.jsx';
+
+export default function HomePage() {
+  const { user, selectedDistrict } = useMarketplace();
+  const [homeData, setHomeData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [bannerIdx, setBannerIdx] = useState(0);
+
+  useEffect(() => {
+    let mounted = true;
+    apiRequest('/marketplace/home')
+      .then((data) => {
+        if (mounted) setHomeData(data);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (loading && !homeData) {
+    return (
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-6 space-y-6">
+        <div className="h-48 sm:h-64 bg-white rounded-xl border border-slate-200 animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((n) => (
+            <div key={n} className="h-80 bg-white rounded-xl border border-slate-200 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const banners = homeData?.banners || [];
+  const categories = homeData?.categories || [];
+  const homemadeProducts = homeData?.homemadeProducts || [];
+  const dealProducts = homeData?.dealProducts || [];
+  const recommendedProducts = homeData?.recommendedProducts || [];
+  const verifiedSellers = homeData?.verifiedSellers || [];
+
+  const activeBanner = banners[bannerIdx % Math.max(1, banners.length)];
+
+  return (
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 space-y-6">
+      {/* Top Practical Hero Banner */}
+      {activeBanner && (
+        <div className="relative bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+          <div className="grid grid-cols-1 lg:grid-cols-12 items-center">
+            <div className="p-5 sm:p-8 lg:col-span-7 space-y-3">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-slate-800 text-[11px] font-bold tracking-wide uppercase">
+                <Truck className="w-3.5 h-3.5 text-slate-700" />
+                {activeBanner.badge}
+              </div>
+              <h1 className="text-xl sm:text-3xl font-extrabold text-slate-900 leading-tight">
+                {activeBanner.title}
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-600 max-w-xl leading-relaxed">
+                {activeBanner.subtitle}
+              </p>
+              <div className="pt-1 flex flex-wrap items-center gap-2.5">
+                <Link
+                  to={activeBanner.ctaLink || '/products'}
+                  className="px-4 py-2.5 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs sm:text-sm inline-flex items-center gap-1.5 transition shadow-sm"
+                >
+                  {activeBanner.ctaText || 'Shop Now'}
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+                <Link
+                  to="/products?homemade=true"
+                  className="px-4 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs sm:text-sm transition"
+                >
+                  Browse Homemade SL
+                </Link>
+              </div>
+            </div>
+
+            <div className="lg:col-span-5 h-44 sm:h-64 lg:h-72 bg-slate-100 relative overflow-hidden">
+              <img
+                src={activeBanner.imageUrl}
+                alt={activeBanner.title}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          </div>
+
+          {banners.length > 1 && (
+            <div className="px-5 py-2 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
+              <span>
+                Delivering to <strong className="text-slate-900">{selectedDistrict} District</strong> • Cash on Delivery Enabled
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  aria-label="Previous banner"
+                  onClick={() => setBannerIdx((prev) => (prev - 1 + banners.length) % banners.length)}
+                  className="p-1 rounded bg-white border border-slate-200 hover:bg-slate-100"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-[11px] font-medium px-1">
+                  {(bannerIdx % banners.length) + 1} / {banners.length}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Next banner"
+                  onClick={() => setBannerIdx((prev) => (prev + 1) % banners.length)}
+                  className="p-1 rounded bg-white border border-slate-200 hover:bg-slate-100"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Mobile & Guest Sign-In Strip (Modeled directly on reference screenshot) */}
+      {!user && (
+        <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">
+              Sign in for the best Yaans.lk experience
+            </h2>
+            <p className="text-xs text-slate-600">
+              Track multi-seller orders, save your Sri Lankan delivery address, or shop immediately with Guest Cash on Delivery.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
+            <Link
+              to="/login"
+              className="px-5 py-2 rounded-full bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs text-center shadow-sm"
+            >
+              Sign in securely
+            </Link>
+            <Link
+              to="/register"
+              className="text-xs font-semibold text-sky-700 hover:underline text-center px-2 py-1"
+            >
+              Create an account
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* 2x2 Category Quad Cards (Mobile-First Reference Layout) */}
+      <section aria-label="Shop by Category">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
+              Explore Categories
+            </h2>
+            <p className="text-xs text-slate-500">
+              Tap any department or subcategory tile to filter products
+            </p>
+          </div>
+          <Link
+            to="/products"
+            className="text-xs font-semibold text-sky-700 hover:text-sky-800 inline-flex items-center gap-0.5"
+          >
+            View All Departments <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {categories.map((cat) => (
+            <CategoryQuadCard key={cat._id} category={cat} />
+          ))}
+        </div>
+      </section>
+
+      {/* Authentic Sri Lankan Homemade Products Section */}
+      <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 mb-4 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <span className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800">
+              <Sparkles className="w-5 h-5" />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
+                  Sri Lankan Homemade & Cottage Products
+                </h2>
+                <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-800">
+                  Direct from Home Kitchens & Artisans
+                </span>
+              </div>
+              <p className="text-xs text-slate-600">
+                Fresh achcharu, pure Kotmale kithul treacle, village clay pots, handloom sarongs & herbal hair oils
+              </p>
+            </div>
+          </div>
+
+          <Link
+            to="/products?homemade=true"
+            className="text-xs font-bold text-sky-700 hover:text-sky-800 inline-flex items-center gap-1 shrink-0"
+          >
+            See all homemade finds <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          {homemadeProducts.slice(0, 8).map((product) => (
+            <ProductCard key={product._id} product={product} />
+          ))}
+        </div>
+      </section>
+
+      {/* Daily Deals in LKR (Rs.) */}
+      <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-2 pb-3 mb-4 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <span className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
+              <Tag className="w-5 h-5" />
+            </span>
+            <div>
+              <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
+                Today&apos;s Value Deals in LKR (Rs.)
+              </h2>
+              <p className="text-xs text-slate-600">
+                Practical discounts on everyday tech, home essentials & pantry items — no hidden tax added at checkout
+              </p>
+            </div>
+          </div>
+
+          <Link
+            to="/products?deals=true"
+            className="text-xs font-bold text-sky-700 hover:text-sky-800 inline-flex items-center gap-1 shrink-0"
+          >
+            All Deals <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          {dealProducts.slice(0, 4).map((product) => (
+            <ProductCard key={product._id} product={product} />
+          ))}
+        </div>
+      </section>
+
+      {/* Verified Local Sellers Showcase */}
+      <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <div>
+            <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
+              Shop by Verified Sri Lankan Sellers
+            </h2>
+            <p className="text-xs text-slate-600">
+              Combine items from multiple sellers in a single cart — Yaans.lk splits & tracks each shipment automatically
+            </p>
+          </div>
+          <Link
+            to="/seller/register"
+            className="text-xs font-bold text-sky-700 hover:text-sky-800 inline-flex items-center gap-1"
+          >
+            Open Your Store <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {verifiedSellers.map((seller) => (
+            <Link
+              key={seller._id}
+              to={`/store/${seller.slug}`}
+              className="p-3.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50/70 hover:bg-white transition flex items-start gap-3"
+            >
+              <img
+                src={seller.logoUrl}
+                alt={seller.storeName}
+                className="w-12 h-12 rounded-lg object-cover border border-slate-200 shrink-0 bg-white"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-bold text-slate-900 truncate">
+                    {seller.storeName}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-600 mt-0.5 flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                  <span className="truncate">{seller.city}</span>
+                </div>
+                <div className="mt-1.5 flex items-center justify-between">
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white border border-slate-200 text-slate-700">
+                    {seller.sellerType}
+                  </span>
+                  <span className="inline-flex items-center text-[11px] font-bold text-slate-800">
+                    <Star className="w-3 h-3 fill-amber-400 text-amber-500 mr-0.5" />
+                    {seller.rating}
+                  </span>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Recommended Marketplace Products */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
+              Recommended For You
+            </h2>
+            <p className="text-xs text-slate-500">
+              Most popular items ordered across Sri Lanka this week
+            </p>
+          </div>
+          <Link
+            to="/products"
+            className="text-xs font-bold text-sky-700 hover:text-sky-800 inline-flex items-center gap-0.5"
+          >
+            Browse All Products <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+          {recommendedProducts.map((product) => (
+            <ProductCard key={product._id} product={product} compact />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}

@@ -63,7 +63,7 @@ export default function HomePage() {
   const activeBanner = banners[bannerIdx % Math.max(1, banners.length)];
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 space-y-6">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 space-y-4 sm:space-y-5">
       {/* Top Practical Hero Banner */}
       {activeBanner && (
         <div className="relative bg-white rounded-xl border border-[#edd7df] overflow-hidden shadow-xs">
@@ -166,19 +166,19 @@ export default function HomePage() {
 
       {/* Mobile & Guest Sign-In Strip (Modeled directly on reference screenshot) */}
       {!user && (
-        <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+        <div className="!mt-2 sm:!mt-2.5 bg-white rounded-xl border border-slate-200 py-2.5 px-3.5 sm:px-4 sm:py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 shadow-xs">
           <div>
-            <h2 className="text-sm font-bold text-slate-900">
+            <h2 className="text-sm font-bold text-slate-900 leading-snug">
               Sign in for the best Yaans.lk experience
             </h2>
-            <p className="text-xs text-slate-600">
+            <p className="text-xs text-slate-600 mt-0.5">
               Track multi-seller orders, save your Sri Lankan delivery address, or shop immediately with Guest Cash on Delivery.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
             <Link
               to="/login"
-              className="px-5 py-2 rounded-full bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs text-center shadow-sm"
+              className="px-5 py-1.5 rounded-full bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs text-center shadow-xs"
             >
               Sign in securely
             </Link>
@@ -193,13 +193,13 @@ export default function HomePage() {
       )}
 
       {/* 2x2 Category Quad Cards (Mobile-First Reference Layout) */}
-      <section aria-label="Shop by Category">
-        <div className="flex items-center justify-between mb-3">
+      <section aria-label="Shop by Category" className="!mt-2 sm:!mt-2.5">
+        <div className="flex items-center justify-between mb-1 sm:mb-1.5">
           <div>
-            <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
+            <h2 className="text-base sm:text-lg font-extrabold text-slate-900 leading-tight">
               Explore Categories
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 mt-0.5">
               Tap any department or subcategory tile to filter products
             </p>
           </div>

@@ -111,6 +111,102 @@ router.put('/products/:productId/moderation', (req, res) => {
   });
 });
 
+// PUT /api/admin/products/:productId (Full Admin Product Edit Override)
+router.put('/products/:productId', (req, res) => {
+  const { productId } = req.params;
+  const store = getStore();
+
+  const product = store.products.find((p) => p._id === productId);
+  if (!product) {
+    return res.status(404).json({ message: 'Product not found.' });
+  }
+
+  const {
+    title,
+    sku,
+    categorySlug,
+    subCategorySlug,
+    description,
+    highlights,
+    priceLkr,
+    compareAtPriceLkr,
+    stock,
+    images,
+    isHomemade,
+    isFeatured,
+    isDeal,
+    codEligible,
+    approvalStatus,
+    adminNote,
+    tags
+  } = req.body;
+
+  if (title !== undefined) product.title = title.trim();
+  if (sku !== undefined) product.sku = sku.trim();
+  if (categorySlug !== undefined) product.categorySlug = categorySlug;
+  if (subCategorySlug !== undefined) product.subCategorySlug = subCategorySlug;
+  if (description !== undefined) product.description = description.trim();
+  if (highlights !== undefined) {
+    product.highlights = Array.isArray(highlights)
+      ? highlights
+      : String(highlights)
+          .split('\n')
+          .map((s) => s.trim())
+          .filter(Boolean);
+  }
+  if (priceLkr !== undefined) product.priceLkr = Math.max(0, Number(priceLkr));
+  if (compareAtPriceLkr !== undefined) {
+    product.compareAtPriceLkr =
+      compareAtPriceLkr === '' || compareAtPriceLkr === null ? null : Number(compareAtPriceLkr);
+  }
+  if (stock !== undefined) product.stock = Math.max(0, Number(stock));
+  if (images !== undefined && Array.isArray(images) && images.length > 0) {
+    product.images = images;
+  }
+  if (isHomemade !== undefined) product.isHomemade = Boolean(isHomemade);
+  if (isFeatured !== undefined) product.isFeatured = Boolean(isFeatured);
+  if (isDeal !== undefined) product.isDeal = Boolean(isDeal);
+  if (codEligible !== undefined) product.codEligible = Boolean(codEligible);
+  if (approvalStatus !== undefined) product.approvalStatus = approvalStatus;
+  if (adminNote !== undefined) product.adminNote = adminNote.trim();
+  if (tags !== undefined) {
+    product.tags = Array.isArray(tags)
+      ? tags
+      : String(tags)
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean);
+  }
+
+  // Audit trail
+  product.lastEditedBy = 'admin';
+  product.lastEditedAt = new Date().toISOString();
+
+  persistStore();
+  return res.json({
+    product,
+    message: `Product "${product.title}" updated by Marketplace Admin.`
+  });
+});
+
+// DELETE /api/admin/products/:productId (Admin Delist/Delete Product)
+router.delete('/products/:productId', (req, res) => {
+  const { productId } = req.params;
+  const store = getStore();
+
+  const idx = store.products.findIndex((p) => p._id === productId);
+  if (idx === -1) {
+    return res.status(404).json({ message: 'Product not found.' });
+  }
+
+  const removed = store.products.splice(idx, 1)[0];
+  persistStore();
+  return res.json({
+    message: `Product "${removed.title}" removed from Yaans.lk marketplace by Admin.`,
+    productId
+  });
+});
+
 // PUT /api/admin/config/districts
 router.put('/config/districts', (req, res) => {
   const { districts } = req.body;

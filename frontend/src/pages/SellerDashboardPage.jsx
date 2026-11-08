@@ -708,6 +708,12 @@ export default function SellerDashboardPage() {
                           {prod.approvalStatus}
                         </span>
                       </div>
+                      {prod.lastEditedBy === 'admin' && (
+                        <div className="mt-1 text-[11px] text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded inline-flex flex-wrap items-center gap-1">
+                          <span className="font-bold">Reviewed & Updated by Marketplace Admin</span>
+                          {prod.adminNote && <span className="font-normal italic">• Note: {prod.adminNote}</span>}
+                        </div>
+                      )}
                     </div>
                   </div>
 

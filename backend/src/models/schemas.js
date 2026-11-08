@@ -144,7 +144,10 @@ const ProductSchema = new Schema(
     rating: { type: Number, default: 4.7 },
     reviewCount: { type: Number, default: 0 },
     soldCount: { type: Number, default: 0 },
-    tags: [{ type: String }]
+    tags: [{ type: String }],
+    adminNote: { type: String, default: '' },
+    lastEditedBy: { type: String, default: null },
+    lastEditedAt: { type: String, default: null }
   },
   { timestamps: true }
 );

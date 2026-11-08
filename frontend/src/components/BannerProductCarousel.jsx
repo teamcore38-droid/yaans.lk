@@ -144,26 +144,26 @@ export default function BannerProductCarousel({
     >
       {/* Top micro-bar: Header label & Auto-play status pill */}
       <div className="flex items-center justify-between pb-2 px-1 text-xs">
-        <div className="flex items-center gap-1.5 text-slate-700 font-bold">
-          <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
-          <span className="text-[11px] uppercase tracking-wider text-slate-600">Featured Categories</span>
+        <div className="flex items-center gap-1.5 font-bold">
+          <span className="text-amber-500 font-black text-sm">#</span>
+          <span className="text-[11px] uppercase tracking-wider text-[#3e2230] font-extrabold">Featured Categories</span>
         </div>
         <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => setPauseState(!paused)}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/80 hover:bg-white text-[10px] font-semibold text-slate-600 border border-slate-200 shadow-2xs transition"
+            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/90 hover:bg-white text-[10px] font-semibold text-[#72495c] border border-[#eed6df] shadow-2xs transition"
             title={paused ? 'Resume auto-scroll' : 'Pause auto-scroll'}
           >
             {paused ? (
               <>
-                <Play className="w-2.5 h-2.5 fill-slate-600 text-slate-600" />
+                <Play className="w-2.5 h-2.5 fill-[#72495c] text-[#72495c]" />
                 <span>Paused</span>
               </>
             ) : (
               <>
-                <Pause className="w-2.5 h-2.5 fill-emerald-600 text-emerald-600" />
-                <span className="text-emerald-700">Auto-scrolling</span>
+                <Pause className="w-2.5 h-2.5 fill-[#72495c] text-[#72495c]" />
+                <span className="text-[#72495c]">Auto scrolling</span>
               </>
             )}
           </button>
@@ -221,7 +221,7 @@ export default function BannerProductCarousel({
           type="button"
           aria-label="Previous card"
           onClick={handlePrev}
-          className="absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 hover:bg-white text-slate-800 shadow-md border border-slate-200/80 flex items-center justify-center transition-all opacity-85 hover:opacity-100 hover:scale-105 active:scale-95 z-10"
+          className="absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/95 hover:bg-white text-[#482c39] shadow-md border border-[#eed6df] flex items-center justify-center transition-all opacity-85 hover:opacity-100 hover:scale-105 active:scale-95 z-10"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -230,7 +230,7 @@ export default function BannerProductCarousel({
           type="button"
           aria-label="Next card"
           onClick={handleNext}
-          className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 hover:bg-white text-slate-800 shadow-md border border-slate-200/80 flex items-center justify-center transition-all opacity-85 hover:opacity-100 hover:scale-105 active:scale-95 z-10"
+          className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/95 hover:bg-white text-[#482c39] shadow-md border border-[#eed6df] flex items-center justify-center transition-all opacity-85 hover:opacity-100 hover:scale-105 active:scale-95 z-10"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -246,8 +246,8 @@ export default function BannerProductCarousel({
             aria-label={`Go to ${card.category}`}
             className={`h-1.5 transition-all duration-300 rounded-full ${
               idx === currentIdx
-                ? 'w-6 bg-slate-900'
-                : 'w-2 bg-slate-300 hover:bg-slate-400'
+                ? 'w-6 bg-[#72495c]'
+                : 'w-2 bg-[#e6cdd7] hover:bg-[#d4b3c0]'
             }`}
           />
         ))}

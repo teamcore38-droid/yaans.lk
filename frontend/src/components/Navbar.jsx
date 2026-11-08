@@ -64,28 +64,28 @@ export default function Navbar() {
   return (
     <>
       {/* Top Utility Bar: Practical Sri Lankan Marketplace Info & Quick Role Access */}
-      <div className="bg-slate-900 text-slate-200 text-xs border-b border-slate-800">
+      <div className="bg-[#482c39] text-[#eddfe6] text-xs border-b border-[#3a212d]">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 h-8 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 overflow-x-auto no-scrollbar whitespace-nowrap">
             <span className="inline-flex items-center gap-1 font-medium text-white">
               <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
               Islandwide Delivery (25 Districts)
             </span>
-            <span className="text-slate-500 hidden sm:inline">|</span>
-            <span className="hidden sm:inline text-slate-300">
+            <span className="text-[#6d4659] hidden sm:inline">|</span>
+            <span className="hidden sm:inline text-[#e6d0db]">
               Cash on Delivery (COD) Available • Prices in LKR (Rs.)
             </span>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 whitespace-nowrap">
             {/* Quick Role Switcher for Instant Demo Testing */}
-            <div className="hidden md:flex items-center gap-1.5 bg-slate-800/90 px-2 py-0.5 rounded border border-slate-700">
-              <span className="text-[11px] text-slate-400">Quick Demo:</span>
+            <div className="hidden md:flex items-center gap-1.5 bg-[#38202c]/90 px-2 py-0.5 rounded border border-[#583346]">
+              <span className="text-[11px] text-[#caa8b8]">Quick Demo:</span>
               <button
                 type="button"
                 disabled={quickDemoLoading}
                 onClick={() => handleQuickDemoSwitch('kasun@gmail.com', 'Customer@123', '/')}
-                className="text-[11px] px-1.5 py-0.5 rounded hover:bg-slate-700 text-slate-200 font-medium"
+                className="text-[11px] px-1.5 py-0.5 rounded hover:bg-[#4d2c3e] text-[#eddfe6] font-medium"
               >
                 Customer
               </button>
@@ -93,7 +93,7 @@ export default function Navbar() {
                 type="button"
                 disabled={quickDemoLoading}
                 onClick={() => handleQuickDemoSwitch('kumari@kandykitchen.lk', 'Seller@123', '/seller/dashboard')}
-                className="text-[11px] px-1.5 py-0.5 rounded hover:bg-slate-700 text-amber-300 font-medium"
+                className="text-[11px] px-1.5 py-0.5 rounded hover:bg-[#4d2c3e] text-amber-300 font-medium"
               >
                 Seller (Kandy)
               </button>
@@ -101,17 +101,17 @@ export default function Navbar() {
                 type="button"
                 disabled={quickDemoLoading}
                 onClick={() => handleQuickDemoSwitch('admin@yaans.lk', 'Admin@123', '/admin')}
-                className="text-[11px] px-1.5 py-0.5 rounded hover:bg-slate-700 text-sky-300 font-medium"
+                className="text-[11px] px-1.5 py-0.5 rounded hover:bg-[#4d2c3e] text-sky-300 font-medium"
               >
                 Admin
               </button>
             </div>
 
-            <Link to="/track-order" className="hover:text-white transition-colors font-medium">
+            <Link to="/track-order" className="text-[#eddfe6] hover:text-white transition-colors font-medium">
               Track Order
             </Link>
-            <span className="text-slate-600">|</span>
-            <Link to="/seller/register" className="hover:text-amber-300 text-amber-200 font-medium">
+            <span className="text-[#6d4659]">|</span>
+            <Link to="/seller/register" className="hover:text-amber-200 text-amber-300 font-medium">
               Sell on Yaans.lk
             </Link>
           </div>
@@ -298,46 +298,46 @@ export default function Navbar() {
         </div>
 
         {/* Sub-Header Quick Navigation Links + Mobile Location Bar */}
-        <div className="bg-slate-50 border-t border-slate-200">
-          <div className="max-w-7xl mx-auto px-3 sm:px-6 flex items-center justify-between gap-3 py-1.5 overflow-x-auto no-scrollbar text-xs font-medium text-slate-700 whitespace-nowrap">
+        <div className="bg-[#72495c] border-t border-[#603b4d] border-b border-[#603b4d]">
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 flex items-center justify-between gap-3 py-1.5 overflow-x-auto no-scrollbar text-xs font-medium text-[#fff0f5] whitespace-nowrap">
             <div className="flex items-center gap-4">
               <button
                 type="button"
                 onClick={() => setDistrictModalOpen(true)}
-                className="inline-flex lg:hidden items-center gap-1 text-slate-900 font-semibold bg-white px-2 py-1 rounded border border-slate-200"
+                className="inline-flex lg:hidden items-center gap-1 text-white font-semibold bg-[#5c3748] px-2 py-1 rounded border border-[#85586d]"
               >
-                <MapPin className="w-3.5 h-3.5 text-slate-700" />
+                <MapPin className="w-3.5 h-3.5 text-white" />
                 Deliver to {selectedDistrict} ▾
               </button>
 
-              <Link to="/products" className="hover:text-slate-950 font-semibold flex items-center gap-1">
+              <Link to="/products" className="hover:text-white font-semibold flex items-center gap-1 bg-[#5c3748] hover:bg-[#502e3e] text-white px-2.5 py-1 rounded-md transition-colors">
                 All Products
               </Link>
               <Link
                 to="/products?homemade=true"
-                className="hover:text-slate-950 font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200"
+                className="hover:text-white font-semibold text-[#fff0f5] hover:bg-[#85586d]/40 px-2 py-0.5 rounded transition-colors"
               >
                 Homemade Sri Lanka
               </Link>
               <Link
                 to="/products?deals=true"
-                className="hover:text-slate-950 font-semibold text-amber-900 bg-amber-50 px-2 py-0.5 rounded border border-amber-200"
+                className="hover:bg-amber-400 font-bold text-slate-950 bg-amber-300 px-3 py-1 rounded-full shadow-xs transition-colors"
               >
                 Today&apos;s Deals
               </Link>
-              <Link to="/products?category=homemade-pantry" className="hover:text-slate-950">
+              <Link to="/products?category=homemade-pantry" className="text-[#fce7f0] hover:text-white transition-colors">
                 Spices & Pantry
               </Link>
-              <Link to="/products?category=electronics" className="hover:text-slate-950">
+              <Link to="/products?category=electronics" className="text-[#fce7f0] hover:text-white transition-colors">
                 Electronics
               </Link>
-              <Link to="/products?category=home-kitchen" className="hover:text-slate-950">
-                Home & Clayware
+              <Link to="/products?category=home-kitchen" className="text-[#fce7f0] hover:text-white transition-colors">
+                Home & Kitchen
               </Link>
-              <Link to="/products?category=fashion-handloom" className="hover:text-slate-950">
+              <Link to="/products?category=fashion-handloom" className="text-[#fce7f0] hover:text-white transition-colors">
                 Fashion & Handloom
               </Link>
-              <Link to="/products?category=ayurveda-beauty" className="hover:text-slate-950">
+              <Link to="/products?category=ayurveda-beauty" className="text-[#fce7f0] hover:text-white transition-colors">
                 Ayurveda & Beauty
               </Link>
             </div>

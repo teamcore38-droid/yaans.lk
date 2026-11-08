@@ -66,18 +66,18 @@ export default function HomePage() {
     <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 space-y-6">
       {/* Top Practical Hero Banner */}
       {activeBanner && (
-        <div className="relative bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="relative bg-white rounded-xl border border-[#edd7df] overflow-hidden shadow-xs">
           <div className="grid grid-cols-1 lg:grid-cols-12 items-center">
             {/* Left Column: Marketplace highlights & Action CTAs */}
-            <div className="p-5 sm:p-7 lg:col-span-6 xl:col-span-6 space-y-3">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-slate-800 text-[11px] font-bold tracking-wide uppercase">
-                <Truck className="w-3.5 h-3.5 text-slate-700" />
+            <div className="p-5 sm:p-7 lg:col-span-6 xl:col-span-6 space-y-3 bg-[#fff1f3]/60">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#fde8ec] border border-[#faccd6] text-[#72495c] text-[11px] font-bold tracking-wide uppercase">
+                <Truck className="w-3.5 h-3.5 text-[#72495c]" />
                 {activeBanner.badge}
               </div>
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-900 leading-tight">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-[#2b1b25] leading-tight">
                 {activeBanner.title}
               </h1>
-              <p className="text-xs sm:text-sm text-slate-600 max-w-xl leading-relaxed">
+              <p className="text-xs sm:text-sm text-[#664b58] max-w-xl leading-relaxed">
                 {activeBanner.subtitle}
               </p>
               <div className="pt-1 flex flex-wrap items-center gap-2.5">
@@ -90,15 +90,15 @@ export default function HomePage() {
                 </Link>
                 <Link
                   to="/products?homemade=true"
-                  className="px-4 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs sm:text-sm transition"
+                  className="px-4 py-2.5 rounded-lg bg-white hover:bg-[#fff0f3] text-[#72495c] border border-[#faccd6] font-semibold text-xs sm:text-sm transition shadow-2xs"
                 >
                   Browse Homemade SL
                 </Link>
               </div>
             </div>
 
-            {/* Right Column: Auto-scrollable Product Cards Designed Like Image 2 */}
-            <div className="lg:col-span-6 xl:col-span-6 bg-slate-50/70 p-3 sm:p-4 border-t lg:border-t-0 lg:border-l border-slate-200/80 overflow-hidden">
+            {/* Right Column: Auto-scrollable Product Cards Designed Like Reference Image */}
+            <div className="lg:col-span-6 xl:col-span-6 bg-[#fff7f9] p-3 sm:p-4 border-t lg:border-t-0 lg:border-l border-[#f0dce3] overflow-hidden">
               <BannerProductCarousel
                 activeCardIndex={activeCardIndex}
                 onCardChange={setActiveCardIndex}
@@ -109,13 +109,13 @@ export default function HomePage() {
           </div>
 
           {/* Bottom Bar with District Status and Interactive Product Card Controls */}
-          <div className="px-4 sm:px-6 py-2.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+          <div className="px-4 sm:px-6 py-2.5 bg-[#fdf6f7] border-t border-[#f0dce3] flex flex-wrap items-center justify-between gap-2 text-xs text-[#6b4d5a]">
             <span>
-              Delivering to <strong className="text-slate-900">{selectedDistrict} District</strong> • Cash on Delivery Enabled
+              Delivering to <strong className="text-[#2b1b25]">{selectedDistrict} District</strong> • Cash on Delivery Enabled
             </span>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-slate-500 hidden sm:inline">
-                Viewing: <strong className="text-slate-800">{BANNER_CAROUSEL_CARDS[activeCardIndex]?.category}</strong>
+              <span className="text-[11px] text-[#72495c] hidden sm:inline">
+                Viewing: <strong className="text-[#3e2230]">{BANNER_CAROUSEL_CARDS[activeCardIndex]?.category}</strong>
               </span>
               <div className="flex items-center gap-1.5">
                 <button
@@ -126,12 +126,12 @@ export default function HomePage() {
                       (prev) => (prev - 1 + BANNER_CAROUSEL_CARDS.length) % BANNER_CAROUSEL_CARDS.length
                     )
                   }
-                  className="p-1 rounded bg-white border border-slate-200 hover:bg-slate-100 transition shadow-2xs"
+                  className="p-1 rounded bg-white border border-[#eed6df] hover:bg-[#fff0f3] text-[#482c39] transition shadow-2xs"
                   title="Previous product card"
                 >
-                  <ChevronLeft className="w-4 h-4 text-slate-700" />
+                  <ChevronLeft className="w-4 h-4" />
                 </button>
-                <span className="text-[11px] font-bold text-slate-800 px-1 min-w-[34px] text-center">
+                <span className="text-[11px] font-bold text-[#2b1b25] px-1 min-w-[34px] text-center">
                   {activeCardIndex + 1} / {BANNER_CAROUSEL_CARDS.length}
                 </span>
                 <button
@@ -140,10 +140,10 @@ export default function HomePage() {
                   onClick={() =>
                     setActiveCardIndex((prev) => (prev + 1) % BANNER_CAROUSEL_CARDS.length)
                   }
-                  className="p-1 rounded bg-white border border-slate-200 hover:bg-slate-100 transition shadow-2xs"
+                  className="p-1 rounded bg-white border border-[#eed6df] hover:bg-[#fff0f3] text-[#482c39] transition shadow-2xs"
                   title="Next product card"
                 >
-                  <ChevronRight className="w-4 h-4 text-slate-700" />
+                  <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
             </div>

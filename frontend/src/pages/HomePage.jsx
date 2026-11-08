@@ -15,12 +15,15 @@ import { apiRequest } from '../utils/api.js';
 import { useMarketplace } from '../context/MarketplaceContext.jsx';
 import CategoryQuadCard from '../components/CategoryQuadCard.jsx';
 import ProductCard from '../components/ProductCard.jsx';
+import BannerProductCarousel, { BANNER_CAROUSEL_CARDS } from '../components/BannerProductCarousel.jsx';
 
 export default function HomePage() {
   const { user, selectedDistrict } = useMarketplace();
   const [homeData, setHomeData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [bannerIdx, setBannerIdx] = useState(0);
+  const [activeCardIndex, setActiveCardIndex] = useState(0);
+  const [isCarouselPaused, setIsCarouselPaused] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -65,12 +68,13 @@ export default function HomePage() {
       {activeBanner && (
         <div className="relative bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
           <div className="grid grid-cols-1 lg:grid-cols-12 items-center">
-            <div className="p-5 sm:p-8 lg:col-span-7 space-y-3">
+            {/* Left Column: Marketplace highlights & Action CTAs */}
+            <div className="p-5 sm:p-7 lg:col-span-6 xl:col-span-6 space-y-3">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-slate-800 text-[11px] font-bold tracking-wide uppercase">
                 <Truck className="w-3.5 h-3.5 text-slate-700" />
                 {activeBanner.badge}
               </div>
-              <h1 className="text-xl sm:text-3xl font-extrabold text-slate-900 leading-tight">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-900 leading-tight">
                 {activeBanner.title}
               </h1>
               <p className="text-xs sm:text-sm text-slate-600 max-w-xl leading-relaxed">
@@ -93,43 +97,57 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="lg:col-span-5 h-44 sm:h-64 lg:h-72 bg-slate-100 relative overflow-hidden">
-              <img
-                src={activeBanner.imageUrl}
-                alt={activeBanner.title}
-                className="w-full h-full object-cover"
+            {/* Right Column: Auto-scrollable Product Cards Designed Like Image 2 */}
+            <div className="lg:col-span-6 xl:col-span-6 bg-slate-50/70 p-3 sm:p-4 border-t lg:border-t-0 lg:border-l border-slate-200/80 overflow-hidden">
+              <BannerProductCarousel
+                activeCardIndex={activeCardIndex}
+                onCardChange={setActiveCardIndex}
+                isPaused={isCarouselPaused}
+                setIsPaused={setIsCarouselPaused}
               />
             </div>
           </div>
 
-          {banners.length > 1 && (
-            <div className="px-5 py-2 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
-              <span>
-                Delivering to <strong className="text-slate-900">{selectedDistrict} District</strong> • Cash on Delivery Enabled
+          {/* Bottom Bar with District Status and Interactive Product Card Controls */}
+          <div className="px-4 sm:px-6 py-2.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+            <span>
+              Delivering to <strong className="text-slate-900">{selectedDistrict} District</strong> • Cash on Delivery Enabled
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-slate-500 hidden sm:inline">
+                Viewing: <strong className="text-slate-800">{BANNER_CAROUSEL_CARDS[activeCardIndex]?.category}</strong>
               </span>
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  aria-label="Previous banner"
-                  onClick={() => setBannerIdx((prev) => (prev - 1 + banners.length) % banners.length)}
-                  className="p-1 rounded bg-white border border-slate-200 hover:bg-slate-100"
+                  aria-label="Previous product card"
+                  onClick={() =>
+                    setActiveCardIndex(
+                      (prev) => (prev - 1 + BANNER_CAROUSEL_CARDS.length) % BANNER_CAROUSEL_CARDS.length
+                    )
+                  }
+                  className="p-1 rounded bg-white border border-slate-200 hover:bg-slate-100 transition shadow-2xs"
+                  title="Previous product card"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="w-4 h-4 text-slate-700" />
                 </button>
-                <span className="text-[11px] font-medium px-1">
-                  {(bannerIdx % banners.length) + 1} / {banners.length}
+                <span className="text-[11px] font-bold text-slate-800 px-1 min-w-[34px] text-center">
+                  {activeCardIndex + 1} / {BANNER_CAROUSEL_CARDS.length}
                 </span>
                 <button
                   type="button"
-                  aria-label="Next banner"
-                  onClick={() => setBannerIdx((prev) => (prev + 1) % banners.length)}
-                  className="p-1 rounded bg-white border border-slate-200 hover:bg-slate-100"
+                  aria-label="Next product card"
+                  onClick={() =>
+                    setActiveCardIndex((prev) => (prev + 1) % BANNER_CAROUSEL_CARDS.length)
+                  }
+                  className="p-1 rounded bg-white border border-slate-200 hover:bg-slate-100 transition shadow-2xs"
+                  title="Next product card"
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-4 h-4 text-slate-700" />
                 </button>
               </div>
             </div>
-          )}
+          </div>
         </div>
       )}
 

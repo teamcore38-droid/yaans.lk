@@ -14,7 +14,9 @@ import {
   Trash2,
   Edit3,
   ExternalLink,
-  AlertCircle
+  AlertCircle,
+  Sliders,
+  Layers
 } from 'lucide-react';
 import { apiRequest, formatLkr } from '../utils/api.js';
 import { useMarketplace, DEFAULT_SL_DISTRICTS } from '../context/MarketplaceContext.jsx';
@@ -37,12 +39,34 @@ export default function SellerDashboardPage() {
     compareAtPriceLkr: '',
     stock: '25',
     imageUrl: '',
-    variantName: 'Option',
-    variantLabel1: 'Standard Pack',
-    variantPrice1: '',
     isHomemade: true
   });
+  const [variantGroupName, setVariantGroupName] = useState('Set Size');
+  const [variantRows, setVariantRows] = useState([]);
   const [uploadingImage, setUploadingImage] = useState(false);
+
+  const handleAddVariantRow = () => {
+    setVariantRows((prev) => [
+      ...prev,
+      {
+        label: '',
+        priceLkr: prodForm.priceLkr || '',
+        stock: prodForm.stock || '15'
+      }
+    ]);
+  };
+
+  const handleVariantRowChange = (index, field, value) => {
+    setVariantRows((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const handleRemoveVariantRow = (index) => {
+    setVariantRows((prev) => prev.filter((_, idx) => idx !== index));
+  };
 
   // Storefront Settings Form State
   const [storeForm, setStoreForm] = useState(null);
@@ -153,6 +177,14 @@ export default function SellerDashboardPage() {
   const handleSaveProduct = async (e) => {
     e.preventDefault();
     try {
+      const validVariants = variantRows
+        .filter((v) => v.label && v.label.trim())
+        .map((v) => ({
+          label: v.label.trim(),
+          priceLkr: Number(v.priceLkr) || Number(prodForm.priceLkr) || 0,
+          stock: Math.max(0, Number(v.stock) || 0)
+        }));
+
       const payload = {
         title: prodForm.title,
         sku: prodForm.sku,
@@ -164,20 +196,15 @@ export default function SellerDashboardPage() {
         stock: Number(prodForm.stock),
         images: prodForm.imageUrl ? [prodForm.imageUrl] : undefined,
         isHomemade: prodForm.isHomemade,
-        variants: prodForm.variantLabel1
-          ? [
-              {
-                name: prodForm.variantName || 'Option',
-                values: [
-                  {
-                    label: prodForm.variantLabel1,
-                    priceLkr: Number(prodForm.variantPrice1 || prodForm.priceLkr),
-                    stock: Number(prodForm.stock)
-                  }
-                ]
-              }
-            ]
-          : []
+        variants:
+          validVariants.length > 0
+            ? [
+                {
+                  name: (variantGroupName || 'Set Size').trim(),
+                  values: validVariants
+                }
+              ]
+            : []
       };
 
       if (editingProductId) {
@@ -195,6 +222,8 @@ export default function SellerDashboardPage() {
       }
 
       setEditingProductId(null);
+      setVariantGroupName('Set Size');
+      setVariantRows([]);
       setProdForm({
         title: '',
         sku: '',
@@ -205,9 +234,6 @@ export default function SellerDashboardPage() {
         compareAtPriceLkr: '',
         stock: '25',
         imageUrl: '',
-        variantName: 'Option',
-        variantLabel1: 'Standard Pack',
-        variantPrice1: '',
         isHomemade: seller?.isHomemadeVendor ?? true
       });
       fetchDashboard();
@@ -228,11 +254,23 @@ export default function SellerDashboardPage() {
       compareAtPriceLkr: prod.compareAtPriceLkr ? String(prod.compareAtPriceLkr) : '',
       stock: String(prod.stock),
       imageUrl: prod.images?.[0] || '',
-      variantName: prod.variants?.[0]?.name || 'Option',
-      variantLabel1: prod.variants?.[0]?.values?.[0]?.label || 'Standard',
-      variantPrice1: String(prod.variants?.[0]?.values?.[0]?.priceLkr || prod.priceLkr),
       isHomemade: Boolean(prod.isHomemade)
     });
+
+    const existingVg = prod.variants?.[0];
+    setVariantGroupName(existingVg?.name || 'Set Size');
+    if (existingVg?.values?.length > 0) {
+      setVariantRows(
+        existingVg.values.map((v) => ({
+          label: v.label || '',
+          priceLkr: v.priceLkr !== undefined ? String(v.priceLkr) : '',
+          stock: v.stock !== undefined ? String(v.stock) : '15'
+        }))
+      );
+    } else {
+      setVariantRows([]);
+    }
+
     setActiveTab('products');
   };
 
@@ -622,6 +660,115 @@ export default function SellerDashboardPage() {
               </div>
             </div>
 
+            {/* Dynamic Product Sets & Variant Offers Builder */}
+            <div className="p-3.5 rounded-xl bg-amber-50/40 border border-amber-200/80 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                    <Sliders className="w-3.5 h-3.5 text-amber-600" />
+                    Product Sets, Combo Offers & Variants (Optional)
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    Add clickable sets or options for customers (e.g. 3-Pot Set vs 5-Pot Set, or 250g vs 500g).
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddVariantRow}
+                  className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs inline-flex items-center gap-1 shadow-xs"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Set / Offer
+                </button>
+              </div>
+
+              {/* Option Group Name & Quick Presets */}
+              <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                <span className="font-semibold text-slate-700">Option Type:</span>
+                <input
+                  type="text"
+                  value={variantGroupName}
+                  onChange={(e) => setVariantGroupName(e.target.value)}
+                  placeholder="e.g. Set Size, Pack Option, Weight"
+                  className="px-2.5 py-1 rounded border border-slate-300 bg-white font-semibold text-slate-800 w-36"
+                />
+                <div className="flex flex-wrap items-center gap-1 text-[11px] text-slate-500">
+                  <span>Presets:</span>
+                  {['Set Size', 'Pack Option', 'Weight', 'Bottle Size'].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setVariantGroupName(preset)}
+                      className="px-1.5 py-0.5 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-medium"
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Variant Rows Table / List */}
+              {variantRows.length > 0 ? (
+                <div className="space-y-2 pt-1">
+                  <div className="grid grid-cols-12 gap-2 text-[10px] font-bold text-slate-500 uppercase px-1">
+                    <div className="col-span-6">Offer / Set Label</div>
+                    <div className="col-span-3">Price (Rs.)</div>
+                    <div className="col-span-2">Stock</div>
+                    <div className="col-span-1 text-right">Del</div>
+                  </div>
+
+                  {variantRows.map((row, idx) => (
+                    <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                      <div className="col-span-6">
+                        <input
+                          type="text"
+                          required
+                          value={row.label}
+                          onChange={(e) => handleVariantRowChange(idx, 'label', e.target.value)}
+                          placeholder="e.g. 3-Pot Set + 2 Katu Handi"
+                          className="w-full px-2 py-1.5 rounded border border-slate-300 text-xs font-semibold"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <input
+                          type="number"
+                          min="0"
+                          required
+                          value={row.priceLkr}
+                          onChange={(e) => handleVariantRowChange(idx, 'priceLkr', e.target.value)}
+                          placeholder="3250"
+                          className="w-full px-2 py-1.5 rounded border border-slate-300 text-xs font-bold text-slate-900"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="number"
+                          min="0"
+                          value={row.stock}
+                          onChange={(e) => handleVariantRowChange(idx, 'stock', e.target.value)}
+                          placeholder="20"
+                          className="w-full px-2 py-1.5 rounded border border-slate-300 text-xs"
+                        />
+                      </div>
+                      <div className="col-span-1 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveVariantRow(idx)}
+                          className="p-1 rounded text-red-500 hover:text-red-700 hover:bg-red-50 transition"
+                          title="Remove this set option"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 mx-auto" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-[11px] text-slate-500 italic bg-white p-2.5 rounded-lg border border-dashed border-slate-300 text-center">
+                  No sets or offers added. Sells at base price above. Click <strong>&quot;+ Add Set / Offer&quot;</strong> to create multi-item bundles or sets (e.g., 3-Pot vs 5-Pot).
+                </div>
+              )}
+            </div>
+
             {/* Cloudinary Image Upload */}
             <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
               <div className="flex items-center justify-between">
@@ -707,6 +854,11 @@ export default function SellerDashboardPage() {
                         >
                           {prod.approvalStatus}
                         </span>
+                        {prod.variants?.[0]?.values?.length > 1 && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">
+                            {prod.variants[0].values.length} Sets / Offers
+                          </span>
+                        )}
                       </div>
                       {prod.lastEditedBy === 'admin' && (
                         <div className="mt-1 text-[11px] text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded inline-flex flex-wrap items-center gap-1">

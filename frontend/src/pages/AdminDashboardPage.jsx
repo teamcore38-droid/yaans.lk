@@ -15,7 +15,8 @@ import {
   X,
   Upload,
   AlertTriangle,
-  Check
+  Check,
+  Plus
 } from 'lucide-react';
 import { apiRequest, formatLkr } from '../utils/api.js';
 import { useMarketplace } from '../context/MarketplaceContext.jsx';
@@ -64,6 +65,31 @@ export default function AdminDashboardPage() {
     adminNote: '',
     tags: ''
   });
+  const [adminVariantGroupName, setAdminVariantGroupName] = useState('Set Size');
+  const [adminVariantRows, setAdminVariantRows] = useState([]);
+
+  const handleAddAdminVariantRow = () => {
+    setAdminVariantRows((prev) => [
+      ...prev,
+      {
+        label: '',
+        priceLkr: adminProdForm.priceLkr || '',
+        stock: adminProdForm.stock || '15'
+      }
+    ]);
+  };
+
+  const handleAdminVariantRowChange = (index, field, value) => {
+    setAdminVariantRows((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const handleRemoveAdminVariantRow = (index) => {
+    setAdminVariantRows((prev) => prev.filter((_, idx) => idx !== index));
+  };
 
   const fetchOverview = useCallback(async () => {
     try {
@@ -180,6 +206,20 @@ export default function AdminDashboardPage() {
       adminNote: prod.adminNote || '',
       tags: Array.isArray(prod.tags) ? prod.tags.join(', ') : ''
     });
+
+    const existingVg = prod.variants?.[0];
+    setAdminVariantGroupName(existingVg?.name || 'Set Size');
+    if (existingVg?.values?.length > 0) {
+      setAdminVariantRows(
+        existingVg.values.map((v) => ({
+          label: v.label || '',
+          priceLkr: v.priceLkr !== undefined ? String(v.priceLkr) : '',
+          stock: v.stock !== undefined ? String(v.stock) : '15'
+        }))
+      );
+    } else {
+      setAdminVariantRows([]);
+    }
   };
 
   const closeEditProductModal = () => {
@@ -212,6 +252,14 @@ export default function AdminDashboardPage() {
 
     try {
       setSavingProduct(true);
+      const validVariants = adminVariantRows
+        .filter((v) => v.label && v.label.trim())
+        .map((v) => ({
+          label: v.label.trim(),
+          priceLkr: Number(v.priceLkr) || Number(adminProdForm.priceLkr) || 0,
+          stock: Math.max(0, Number(v.stock) || 0)
+        }));
+
       const payload = {
         title: adminProdForm.title,
         sku: adminProdForm.sku,
@@ -223,6 +271,15 @@ export default function AdminDashboardPage() {
         compareAtPriceLkr: adminProdForm.compareAtPriceLkr ? Number(adminProdForm.compareAtPriceLkr) : null,
         stock: Number(adminProdForm.stock),
         images: adminProdForm.imageUrl ? [adminProdForm.imageUrl] : editingProduct.images,
+        variants:
+          validVariants.length > 0
+            ? [
+                {
+                  name: (adminVariantGroupName || 'Set Size').trim(),
+                  values: validVariants
+                }
+              ]
+            : [],
         isHomemade: adminProdForm.isHomemade,
         isFeatured: adminProdForm.isFeatured,
         isDeal: adminProdForm.isDeal,
@@ -553,8 +610,15 @@ export default function AdminDashboardPage() {
                           />
                           <div>
                             <div className="font-bold text-slate-900 line-clamp-1">{p.title}</div>
-                            <div className="text-slate-500">
-                              SKU: {p.sku} • Stock: {p.stock} • Cat: {p.categorySlug}
+                            <div className="text-slate-500 flex items-center gap-1.5 flex-wrap">
+                              <span>SKU: {p.sku}</span>
+                              <span>• Stock: {p.stock}</span>
+                              <span>• Cat: {p.categorySlug}</span>
+                              {p.variants?.[0]?.values?.length > 1 && (
+                                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-sky-100 text-sky-800">
+                                  {p.variants[0].values.length} Sets / Offers
+                                </span>
+                              )}
                             </div>
                             {p.lastEditedBy === 'admin' && (
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-purple-100 text-purple-800 font-bold mt-0.5">
@@ -1161,6 +1225,115 @@ export default function AdminDashboardPage() {
                     className="w-full px-3 py-2 rounded-lg border border-slate-300"
                   />
                 </div>
+              </div>
+
+              {/* Product Sets & Variant Offers Builder */}
+              <div className="p-3.5 rounded-xl bg-amber-50/40 border border-amber-200/80 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                      <Sliders className="w-3.5 h-3.5 text-amber-600" />
+                      Product Sets, Combo Offers & Variants (Optional)
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      Configure set options for this listing (e.g. 3-Pot Set vs 5-Pot Set, or 250g vs 500g).
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddAdminVariantRow}
+                    className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs inline-flex items-center gap-1 shadow-xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Set / Offer
+                  </button>
+                </div>
+
+                {/* Option Group Name & Quick Presets */}
+                <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                  <span className="font-semibold text-slate-700">Option Type:</span>
+                  <input
+                    type="text"
+                    value={adminVariantGroupName}
+                    onChange={(e) => setAdminVariantGroupName(e.target.value)}
+                    placeholder="e.g. Set Size, Pack Option, Weight"
+                    className="px-2.5 py-1 rounded border border-slate-300 bg-white font-semibold text-slate-800 w-36"
+                  />
+                  <div className="flex flex-wrap items-center gap-1 text-[11px] text-slate-500">
+                    <span>Presets:</span>
+                    {['Set Size', 'Pack Option', 'Weight', 'Bottle Size'].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setAdminVariantGroupName(preset)}
+                        className="px-1.5 py-0.5 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-medium"
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Variant Rows Table / List */}
+                {adminVariantRows.length > 0 ? (
+                  <div className="space-y-2 pt-1">
+                    <div className="grid grid-cols-12 gap-2 text-[10px] font-bold text-slate-500 uppercase px-1">
+                      <div className="col-span-6">Offer / Set Label</div>
+                      <div className="col-span-3">Price (Rs.)</div>
+                      <div className="col-span-2">Stock</div>
+                      <div className="col-span-1 text-right">Del</div>
+                    </div>
+
+                    {adminVariantRows.map((row, idx) => (
+                      <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                        <div className="col-span-6">
+                          <input
+                            type="text"
+                            required
+                            value={row.label}
+                            onChange={(e) => handleAdminVariantRowChange(idx, 'label', e.target.value)}
+                            placeholder="e.g. 3-Pot Set + 2 Katu Handi"
+                            className="w-full px-2 py-1.5 rounded border border-slate-300 text-xs font-semibold"
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <input
+                            type="number"
+                            min="0"
+                            required
+                            value={row.priceLkr}
+                            onChange={(e) => handleAdminVariantRowChange(idx, 'priceLkr', e.target.value)}
+                            placeholder="3250"
+                            className="w-full px-2 py-1.5 rounded border border-slate-300 text-xs font-bold text-slate-900"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <input
+                            type="number"
+                            min="0"
+                            value={row.stock}
+                            onChange={(e) => handleAdminVariantRowChange(idx, 'stock', e.target.value)}
+                            placeholder="20"
+                            className="w-full px-2 py-1.5 rounded border border-slate-300 text-xs"
+                          />
+                        </div>
+                        <div className="col-span-1 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAdminVariantRow(idx)}
+                            className="p-1 rounded text-red-500 hover:text-red-700 hover:bg-red-50 transition"
+                            title="Remove this set option"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 mx-auto" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-slate-500 italic bg-white p-2.5 rounded-lg border border-dashed border-slate-300 text-center">
+                    No set options defined. Sells at base price above. Click <strong>&quot;+ Add Set / Offer&quot;</strong> to configure set tiers (e.g. 3-Pot vs 5-Pot).
+                  </div>
+                )}
               </div>
 
               {/* Product Image & Upload */}

@@ -132,6 +132,7 @@ router.put('/products/:productId', (req, res) => {
     compareAtPriceLkr,
     stock,
     images,
+    variants,
     isHomemade,
     isFeatured,
     isDeal,
@@ -162,6 +163,9 @@ router.put('/products/:productId', (req, res) => {
   if (stock !== undefined) product.stock = Math.max(0, Number(stock));
   if (images !== undefined && Array.isArray(images) && images.length > 0) {
     product.images = images;
+  }
+  if (variants !== undefined && Array.isArray(variants)) {
+    product.variants = variants;
   }
   if (isHomemade !== undefined) product.isHomemade = Boolean(isHomemade);
   if (isFeatured !== undefined) product.isFeatured = Boolean(isFeatured);

@@ -1,116 +1,143 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Initialize Cloudinary SDK
+function initCloudinary() {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+  const cloudinaryUrl = process.env.CLOUDINARY_URL;
 
-const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
-const UPLOADS_DIR = IS_SERVERLESS
-  ? path.join(os.tmpdir(), 'yaans_lk_uploads')
-  : path.resolve(__dirname, '../../uploads');
-
-try {
-  if (!fs.existsSync(UPLOADS_DIR)) {
-    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  if (cloudinaryUrl) {
+    cloudinary.config({ cloudinary_url: cloudinaryUrl });
+    return true;
   }
-} catch (_err) {
-  // Ignore on read-only containers
+
+  if (cloudName && apiKey && apiSecret) {
+    cloudinary.config({
+      cloud_name: cloudName.trim(),
+      api_key: apiKey.trim(),
+      api_secret: apiSecret.trim(),
+      secure: true
+    });
+    return true;
+  }
+
+  return false;
 }
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    try {
-      if (!fs.existsSync(UPLOADS_DIR)) {
-        fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-      }
-    } catch (_e) {
-      // ignore
-    }
-    cb(null, UPLOADS_DIR);
-  },
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg';
-    const safeName = `ylk_${Date.now()}_${Math.random().toString(36).substring(2, 7)}${ext}`;
-    cb(null, safeName);
-  }
-});
-
+// Multer memory storage: direct stream to Cloudinary without writing to disk (ideal for Vercel Serverless)
 export const uploadMiddleware = multer({
-  storage,
-  limits: { fileSize: 4 * 1024 * 1024 }, // 4MB max (Vercel serverless body limit safe)
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
   fileFilter: (_req, file, cb) => {
-    if (/^image\/(jpeg|png|webp|gif|jpg)$/.test(file.mimetype)) {
+    if (/^image\/(jpeg|png|webp|gif|jpg|avif)$/i.test(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Only JPG, PNG, and WebP product images are allowed.'));
+      cb(new Error('Only JPG, PNG, WebP, AVIF, and GIF images are allowed.'));
     }
   }
 });
 
 /**
- * Uploads image to Cloudinary with automatic optimization (`f_auto,q_auto`) when credentials are set,
- * or converts to a persistent Data URI on serverless / local `/uploads` in development.
+ * Uploads an image buffer or file stream to Cloudinary with professional production settings:
+ * - Organized folder: yaans_lk/products, yaans_lk/sellers, yaans_lk/banners
+ * - Automatic WebP/AVIF format conversion (f_auto)
+ * - Intelligent visual quality compression (q_auto:good)
+ * - Max dimension bound (1200x1200px limit)
+ * - EXIF profile strip for faster mobile loading
  */
-export async function uploadProductImage(filePath, req) {
-  const hasCloudinary =
-    Boolean(process.env.CLOUDINARY_CLOUD_NAME) &&
-    Boolean(process.env.CLOUDINARY_API_KEY) &&
-    Boolean(process.env.CLOUDINARY_API_SECRET);
+export async function uploadToCloudinary(fileBuffer, options = {}) {
+  const isConfigured = initCloudinary();
+  const folder = options.folder || process.env.CLOUDINARY_FOLDER || 'yaans_lk/products';
+  const customPublicId = options.publicId || `ylk_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
-  if (hasCloudinary) {
-    cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key: process.env.CLOUDINARY_API_KEY,
-      api_secret: process.env.CLOUDINARY_API_SECRET
+  if (isConfigured) {
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder,
+          public_id: customPublicId,
+          resource_type: 'image',
+          overwrite: true,
+          transformation: [
+            {
+              width: 1200,
+              height: 1200,
+              crop: 'limit',
+              quality: 'auto:good',
+              fetch_format: 'auto',
+              flags: 'strip_profile'
+            }
+          ]
+        },
+        (error, result) => {
+          if (error) {
+            return reject(new Error(`Cloudinary upload failed: ${error.message}`));
+          }
+          resolve({
+            url: result.secure_url,
+            publicId: result.public_id,
+            format: result.format,
+            bytes: result.bytes,
+            width: result.width,
+            height: result.height,
+            provider: 'cloudinary'
+          });
+        }
+      );
+      uploadStream.end(fileBuffer);
     });
-
-    const result = await cloudinary.uploader.upload(filePath, {
-      folder: process.env.CLOUDINARY_FOLDER || 'yaans_lk/products',
-      transformation: [{ width: 1000, height: 1000, crop: 'limit', quality: 'auto', fetch_format: 'auto' }]
-    });
-
-    try {
-      fs.unlinkSync(filePath);
-    } catch (_e) {
-      // ignore
-    }
-
-    return {
-      url: result.secure_url,
-      provider: 'cloudinary',
-      publicId: result.public_id
-    };
   }
 
-  // If running on Vercel Serverless without Cloudinary keys, return inline base64 Data URI so it persists in MongoDB Atlas
+  // Graceful fallback for local development if Cloudinary env vars are missing
+  const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
   if (IS_SERVERLESS) {
-    const buf = fs.readFileSync(filePath);
-    const ext = path.extname(filePath).replace('.', '').toLowerCase() || 'jpeg';
-    const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-    const dataUrl = `data:${mime};base64,${buf.toString('base64')}`;
-    try {
-      fs.unlinkSync(filePath);
-    } catch (_e) {
-      // ignore
-    }
+    const mime = options.mimetype || 'image/jpeg';
+    const dataUrl = `data:${mime};base64,${fileBuffer.toString('base64')}`;
     return {
       url: dataUrl,
-      provider: 'mongodb_inline_storage',
-      publicId: path.basename(filePath)
+      publicId: customPublicId,
+      provider: 'mongodb_inline_storage'
     };
   }
 
-  // Local dev fallback URL
-  const filename = path.basename(filePath);
-  const host = req.get('host') || 'localhost:5000';
-  const protocol = req.protocol || 'http';
+  // Local uploads folder fallback
+  const uploadsDir = path.resolve(process.cwd(), 'backend/uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  const ext = (options.originalname && path.extname(options.originalname)) || '.jpg';
+  const filename = `${customPublicId}${ext}`;
+  const filePath = path.join(uploadsDir, filename);
+  fs.writeFileSync(filePath, fileBuffer);
+
+  const req = options.req;
+  const host = req?.get('host') || 'localhost:5000';
+  const protocol = req?.protocol || 'http';
+
   return {
     url: `${protocol}://${host}/uploads/${filename}`,
-    provider: 'local_storage',
-    publicId: filename
+    publicId: customPublicId,
+    provider: 'local_storage'
   };
+}
+
+/**
+ * Universal controller helper for Express route handlers
+ */
+export async function handleProductImageUpload(req) {
+  if (!req.file) {
+    throw new Error('No image file was provided.');
+  }
+
+  return await uploadToCloudinary(req.file.buffer, {
+    folder: 'yaans_lk/products',
+    originalname: req.file.originalname,
+    mimetype: req.file.mimetype,
+    req
+  });
 }

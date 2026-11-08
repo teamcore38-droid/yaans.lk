@@ -1,7 +1,7 @@
 import express from 'express';
 import { getStore, persistStore, generateId } from '../config/db.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
-import { uploadMiddleware, uploadProductImage } from '../config/cloudinary.js';
+import { uploadMiddleware, handleProductImageUpload } from '../config/cloudinary.js';
 
 const router = express.Router();
 
@@ -82,10 +82,7 @@ router.get('/dashboard', (req, res) => {
 // POST /api/seller/upload-image
 router.post('/upload-image', uploadMiddleware.single('image'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No image file provided.' });
-    }
-    const uploaded = await uploadProductImage(req.file.path, req);
+    const uploaded = await handleProductImageUpload(req);
     return res.status(201).json(uploaded);
   } catch (err) {
     return res.status(500).json({ message: err.message || 'Image upload failed.' });

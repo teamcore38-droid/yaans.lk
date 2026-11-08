@@ -1,3 +1,8 @@
 import app from '../backend/src/server.js';
 
-export default app;
+export default function handler(req, res) {
+  if (req.url && !req.url.startsWith('/api')) {
+    req.url = `/api${req.url.startsWith('/') ? '' : '/'}${req.url}`;
+  }
+  return app(req, res);
+}

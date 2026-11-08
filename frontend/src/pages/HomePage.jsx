@@ -68,8 +68,21 @@ export default function HomePage() {
       {activeBanner && (
         <div className="relative bg-white rounded-xl border border-[#edd7df] overflow-hidden shadow-xs">
           <div className="grid grid-cols-1 lg:grid-cols-12 items-stretch">
-            {/* Left Column: Marketplace highlights & Action CTAs - vertically centered with full-height background */}
-            <div className="p-5 sm:p-6 lg:p-7 lg:col-span-6 xl:col-span-6 flex flex-col justify-center space-y-2.5 sm:space-y-3 bg-[#fff1f3]/60">
+            {/* Mobile-Only Hero Banner (Replaces marked text section on mobile screens) */}
+            <Link
+              to={activeBanner.ctaLink || '/products'}
+              aria-label="Sri Lankan Homemade & Everyday Essentials - Shop Now"
+              className="block lg:hidden w-full bg-[#fff1f3] overflow-hidden"
+            >
+              <img
+                src="/mobile_hero_banner.jpg"
+                alt="Sri Lankan Homemade & Everyday Essentials - Cash on Delivery"
+                className="w-full h-auto object-cover block"
+              />
+            </Link>
+
+            {/* Desktop Left Column: Marketplace highlights & Action CTAs - vertically centered with full-height background */}
+            <div className="hidden lg:flex p-5 sm:p-6 lg:p-7 lg:col-span-6 xl:col-span-6 flex-col justify-center space-y-2.5 sm:space-y-3 bg-[#fff1f3]/60">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#fde8ec] border border-[#faccd6] text-[#72495c] text-[11px] font-bold tracking-wide uppercase w-fit">
                 <Truck className="w-3.5 h-3.5 text-[#72495c]" />
                 {activeBanner.badge}

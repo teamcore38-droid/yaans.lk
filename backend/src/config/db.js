@@ -1,5 +1,6 @@
 import fs from 'fs';
 import os from 'os';
+import dns from 'dns';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
@@ -198,8 +199,15 @@ export async function connectDatabase() {
 
     if (shouldTryMongo) {
       try {
+        if (!IS_SERVERLESS && uri.startsWith('mongodb+srv://')) {
+          try {
+            dns.setServers(['8.8.8.8', '1.1.1.1']);
+          } catch (_e) {
+            // ignore
+          }
+        }
         await mongoose.connect(uri, {
-          serverSelectionTimeoutMS: 6000,
+          serverSelectionTimeoutMS: 8000,
           dbName: process.env.MONGODB_DB_NAME || 'yaans_lk'
         });
         isMongoConnected = true;

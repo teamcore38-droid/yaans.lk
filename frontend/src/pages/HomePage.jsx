@@ -67,38 +67,38 @@ export default function HomePage() {
       {/* Top Practical Hero Banner */}
       {activeBanner && (
         <div className="relative bg-white rounded-xl border border-[#edd7df] overflow-hidden shadow-xs">
-          <div className="grid grid-cols-1 lg:grid-cols-12 items-center">
-            {/* Left Column: Marketplace highlights & Action CTAs */}
-            <div className="p-5 sm:p-7 lg:col-span-6 xl:col-span-6 space-y-3 bg-[#fff1f3]/60">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#fde8ec] border border-[#faccd6] text-[#72495c] text-[11px] font-bold tracking-wide uppercase">
+          <div className="grid grid-cols-1 lg:grid-cols-12 items-stretch">
+            {/* Left Column: Marketplace highlights & Action CTAs - vertically centered with full-height background */}
+            <div className="p-5 sm:p-6 lg:p-7 lg:col-span-6 xl:col-span-6 flex flex-col justify-center space-y-2.5 sm:space-y-3 bg-[#fff1f3]/60">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#fde8ec] border border-[#faccd6] text-[#72495c] text-[11px] font-bold tracking-wide uppercase w-fit">
                 <Truck className="w-3.5 h-3.5 text-[#72495c]" />
                 {activeBanner.badge}
               </div>
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-[#2b1b25] leading-tight">
+              <h1 className="text-xl sm:text-2xl lg:text-[26px] xl:text-3xl font-extrabold text-[#2b1b25] leading-tight">
                 {activeBanner.title}
               </h1>
-              <p className="text-xs sm:text-sm text-[#664b58] max-w-xl leading-relaxed">
+              <p className="text-xs sm:text-[13px] text-[#664b58] max-w-xl leading-relaxed">
                 {activeBanner.subtitle}
               </p>
-              <div className="pt-1 flex flex-wrap items-center gap-2.5">
+              <div className="pt-0.5 flex flex-wrap items-center gap-2.5">
                 <Link
                   to={activeBanner.ctaLink || '/products'}
-                  className="px-4 py-2.5 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs sm:text-sm inline-flex items-center gap-1.5 transition shadow-sm"
+                  className="px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs sm:text-sm inline-flex items-center gap-1.5 transition shadow-sm"
                 >
                   {activeBanner.ctaText || 'Shop Now'}
                   <ChevronRight className="w-4 h-4" />
                 </Link>
                 <Link
                   to="/products?homemade=true"
-                  className="px-4 py-2.5 rounded-lg bg-white hover:bg-[#fff0f3] text-[#72495c] border border-[#faccd6] font-semibold text-xs sm:text-sm transition shadow-2xs"
+                  className="px-4 py-2 rounded-lg bg-white hover:bg-[#fff0f3] text-[#72495c] border border-[#faccd6] font-semibold text-xs sm:text-sm transition shadow-2xs"
                 >
                   Browse Homemade SL
                 </Link>
               </div>
             </div>
 
-            {/* Right Column: Auto-scrollable Product Cards Designed Like Reference Image */}
-            <div className="lg:col-span-6 xl:col-span-6 bg-[#fff7f9] p-3 sm:p-4 border-t lg:border-t-0 lg:border-l border-[#f0dce3] overflow-hidden">
+            {/* Right Column: Compact Auto-scrollable Product Cards with consistent height */}
+            <div className="lg:col-span-6 xl:col-span-6 bg-[#fff7f9] p-2.5 sm:p-3.5 border-t lg:border-t-0 lg:border-l border-[#f0dce3] overflow-hidden flex flex-col justify-center">
               <BannerProductCarousel
                 activeCardIndex={activeCardIndex}
                 onCardChange={setActiveCardIndex}

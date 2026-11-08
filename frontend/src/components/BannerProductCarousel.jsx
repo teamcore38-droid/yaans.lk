@@ -143,9 +143,9 @@ export default function BannerProductCarousel({
       onTouchEnd={() => setPauseState(false)}
     >
       {/* Top micro-bar: Header label & Auto-play status pill */}
-      <div className="flex items-center justify-between pb-2 px-1 text-xs">
+      <div className="flex items-center justify-between pb-1.5 px-1 text-xs">
         <div className="flex items-center gap-1.5 font-bold">
-          <span className="text-amber-500 font-black text-sm">#</span>
+          <span className="text-amber-500 font-black text-sm leading-none">#</span>
           <span className="text-[11px] uppercase tracking-wider text-[#3e2230] font-extrabold">Featured Categories</span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -174,7 +174,7 @@ export default function BannerProductCarousel({
       <div className="relative group">
         <div
           ref={trackRef}
-          className="flex gap-3 sm:gap-4 overflow-x-auto scroll-smooth no-scrollbar py-1 px-1 snap-x snap-mandatory cursor-grab active:cursor-grabbing"
+          className="flex gap-2.5 sm:gap-3 overflow-x-auto scroll-smooth no-scrollbar py-0.5 px-0.5 snap-x snap-mandatory cursor-grab active:cursor-grabbing"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {BANNER_CAROUSEL_CARDS.map((card, idx) => {
@@ -184,12 +184,12 @@ export default function BannerProductCarousel({
                 key={card.id}
                 to={card.link}
                 onClick={() => setIndex(idx)}
-                className={`group/card relative shrink-0 snap-start rounded-2xl sm:rounded-3xl overflow-hidden transition-all duration-300 transform focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm hover:shadow-md ${
+                className={`group/card relative shrink-0 snap-start rounded-2xl overflow-hidden transition-all duration-300 transform focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm hover:shadow-md ${
                   isActive ? 'ring-2 ring-slate-900/10 scale-[1.01]' : 'opacity-95 hover:opacity-100'
                 }`}
                 style={{
-                  width: 'clamp(180px, 32vw, 220px)',
-                  height: 'clamp(270px, 42vw, 310px)',
+                  width: 'clamp(155px, 20vw, 190px)',
+                  height: 'clamp(215px, 26vw, 245px)',
                   backgroundColor: card.bgColor
                 }}
                 title={`Browse ${card.category}`}
@@ -203,7 +203,7 @@ export default function BannerProductCarousel({
                 />
 
                 {/* Hover overlay with Category Tag & Action Pill */}
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-2.5">
                   <span className="text-white text-xs font-bold leading-tight drop-shadow-sm">
                     {card.category}
                   </span>
@@ -221,23 +221,23 @@ export default function BannerProductCarousel({
           type="button"
           aria-label="Previous card"
           onClick={handlePrev}
-          className="absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/95 hover:bg-white text-[#482c39] shadow-md border border-[#eed6df] flex items-center justify-center transition-all opacity-85 hover:opacity-100 hover:scale-105 active:scale-95 z-10"
+          className="absolute left-1 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/95 hover:bg-white text-[#482c39] shadow-md border border-[#eed6df] flex items-center justify-center transition-all opacity-85 hover:opacity-100 hover:scale-105 active:scale-95 z-10"
         >
-          <ChevronLeft className="w-4 h-4" />
+          <ChevronLeft className="w-3.5 h-3.5" />
         </button>
 
         <button
           type="button"
           aria-label="Next card"
           onClick={handleNext}
-          className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/95 hover:bg-white text-[#482c39] shadow-md border border-[#eed6df] flex items-center justify-center transition-all opacity-85 hover:opacity-100 hover:scale-105 active:scale-95 z-10"
+          className="absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/95 hover:bg-white text-[#482c39] shadow-md border border-[#eed6df] flex items-center justify-center transition-all opacity-85 hover:opacity-100 hover:scale-105 active:scale-95 z-10"
         >
-          <ChevronRight className="w-4 h-4" />
+          <ChevronRight className="w-3.5 h-3.5" />
         </button>
       </div>
 
       {/* Bottom Indicators & Jump Pills */}
-      <div className="flex items-center justify-center gap-1.5 pt-2.5">
+      <div className="flex items-center justify-center gap-1.5 pt-1.5">
         {BANNER_CAROUSEL_CARDS.map((card, idx) => (
           <button
             key={card.id}

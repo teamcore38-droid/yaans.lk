@@ -108,32 +108,64 @@ export default function SellerDashboardPage() {
     }
   }, [user, fetchDashboard]);
 
-  if (!user || (user.role !== 'seller' && user.role !== 'admin')) {
+  if (!user) {
     return (
-      <div className="max-w-xl mx-auto px-4 py-12">
-        <div className="bg-white rounded-xl border border-slate-200 p-6 text-center space-y-4 shadow-sm">
-          <Store className="w-10 h-10 text-slate-700 mx-auto" />
-          <h1 className="text-lg font-extrabold text-slate-900">
+      <div className="max-w-xl mx-auto px-4 py-16">
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-4 shadow-sm">
+          <div className="w-14 h-14 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto text-amber-700">
+            <Store className="w-7 h-7" />
+          </div>
+          <h1 className="text-xl font-extrabold text-slate-900">
             Yaans.lk Seller Portal Access
           </h1>
-          <p className="text-xs text-slate-600">
-            Sign in with a Seller account to manage products, Cloudinary images, split orders, and LKR earnings.
+          <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
+            Sign in with your verified Seller account to manage your store listings, images, orders, and courier fulfillment.
           </p>
-          <div className="flex flex-wrap justify-center gap-2 pt-2">
-            <button
-              type="button"
-              onClick={() => login('kumari@kandykitchen.lk', 'Seller@123')}
-              className="px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs"
+          <div className="flex flex-wrap justify-center gap-3 pt-3">
+            <Link
+              to="/login?redirect=/seller/dashboard"
+              className="px-5 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm transition"
             >
-              Demo Sign-In: Kandy Homemade Seller
-            </button>
-            <button
-              type="button"
-              onClick={() => login('rizwan@colombotech.lk', 'Seller@123')}
-              className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs"
+              Sign In to Seller Portal
+            </Link>
+            <Link
+              to="/seller/register"
+              className="px-5 py-2.5 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold text-xs shadow-sm transition"
             >
-              Demo Sign-In: Colombo Tech Seller
-            </button>
+              Apply to Sell on Yaans.lk
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (user.role !== 'seller' && user.role !== 'admin') {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-16">
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-4 shadow-sm">
+          <div className="w-14 h-14 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center mx-auto text-slate-800">
+            <Store className="w-7 h-7" />
+          </div>
+          <h1 className="text-xl font-extrabold text-slate-900">
+            Seller Account Required
+          </h1>
+          <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
+            You are signed in as <strong className="text-slate-900">{user.name}</strong> with a customer account. To open a store, list products, and sell across Sri Lanka, submit your seller application.
+          </p>
+          <div className="flex flex-wrap justify-center gap-3 pt-3">
+            <Link
+              to="/seller/register"
+              className="px-5 py-2.5 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold text-xs shadow-sm transition"
+            >
+              Apply as a Seller
+            </Link>
+            <Link
+              to="/"
+              className="px-4 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs"
+            >
+              Return to Store
+            </Link>
           </div>
         </div>
       </div>

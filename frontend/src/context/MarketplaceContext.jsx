@@ -37,7 +37,7 @@ export function MarketplaceProvider({ children }) {
   const [guestWishlist, setGuestWishlist] = useState(() => {
     try {
       const saved = localStorage.getItem('yaans_wishlist');
-      return saved ? JSON.parse(saved) : ['prd_1', 'prd_5'];
+      return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }

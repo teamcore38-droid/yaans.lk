@@ -106,7 +106,10 @@ export async function loadStoreFromMongo() {
     memoryStore = {
       users: users.map((d) => ({ ...d, _id: String(d._id) })),
       sellers: sellers.map((d) => ({ ...d, _id: String(d._id) })),
-      categories: categories.map((d) => ({ ...d, _id: String(d._id) })),
+      categories:
+        categories.length > 0
+          ? categories.map((d) => ({ ...d, _id: String(d._id) }))
+          : seedFallback.categories,
       products: products.map((d) => ({ ...d, _id: String(d._id) })),
       reviews: reviews.map((d) => ({ ...d, _id: String(d._id) })),
       subOrders: subOrders.map((d) => ({ ...d, _id: String(d._id) })),
@@ -213,9 +216,9 @@ export async function connectDatabase() {
         isMongoConnected = true;
         console.log('[Yaans.lk DB] Connected to MongoDB Atlas via Mongoose!');
 
-        const count = await ProductModel.collection.countDocuments();
-        if (count === 0) {
-          console.log('[Yaans.lk DB] Seeding initial Sri Lankan marketplace data into MongoDB Atlas...');
+        const configCount = await PlatformConfigModel.collection.countDocuments();
+        if (configCount === 0) {
+          console.log('[Yaans.lk DB] Initializing clean Yaans.lk marketplace schema into MongoDB Atlas...');
           await seedMongoDatabase();
         } else {
           await loadStoreFromMongo();

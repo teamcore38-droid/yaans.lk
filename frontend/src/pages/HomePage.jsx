@@ -248,11 +248,24 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-          {homemadeProducts.slice(0, 8).map((product) => (
-            <ProductCard key={product._id} product={product} />
-          ))}
-        </div>
+        {homemadeProducts.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+            {homemadeProducts.slice(0, 8).map((product) => (
+              <ProductCard key={product._id} product={product} />
+            ))}
+          </div>
+        ) : (
+          <div className="p-8 rounded-xl bg-slate-50 border border-slate-200 text-center space-y-2">
+            <p className="text-xs font-semibold text-slate-700">No homemade items listed yet.</p>
+            <p className="text-[11px] text-slate-500">Are you a home-based creator or small producer in Sri Lanka? Register to start selling today!</p>
+            <Link
+              to="/seller/register"
+              className="inline-block mt-1 px-4 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs shadow-xs"
+            >
+              Sell Your Homemade Products
+            </Link>
+          </div>
+        )}
       </section>
 
       {/* Daily Deals in LKR (Rs.) */}
@@ -280,11 +293,17 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-          {dealProducts.slice(0, 4).map((product) => (
-            <ProductCard key={product._id} product={product} />
-          ))}
-        </div>
+        {dealProducts.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+            {dealProducts.slice(0, 4).map((product) => (
+              <ProductCard key={product._id} product={product} />
+            ))}
+          </div>
+        ) : (
+          <div className="p-6 rounded-xl bg-slate-50 border border-slate-200 text-center">
+            <p className="text-xs text-slate-500">Deals are updated in real-time as sellers launch promotions across Sri Lanka.</p>
+          </div>
+        )}
       </section>
 
       {/* Verified Local Sellers Showcase */}
@@ -306,41 +325,54 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {verifiedSellers.map((seller) => (
+        {verifiedSellers.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {verifiedSellers.map((seller) => (
+              <Link
+                key={seller._id}
+                to={`/store/${seller.slug}`}
+                className="p-3.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50/70 hover:bg-white transition flex items-start gap-3"
+              >
+                <img
+                  src={seller.logoUrl}
+                  alt={seller.storeName}
+                  className="w-12 h-12 rounded-lg object-cover border border-slate-200 shrink-0 bg-white"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-bold text-slate-900 truncate">
+                      {seller.storeName}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-600 mt-0.5 flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                    <span className="truncate">{seller.city}</span>
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between">
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white border border-slate-200 text-slate-700">
+                      {seller.sellerType}
+                    </span>
+                    <span className="inline-flex items-center text-[11px] font-bold text-slate-800">
+                      <Star className="w-3 h-3 fill-amber-400 text-amber-500 mr-0.5" />
+                      {seller.rating}
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="p-8 rounded-xl bg-slate-50 border border-slate-200 text-center space-y-2">
+            <p className="text-xs font-semibold text-slate-700">No verified sellers registered yet.</p>
+            <p className="text-[11px] text-slate-500">Sell homemade or retail products across all 25 Sri Lankan districts with automated courier logistics.</p>
             <Link
-              key={seller._id}
-              to={`/store/${seller.slug}`}
-              className="p-3.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50/70 hover:bg-white transition flex items-start gap-3"
+              to="/seller/register"
+              className="inline-block mt-1 px-4 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs"
             >
-              <img
-                src={seller.logoUrl}
-                alt={seller.storeName}
-                className="w-12 h-12 rounded-lg object-cover border border-slate-200 shrink-0 bg-white"
-              />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1">
-                  <span className="text-xs font-bold text-slate-900 truncate">
-                    {seller.storeName}
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-600 mt-0.5 flex items-center gap-1">
-                  <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                  <span className="truncate">{seller.city}</span>
-                </div>
-                <div className="mt-1.5 flex items-center justify-between">
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white border border-slate-200 text-slate-700">
-                    {seller.sellerType}
-                  </span>
-                  <span className="inline-flex items-center text-[11px] font-bold text-slate-800">
-                    <Star className="w-3 h-3 fill-amber-400 text-amber-500 mr-0.5" />
-                    {seller.rating}
-                  </span>
-                </div>
-              </div>
+              Become the First Seller
             </Link>
-          ))}
-        </div>
+          </div>
+        )}
       </section>
 
       {/* Recommended Marketplace Products */}
@@ -362,11 +394,17 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-          {recommendedProducts.map((product) => (
-            <ProductCard key={product._id} product={product} compact />
-          ))}
-        </div>
+        {recommendedProducts.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+            {recommendedProducts.map((product) => (
+              <ProductCard key={product._id} product={product} compact />
+            ))}
+          </div>
+        ) : (
+          <div className="p-8 rounded-xl bg-white border border-slate-200 text-center">
+            <p className="text-xs text-slate-500">Marketplace catalog is ready. New listings will appear here automatically.</p>
+          </div>
+        )}
       </section>
     </div>
   );

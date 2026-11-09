@@ -39,7 +39,6 @@ export default function Navbar() {
   const [searchCat, setSearchCat] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [districtModalOpen, setDistrictModalOpen] = useState(false);
-  const [quickDemoLoading, setQuickDemoLoading] = useState(false);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -48,18 +47,6 @@ export default function Navbar() {
     if (searchCat) params.set('category', searchCat);
     navigate(`/products?${params.toString()}`);
     setMobileMenuOpen(false);
-  };
-
-  const handleQuickDemoSwitch = async (email, password, redirectPath) => {
-    try {
-      setQuickDemoLoading(true);
-      await login(email, password);
-      navigate(redirectPath);
-    } catch (_err) {
-      // ignore
-    } finally {
-      setQuickDemoLoading(false);
-    }
   };
 
   return (
@@ -79,35 +66,6 @@ export default function Navbar() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 whitespace-nowrap">
-            {/* Quick Role Switcher for Instant Demo Testing */}
-            <div className="hidden md:flex items-center gap-1.5 bg-[#38202c]/90 px-2 py-0.5 rounded border border-[#583346]">
-              <span className="text-[11px] text-[#caa8b8]">Quick Demo:</span>
-              <button
-                type="button"
-                disabled={quickDemoLoading}
-                onClick={() => handleQuickDemoSwitch('kasun@gmail.com', 'Customer@123', '/')}
-                className="text-[11px] px-1.5 py-0.5 rounded hover:bg-[#4d2c3e] text-[#eddfe6] font-medium"
-              >
-                Customer
-              </button>
-              <button
-                type="button"
-                disabled={quickDemoLoading}
-                onClick={() => handleQuickDemoSwitch('kumari@kandykitchen.lk', 'Seller@123', '/seller/dashboard')}
-                className="text-[11px] px-1.5 py-0.5 rounded hover:bg-[#4d2c3e] text-amber-300 font-medium"
-              >
-                Seller (Kandy)
-              </button>
-              <button
-                type="button"
-                disabled={quickDemoLoading}
-                onClick={() => handleQuickDemoSwitch('admin@yaans.lk', 'Admin@123', '/admin')}
-                className="text-[11px] px-1.5 py-0.5 rounded hover:bg-[#4d2c3e] text-sky-300 font-medium"
-              >
-                Admin
-              </button>
-            </div>
-
             <Link to="/track-order" className="text-[#eddfe6] hover:text-white transition-colors font-medium">
               Track Order
             </Link>
@@ -217,13 +175,31 @@ export default function Navbar() {
               {user ? (
                 <div className="flex items-center gap-1">
                   <Link
-                    to="/account"
+                    to={
+                      user.role === 'admin'
+                        ? '/admin'
+                        : user.role === 'seller'
+                        ? '/seller/dashboard'
+                        : '/account'
+                    }
                     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-800"
                   >
                     <User className="w-5 h-5 text-slate-700" />
                     <div className="hidden xl:block text-left leading-tight">
-                      <div className="text-[10px] text-slate-500">Hello, {user.name.split(' ')[0]}</div>
-                      <div className="text-xs font-bold text-slate-900">Account & Orders</div>
+                      <div className="text-[10px] text-slate-500">
+                        {user.role === 'admin'
+                          ? 'Super Admin'
+                          : user.role === 'seller'
+                          ? 'Verified Seller'
+                          : `Hello, ${user.name.split(' ')[0]}`}
+                      </div>
+                      <div className="text-xs font-bold text-slate-900">
+                        {user.role === 'admin'
+                          ? 'Admin Console'
+                          : user.role === 'seller'
+                          ? (user.sellerStoreName || 'Seller Portal')
+                          : 'Account & Orders'}
+                      </div>
                     </div>
                   </Link>
                   <button
@@ -364,41 +340,73 @@ export default function Navbar() {
             </div>
 
             <div className="p-4 border-b border-slate-200 bg-slate-50">
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">
-                Instant Demo Role Switcher
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    handleQuickDemoSwitch('kasun@gmail.com', 'Customer@123', '/');
-                  }}
-                  className="px-2 py-1.5 text-xs font-semibold rounded bg-white border border-slate-300 text-slate-800"
-                >
-                  Customer
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    handleQuickDemoSwitch('kumari@kandykitchen.lk', 'Seller@123', '/seller/dashboard');
-                  }}
-                  className="px-2 py-1.5 text-xs font-semibold rounded bg-amber-50 border border-amber-300 text-amber-900"
-                >
-                  Seller
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    handleQuickDemoSwitch('admin@yaans.lk', 'Admin@123', '/admin');
-                  }}
-                  className="px-2 py-1.5 text-xs font-semibold rounded bg-sky-50 border border-sky-300 text-sky-900"
-                >
-                  Admin
-                </button>
-              </div>
+              {user ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-extrabold text-slate-900">{user.name}</div>
+                      <div className="text-[11px] text-slate-500">{user.email}</div>
+                    </div>
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                        user.role === 'admin'
+                          ? 'bg-sky-100 text-sky-800'
+                          : user.role === 'seller'
+                          ? 'bg-amber-100 text-amber-900'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}
+                    >
+                      {user.role}
+                    </span>
+                  </div>
+                  <div className="pt-2 flex items-center gap-2">
+                    <Link
+                      to={
+                        user.role === 'admin'
+                          ? '/admin'
+                          : user.role === 'seller'
+                          ? '/seller/dashboard'
+                          : '/account'
+                      }
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex-1 py-1.5 px-3 rounded-lg bg-slate-900 text-white text-xs font-bold text-center"
+                    >
+                      {user.role === 'admin'
+                        ? 'Admin Console'
+                        : user.role === 'seller'
+                        ? 'Seller Dashboard'
+                        : 'My Account & Orders'}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        logout();
+                      }}
+                      className="py-1.5 px-3 rounded-lg border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-100"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Link
+                    to="/login"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex-1 py-2 px-3 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 text-xs font-extrabold text-center"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    to="/register"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex-1 py-2 px-3 rounded-lg border border-slate-300 text-slate-800 text-xs font-bold text-center hover:bg-slate-100"
+                  >
+                    Register
+                  </Link>
+                </div>
+              )}
             </div>
 
             <div className="p-4 space-y-1 flex-1">

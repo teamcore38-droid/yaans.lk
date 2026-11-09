@@ -27,23 +27,18 @@ export function LoginPage() {
     try {
       setLoading(true);
       const loggedUser = await login(email, password);
-      if (loggedUser.role === 'admin') navigate('/admin');
-      else if (loggedUser.role === 'seller') navigate('/seller/dashboard');
-      else navigate('/');
-    } catch (err) {
-      showToast(err.message, 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+      const searchParams = new URLSearchParams(window.location.search);
+      const redirect = searchParams.get('redirect');
 
-  const quickFillAndLogin = async (demoEmail, demoPass, targetPath) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    try {
-      setLoading(true);
-      await login(demoEmail, demoPass);
-      navigate(targetPath);
+      if (redirect && redirect.startsWith('/')) {
+        navigate(redirect);
+      } else if (loggedUser.role === 'admin') {
+        navigate('/admin');
+      } else if (loggedUser.role === 'seller') {
+        navigate('/seller/dashboard');
+      } else {
+        navigate('/account');
+      }
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -52,8 +47,8 @@ export function LoginPage() {
   };
 
   return (
-    <div className="max-w-md mx-auto px-4 py-8 space-y-5">
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
+    <div className="max-w-md mx-auto px-4 py-10 space-y-5">
+      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-5">
         <div className="text-center">
           <img
             src="/brand/yaans-logo-horizontal-dark.png"
@@ -62,20 +57,20 @@ export function LoginPage() {
           />
           <h1 className="text-lg font-extrabold text-slate-900">Sign In to Yaans.lk</h1>
           <p className="text-xs text-slate-500">
-            Access your customer orders, seller portal, or marketplace admin dashboard
+            Enter your credentials to access your isolated account
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
           <div>
-            <label className="block font-bold text-slate-700 mb-1">Email Address</label>
+            <label className="block font-bold text-slate-700 mb-1">Email Address / Username</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="name@example.lk"
-              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300"
+              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
             />
           </div>
 
@@ -87,7 +82,7 @@ export function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300"
+              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
             />
           </div>
 
@@ -100,75 +95,7 @@ export function LoginPage() {
           </button>
         </form>
 
-        {/* 1-Click Role Demo Accounts */}
-        <div className="pt-4 border-t border-slate-200 space-y-2">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            1-Click Demo Role Sign-In
-          </div>
-          <div className="grid grid-cols-1 gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => quickFillAndLogin('kasun@gmail.com', 'Customer@123', '/account')}
-              className="p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center justify-between text-left"
-            >
-              <div>
-                <div className="font-bold text-slate-900">Customer Account (Kasun Perera)</div>
-                <div className="text-[11px] text-slate-500">kasun@gmail.com • Saved Colombo/Kandy addresses</div>
-              </div>
-              <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-bold text-[10px]">
-                Customer
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                quickFillAndLogin('kumari@kandykitchen.lk', 'Seller@123', '/seller/dashboard')
-              }
-              className="p-2.5 rounded-lg border border-amber-200 bg-amber-50/50 hover:bg-amber-50 flex items-center justify-between text-left"
-            >
-              <div>
-                <div className="font-bold text-slate-900">Homemade Seller (Kandy Spice Pantry)</div>
-                <div className="text-[11px] text-slate-600">kumari@kandykitchen.lk • Products, Orders & Earnings</div>
-              </div>
-              <span className="px-2 py-0.5 rounded bg-amber-200 text-amber-950 font-bold text-[10px]">
-                Seller
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                quickFillAndLogin('rizwan@colombotech.lk', 'Seller@123', '/seller/dashboard')
-              }
-              className="p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center justify-between text-left"
-            >
-              <div>
-                <div className="font-bold text-slate-900">Retail Tech Seller (Colombo Tech Hub)</div>
-                <div className="text-[11px] text-slate-500">rizwan@colombotech.lk • Electronics Vendor</div>
-              </div>
-              <span className="px-2 py-0.5 rounded bg-slate-200 text-slate-800 font-bold text-[10px]">
-                Seller
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => quickFillAndLogin('admin@yaans.lk', 'Admin@123', '/admin')}
-              className="p-2.5 rounded-lg border border-sky-200 bg-sky-50/50 hover:bg-sky-50 flex items-center justify-between text-left"
-            >
-              <div>
-                <div className="font-bold text-slate-900">Yaans.lk Marketplace Admin</div>
-                <div className="text-[11px] text-slate-600">admin@yaans.lk • Approvals, 25 Districts, Settlements</div>
-              </div>
-              <span className="px-2 py-0.5 rounded bg-sky-200 text-sky-950 font-bold text-[10px]">
-                Admin
-              </span>
-            </button>
-          </div>
-        </div>
-
-        <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-xs">
+        <div className="pt-4 border-t border-slate-200 flex items-center justify-between text-xs">
           <Link to="/register" className="font-bold text-sky-700 hover:underline">
             Create Customer Account
           </Link>
@@ -546,9 +473,26 @@ export function CustomerAccountPage() {
     district: user?.defaultDistrict || 'Colombo',
     postalCode: ''
   });
+  const [custProfile, setCustProfile] = useState({
+    name: user?.name || '',
+    phone: user?.phone || '',
+    defaultDistrict: user?.defaultDistrict || 'Colombo'
+  });
+  const [custPasswordForm, setCustPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [savingCustProfile, setSavingCustProfile] = useState(false);
+  const [savingCustPassword, setSavingCustPassword] = useState(false);
 
   useEffect(() => {
     if (user) {
+      setCustProfile({
+        name: user.name || '',
+        phone: user.phone || '',
+        defaultDistrict: user.defaultDistrict || 'Colombo'
+      });
       apiRequest('/orders/my-orders')
         .then((res) => setOrders(res.orders || []))
         .catch(() => {});
@@ -557,19 +501,66 @@ export function CustomerAccountPage() {
 
   if (!user) {
     return (
-      <div className="max-w-md mx-auto px-4 py-12 text-center">
-        <div className="bg-white p-6 rounded-xl border border-slate-200 space-y-3">
-          <h1 className="text-base font-bold text-slate-900">Please sign in to view your account</h1>
+      <div className="max-w-md mx-auto px-4 py-16 text-center">
+        <div className="bg-white p-8 rounded-2xl border border-slate-200 space-y-4 shadow-sm">
+          <User className="w-10 h-10 text-slate-700 mx-auto" />
+          <h1 className="text-base font-extrabold text-slate-900">Please sign in to view your account</h1>
+          <p className="text-xs text-slate-500">Access your order history, delivery addresses and personal settings</p>
           <Link
-            to="/login"
-            className="inline-block px-4 py-2 rounded-lg bg-amber-400 text-slate-950 font-bold text-xs"
+            to="/login?redirect=/account"
+            className="inline-block px-5 py-2.5 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs"
           >
-            Sign In
+            Sign In to Your Account
           </Link>
         </div>
       </div>
     );
   }
+
+  const handleUpdateCustProfile = async (e) => {
+    e.preventDefault();
+    try {
+      setSavingCustProfile(true);
+      await apiRequest('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify(custProfile)
+      });
+      await refreshUser();
+      showToast('Profile settings updated!');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSavingCustProfile(false);
+    }
+  };
+
+  const handleUpdateCustPassword = async (e) => {
+    e.preventDefault();
+    if (custPasswordForm.newPassword !== custPasswordForm.confirmPassword) {
+      showToast('New passwords do not match.', 'error');
+      return;
+    }
+    if (custPasswordForm.newPassword.length < 6) {
+      showToast('Password must be at least 6 characters.', 'error');
+      return;
+    }
+    try {
+      setSavingCustPassword(true);
+      await apiRequest('/auth/update-credentials', {
+        method: 'PUT',
+        body: JSON.stringify({
+          currentPassword: custPasswordForm.currentPassword,
+          newPassword: custPasswordForm.newPassword
+        })
+      });
+      setCustPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      showToast('Password changed successfully!');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSavingCustPassword(false);
+    }
+  };
 
   const handleAddAddress = async (e) => {
     e.preventDefault();
@@ -713,6 +704,54 @@ export function CustomerAccountPage() {
               Save Address
             </button>
           </form>
+
+          {/* Account Security & Password */}
+          <div className="pt-4 border-t border-slate-200 space-y-3">
+            <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
+              Account Security & Password
+            </h3>
+            <form onSubmit={handleUpdateCustPassword} className="space-y-2 text-xs">
+              <input
+                type="password"
+                required
+                placeholder="Current password"
+                value={custPasswordForm.currentPassword}
+                onChange={(e) =>
+                  setCustPasswordForm({ ...custPasswordForm, currentPassword: e.target.value })
+                }
+                className="w-full px-2.5 py-1.5 rounded border border-slate-300"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="password"
+                  required
+                  placeholder="New password (min 6)"
+                  value={custPasswordForm.newPassword}
+                  onChange={(e) =>
+                    setCustPasswordForm({ ...custPasswordForm, newPassword: e.target.value })
+                  }
+                  className="px-2.5 py-1.5 rounded border border-slate-300"
+                />
+                <input
+                  type="password"
+                  required
+                  placeholder="Confirm password"
+                  value={custPasswordForm.confirmPassword}
+                  onChange={(e) =>
+                    setCustPasswordForm({ ...custPasswordForm, confirmPassword: e.target.value })
+                  }
+                  className="px-2.5 py-1.5 rounded border border-slate-300"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={savingCustPassword}
+                className="w-full py-2 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs disabled:opacity-50"
+              >
+                {savingCustPassword ? 'Updating...' : 'Change Password'}
+              </button>
+            </form>
+          </div>
         </div>
 
         {/* Customer Orders */}

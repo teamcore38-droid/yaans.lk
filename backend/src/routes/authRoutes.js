@@ -197,14 +197,75 @@ router.get('/me', authenticate, (req, res) => {
 
 // PUT /api/auth/profile
 router.put('/profile', authenticate, (req, res) => {
-  const { name, phone, defaultDistrict } = req.body;
+  const { name, phone, defaultDistrict, email } = req.body;
   const store = getStore();
   const user = store.users.find((u) => u._id === req.user._id);
+  if (!user) {
+    return res.status(404).json({ message: 'User not found.' });
+  }
   if (name) user.name = name.trim();
   if (phone) user.phone = phone.trim();
   if (defaultDistrict) user.defaultDistrict = defaultDistrict;
+  if (email && email.toLowerCase().trim() !== user.email.toLowerCase()) {
+    const trimmed = email.toLowerCase().trim();
+    const existing = store.users.find((u) => u._id !== user._id && u.email.toLowerCase() === trimmed);
+    if (existing) {
+      return res.status(409).json({ message: 'Email is already in use.' });
+    }
+    user.email = trimmed;
+  }
   persistStore();
   return res.json({ user: sanitizeUser(user, store) });
+});
+
+// PUT /api/auth/update-credentials
+// Allows updating username/email, password, name, phone with current password verification
+router.put('/update-credentials', authenticate, (req, res) => {
+  const { currentPassword, newEmail, newPassword, newName, newPhone } = req.body;
+  const store = getStore();
+  const user = store.users.find((u) => u._id === req.user._id);
+  if (!user) {
+    return res.status(404).json({ message: 'User not found.' });
+  }
+
+  // If updating password or changing email, verify current password
+  if (newPassword || (newEmail && newEmail.toLowerCase().trim() !== user.email.toLowerCase())) {
+    if (!currentPassword) {
+      return res.status(400).json({ message: 'Current password is required to update credentials.' });
+    }
+    if (!bcrypt.compareSync(currentPassword, user.passwordHash)) {
+      return res.status(401).json({ message: 'Current password is incorrect.' });
+    }
+  }
+
+  if (newEmail && newEmail.toLowerCase().trim() !== user.email.toLowerCase()) {
+    const trimmedEmail = newEmail.toLowerCase().trim();
+    const existing = store.users.find(
+      (u) => u._id !== user._id && u.email.toLowerCase() === trimmedEmail
+    );
+    if (existing) {
+      return res.status(409).json({ message: 'Email / username is already in use by another account.' });
+    }
+    user.email = trimmedEmail;
+  }
+
+  if (newPassword) {
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters.' });
+    }
+    user.passwordHash = bcrypt.hashSync(newPassword, 8);
+  }
+
+  if (newName && newName.trim()) user.name = newName.trim();
+  if (newPhone !== undefined) user.phone = newPhone.trim();
+
+  persistStore();
+  const token = signToken(user);
+  return res.json({
+    token,
+    user: sanitizeUser(user, store),
+    message: 'Credentials updated successfully.'
+  });
 });
 
 // POST /api/auth/addresses

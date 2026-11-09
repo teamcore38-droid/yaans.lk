@@ -46,6 +46,22 @@ export function MarketplaceProvider({ children }) {
   const [cartQuote, setCartQuote] = useState(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [toast, setToast] = useState(null);
+  const [categories, setCategories] = useState([]);
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await apiRequest('/marketplace/categories');
+      if (res.categories) {
+        setCategories(res.categories);
+      }
+    } catch (_err) {
+      // fallback
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type, id: Date.now() });
@@ -299,7 +315,9 @@ export function MarketplaceProvider({ children }) {
         wishlistIds,
         toggleWishlist,
         toast,
-        showToast
+        showToast,
+        categories,
+        refreshCategories: fetchCategories
       }}
     >
       {children}

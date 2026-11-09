@@ -66,6 +66,13 @@ router.get('/districts', (_req, res) => {
   });
 });
 
+// GET /api/marketplace/categories
+router.get('/categories', (_req, res) => {
+  const store = getStore();
+  const categories = [...store.categories].sort((a, b) => a.displayOrder - b.displayOrder);
+  return res.json({ categories });
+});
+
 // GET /api/marketplace/products
 // Supports search, category, subcategory, sellerId, district, homemade, deals, minPrice, maxPrice, inStock, sort, page, limit
 router.get('/products', (req, res) => {

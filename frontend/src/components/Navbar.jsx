@@ -28,7 +28,8 @@ export default function Navbar() {
     selectedDistrict,
     setSelectedDistrict,
     totalCartItems,
-    wishlistIds
+    wishlistIds,
+    categories = []
   } = useMarketplace();
 
   const navigate = useNavigate();
@@ -169,12 +170,11 @@ export default function Navbar() {
                 className="bg-slate-100 text-slate-700 text-xs font-medium px-3 py-2.5 border-r border-slate-300 focus:outline-none cursor-pointer"
               >
                 <option value="">All Categories</option>
-                <option value="homemade-pantry">Homemade & Spices</option>
-                <option value="electronics">Electronics</option>
-                <option value="home-kitchen">Home & Kitchen</option>
-                <option value="fashion-handloom">Fashion & Handloom</option>
-                <option value="ayurveda-beauty">Ayurveda & Beauty</option>
-                <option value="fitness-daily-deals">Fitness & Deals</option>
+                {categories.map((c) => (
+                  <option key={c.slug} value={c.slug}>
+                    {c.name}
+                  </option>
+                ))}
               </select>
               <input
                 type="text"
@@ -325,21 +325,15 @@ export default function Navbar() {
               >
                 Today&apos;s Deals
               </Link>
-              <Link to="/products?category=homemade-pantry" className="text-[#fce7f0] hover:text-white transition-colors">
-                Spices & Pantry
-              </Link>
-              <Link to="/products?category=electronics" className="text-[#fce7f0] hover:text-white transition-colors">
-                Electronics
-              </Link>
-              <Link to="/products?category=home-kitchen" className="text-[#fce7f0] hover:text-white transition-colors">
-                Home & Kitchen
-              </Link>
-              <Link to="/products?category=fashion-handloom" className="text-[#fce7f0] hover:text-white transition-colors">
-                Fashion & Handloom
-              </Link>
-              <Link to="/products?category=ayurveda-beauty" className="text-[#fce7f0] hover:text-white transition-colors">
-                Ayurveda & Beauty
-              </Link>
+              {categories.map((c) => (
+                <Link
+                  key={c.slug}
+                  to={`/products?category=${c.slug}`}
+                  className="text-[#fce7f0] hover:text-white transition-colors"
+                >
+                  {c.name}
+                </Link>
+              ))}
             </div>
           </div>
         </div>

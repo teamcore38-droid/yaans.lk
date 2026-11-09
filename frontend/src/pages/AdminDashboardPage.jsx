@@ -22,7 +22,7 @@ import { apiRequest, formatLkr } from '../utils/api.js';
 import { useMarketplace } from '../context/MarketplaceContext.jsx';
 
 export default function AdminDashboardPage() {
-  const { user, login, showToast } = useMarketplace();
+  const { user, login, showToast, refreshCategories } = useMarketplace();
   const [activeTab, setActiveTab] = useState('sellers');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -41,6 +41,17 @@ export default function AdminDashboardPage() {
   // New Category Form
   const [catName, setCatName] = useState('');
   const [catHeadline, setCatHeadline] = useState('');
+
+  // Category Edit Modal State
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [catEditForm, setCatEditForm] = useState({
+    name: '',
+    quadHeadline: '',
+    description: '',
+    imageUrl: '',
+    subCategories: []
+  });
 
   // Admin Product Edit Modal State
   const [editingProduct, setEditingProduct] = useState(null);
@@ -362,6 +373,74 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const openEditCategoryModal = (cat) => {
+    setEditingCategory(cat);
+    setCatEditForm({
+      name: cat.name || '',
+      quadHeadline: cat.quadHeadline || '',
+      description: cat.description || '',
+      imageUrl: cat.imageUrl || '',
+      subCategories: (cat.subCategories || []).map((s, idx) => ({
+        name: s.name || `Sub-category ${idx + 1}`,
+        slug: s.slug || `sub-${idx + 1}`,
+        imageUrl: s.imageUrl || '',
+        bgTint: s.bgTint || '#F3F4F6'
+      }))
+    });
+  };
+
+  const closeEditCategoryModal = () => {
+    setEditingCategory(null);
+  };
+
+  const handleSubCatChange = (index, field, value) => {
+    setCatEditForm((prev) => {
+      const next = [...prev.subCategories];
+      next[index] = { ...next[index], [field]: value };
+      return { ...prev, subCategories: next };
+    });
+  };
+
+  const handleSaveCategory = async (e) => {
+    e.preventDefault();
+    if (!editingCategory) return;
+    try {
+      setSavingCategory(true);
+      await apiRequest(`/admin/categories/${editingCategory._id}`, {
+        method: 'PUT',
+        body: JSON.stringify(catEditForm)
+      });
+      showToast(`Department "${catEditForm.name}" updated!`);
+      closeEditCategoryModal();
+      fetchOverview();
+      refreshCategories?.();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
+  const handleDeleteCategory = async (catId, catName) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete department "${catName}"? Any products currently assigned to it will be safely moved to the default department.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await apiRequest(`/admin/categories/${catId}`, {
+        method: 'DELETE'
+      });
+      showToast(res.message || `Department "${catName}" removed.`);
+      fetchOverview();
+      refreshCategories?.();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   const handleCreateCategory = async (e) => {
     e.preventDefault();
     if (!catName || !catHeadline) return;
@@ -374,6 +453,7 @@ export default function AdminDashboardPage() {
       setCatHeadline('');
       showToast('New category & 2x2 quad card added!');
       fetchOverview();
+      refreshCategories?.();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -719,42 +799,133 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Add New Category & 2x2 Quad Card */}
-          <form
-            onSubmit={handleCreateCategory}
-            className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-wrap items-end gap-3 text-xs"
-          >
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">New Category Name</label>
-              <input
-                type="text"
-                required
-                value={catName}
-                onChange={(e) => setCatName(e.target.value)}
-                placeholder="e.g., Ceylon Tea & Coffee"
-                className="px-3 py-2 rounded-lg border border-slate-300"
-              />
+          {/* Departments & Homepage 2x2 Quad Cards Management */}
+          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+              <div>
+                <h2 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-amber-600" />
+                  Departments & Homepage 2x2 Quad Cards ({data?.categories?.length || 0})
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Manage marketplace departments, customize homepage 2x2 quad headlines, adjust sub-categories, and control category discovery.
+                </p>
+              </div>
             </div>
-            <div className="flex-1 min-w-[220px]">
-              <label className="block font-bold text-slate-700 mb-1">
-                Homepage 2x2 Quad Card Headline
-              </label>
-              <input
-                type="text"
-                required
-                value={catHeadline}
-                onChange={(e) => setCatHeadline(e.target.value)}
-                placeholder="e.g., Freshly Brewed Ceylon Tea & Estate Coffee"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300"
-              />
+
+            {/* Existing Categories Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-500">
+                    <th className="py-2.5">Department</th>
+                    <th className="py-2.5">Homepage 2x2 Quad Headline</th>
+                    <th className="py-2.5">Sub-Categories (4 Tiles)</th>
+                    <th className="py-2.5">Listings</th>
+                    <th className="py-2.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(data?.categories || []).map((cat) => {
+                    const catProductsCount = products.filter((p) => p.categorySlug === cat.slug).length;
+                    return (
+                      <tr key={cat._id || cat.slug}>
+                        <td className="py-2.5 pr-3">
+                          <div className="flex items-center gap-2.5">
+                            <img
+                              src={cat.imageUrl || 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=120&q=80'}
+                              alt={cat.name}
+                              className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0"
+                            />
+                            <div>
+                              <div className="font-bold text-slate-900">{cat.name}</div>
+                              <div className="text-[11px] font-mono text-slate-500">slug: {cat.slug}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-2.5 pr-3 font-semibold text-slate-800">
+                          {cat.quadHeadline || cat.name}
+                        </td>
+                        <td className="py-2.5 pr-3">
+                          <div className="flex flex-wrap gap-1">
+                            {(cat.subCategories || []).map((sub) => (
+                              <span
+                                key={sub.slug}
+                                className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-700 font-medium"
+                              >
+                                {sub.name}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="py-2.5 pr-3">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900">
+                            {catProductsCount} Products
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-right space-x-1.5 whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => openEditCategoryModal(cat)}
+                            className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-white font-bold inline-flex items-center gap-1 shadow-xs transition"
+                            title="Edit Category & 4 Sub-Categories"
+                          >
+                            <Edit3 className="w-3 h-3" /> Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCategory(cat._id, cat.name)}
+                            className="p-1.5 rounded border border-red-200 text-red-600 hover:bg-red-50 transition"
+                            title="Delete Department"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-            <button
-              type="submit"
-              className="px-4 py-2 rounded-lg bg-slate-900 text-white font-bold"
+
+            {/* Add New Category & 2x2 Quad Card Form */}
+            <form
+              onSubmit={handleCreateCategory}
+              className="mt-4 pt-4 border-t border-slate-200 flex flex-wrap items-end gap-3 text-xs bg-slate-50 p-3.5 rounded-xl border"
             >
-              Add Category Quad Card
-            </button>
-          </form>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">New Department Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={catName}
+                  onChange={(e) => setCatName(e.target.value)}
+                  placeholder="e.g., Ceylon Tea & Coffee"
+                  className="px-3 py-2 rounded-lg border border-slate-300 bg-white"
+                />
+              </div>
+              <div className="flex-1 min-w-[220px]">
+                <label className="block font-bold text-slate-700 mb-1">
+                  Homepage 2x2 Quad Card Headline *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={catHeadline}
+                  onChange={(e) => setCatHeadline(e.target.value)}
+                  placeholder="e.g., Freshly Brewed Ceylon Tea & Estate Coffee"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white"
+                />
+              </div>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold inline-flex items-center gap-1.5 transition"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add Department
+              </button>
+            </form>
+          </div>
         </div>
       )}
 
@@ -1499,6 +1670,163 @@ export default function AdminDashboardPage() {
                     {savingProduct ? 'Saving Overrides...' : 'Save & Publish Overrides'}
                   </button>
                 </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Category / Department Edit Modal */}
+      {editingCategory && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-200">
+            {/* Header */}
+            <div className="sticky top-0 bg-white z-10 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-900 uppercase">
+                    Admin Override
+                  </span>
+                  <span className="text-xs text-slate-500 font-mono">slug: {editingCategory.slug}</span>
+                </div>
+                <h3 className="text-lg font-black text-slate-900 mt-1">
+                  Edit Department &amp; Homepage 2x2 Card
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={closeEditCategoryModal}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveCategory} className="p-6 space-y-5 text-xs">
+              {/* Basic Department Settings */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Department Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={catEditForm.name}
+                    onChange={(e) => setCatEditForm({ ...catEditForm, name: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Homepage 2x2 Quad Card Headline
+                  </label>
+                  <input
+                    type="text"
+                    value={catEditForm.quadHeadline}
+                    onChange={(e) => setCatEditForm({ ...catEditForm, quadHeadline: e.target.value })}
+                    placeholder="e.g. Traditional Spices &amp; Homemade Delights"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Department Banner / Cover Image URL
+                </label>
+                <input
+                  type="url"
+                  value={catEditForm.imageUrl}
+                  onChange={(e) => setCatEditForm({ ...catEditForm, imageUrl: e.target.value })}
+                  placeholder="https://images.unsplash.com/..."
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Department Description</label>
+                <textarea
+                  rows={2}
+                  value={catEditForm.description}
+                  onChange={(e) => setCatEditForm({ ...catEditForm, description: e.target.value })}
+                  placeholder="Short description for SEO and category headers..."
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300"
+                />
+              </div>
+
+              {/* 4 Sub-Categories / 2x2 Homepage Tiles */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-black text-slate-900 text-sm">
+                      Homepage 2x2 Quad Card Tiles (4 Sub-Categories)
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      These 4 tiles are visually rendered inside the homepage department card for quick customer navigation.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  {(catEditForm.subCategories || []).map((sub, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 bg-white rounded-lg border border-slate-200 shadow-xs space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-700 text-[11px]">
+                          Tile #{idx + 1}
+                        </span>
+                        {sub.imageUrl && (
+                          <img
+                            src={sub.imageUrl}
+                            alt=""
+                            className="w-6 h-6 object-cover rounded border border-slate-200"
+                          />
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Title</label>
+                        <input
+                          type="text"
+                          value={sub.name}
+                          onChange={(e) => handleSubCatChange(idx, 'name', e.target.value)}
+                          placeholder="e.g. Ceylon Cinnamon"
+                          className="w-full px-2 py-1.5 rounded border border-slate-300 text-xs font-semibold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Image URL</label>
+                        <input
+                          type="url"
+                          value={sub.imageUrl}
+                          onChange={(e) => handleSubCatChange(idx, 'imageUrl', e.target.value)}
+                          placeholder="https://..."
+                          className="w-full px-2 py-1.5 rounded border border-slate-300 text-[11px]"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={closeEditCategoryModal}
+                  className="px-4 py-2 rounded-lg border border-slate-300 hover:bg-slate-100 font-semibold text-slate-700 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingCategory}
+                  className="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold inline-flex items-center gap-1.5 shadow-sm transition disabled:opacity-50"
+                >
+                  <Check className="w-4 h-4 text-slate-900" />
+                  {savingCategory ? 'Saving Department...' : 'Save Department Changes'}
+                </button>
               </div>
             </form>
           </div>

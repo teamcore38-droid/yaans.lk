@@ -336,6 +336,95 @@ router.post('/categories', (req, res) => {
   return res.status(201).json({ category: newCat, message: 'Category created.' });
 });
 
+// PUT /api/admin/categories/:categoryId
+router.put('/categories/:categoryId', (req, res) => {
+  const { categoryId } = req.params;
+  const store = getStore();
+
+  const category = store.categories.find(
+    (c) => c._id === categoryId || c.slug === categoryId
+  );
+  if (!category) {
+    return res.status(404).json({ message: 'Category not found.' });
+  }
+
+  const {
+    name,
+    quadHeadline,
+    description,
+    imageUrl,
+    displayOrder,
+    showInQuadGrid,
+    subCategories
+  } = req.body;
+
+  if (name !== undefined) category.name = name.trim();
+  if (quadHeadline !== undefined) category.quadHeadline = quadHeadline.trim();
+  if (description !== undefined) category.description = description.trim();
+  if (imageUrl !== undefined) category.imageUrl = imageUrl.trim();
+  if (displayOrder !== undefined) category.displayOrder = Number(displayOrder);
+  if (showInQuadGrid !== undefined) category.showInQuadGrid = Boolean(showInQuadGrid);
+  if (Array.isArray(subCategories) && subCategories.length > 0) {
+    category.subCategories = subCategories.map((s, idx) => ({
+      name: s.name?.trim() || `Tile ${idx + 1}`,
+      slug: (s.slug || s.name || `tile-${idx + 1}`)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, ''),
+      imageUrl:
+        s.imageUrl ||
+        'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=400&q=80',
+      bgTint: s.bgTint || '#F3F4F6'
+    }));
+  }
+
+  persistStore();
+  return res.json({
+    category,
+    message: `Department "${category.name}" updated successfully.`
+  });
+});
+
+// DELETE /api/admin/categories/:categoryId
+router.delete('/categories/:categoryId', (req, res) => {
+  const { categoryId } = req.params;
+  const store = getStore();
+
+  const idx = store.categories.findIndex(
+    (c) => c._id === categoryId || c.slug === categoryId
+  );
+  if (idx === -1) {
+    return res.status(404).json({ message: 'Category not found.' });
+  }
+
+  const cat = store.categories[idx];
+  const assignedProducts = store.products.filter(
+    (p) => p.categorySlug === cat.slug
+  );
+
+  // Reassign products to fallback category if any were assigned
+  if (assignedProducts.length > 0) {
+    const fallbackCategory = store.categories.find((c) => c.slug !== cat.slug) || {
+      slug: 'homemade-pantry'
+    };
+    for (const prod of assignedProducts) {
+      prod.categorySlug = fallbackCategory.slug;
+      prod.subCategorySlug = '';
+    }
+  }
+
+  store.categories.splice(idx, 1);
+  persistStore();
+  return res.json({
+    message: `Department "${cat.name}" removed.${
+      assignedProducts.length > 0
+        ? ` Reassigned ${assignedProducts.length} listing(s) safely.`
+        : ''
+    }`,
+    categoryId
+  });
+});
+
 // POST /api/admin/settlements/payout
 // Reconciles and settles all eligible_for_payout SubOrders for a given seller
 router.post('/settlements/payout', (req, res) => {

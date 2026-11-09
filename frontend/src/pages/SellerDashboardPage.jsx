@@ -22,7 +22,7 @@ import { apiRequest, formatLkr } from '../utils/api.js';
 import { useMarketplace, DEFAULT_SL_DISTRICTS } from '../context/MarketplaceContext.jsx';
 
 export default function SellerDashboardPage() {
-  const { user, login, showToast } = useMarketplace();
+  const { user, login, showToast, categories = [] } = useMarketplace();
   const [activeTab, setActiveTab] = useState('orders');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -606,12 +606,11 @@ export default function SellerDashboardPage() {
                   onChange={(e) => setProdForm({ ...prodForm, categorySlug: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-semibold"
                 >
-                  <option value="homemade-pantry">Homemade & Spices</option>
-                  <option value="electronics">Electronics & Tech</option>
-                  <option value="home-kitchen">Home & Clayware</option>
-                  <option value="fashion-handloom">Fashion & Handloom</option>
-                  <option value="ayurveda-beauty">Ayurveda & Beauty</option>
-                  <option value="fitness-daily-deals">Fitness & Everyday</option>
+                  {(categories.length > 0 ? categories : (data?.categories || [])).map((cat) => (
+                    <option key={cat.slug} value={cat.slug}>
+                      {cat.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>

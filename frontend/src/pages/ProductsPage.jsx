@@ -10,6 +10,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { apiRequest } from '../utils/api.js';
+import { useMarketplace } from '../context/MarketplaceContext.jsx';
 import ProductCard from '../components/ProductCard.jsx';
 
 const CATEGORIES_LIST = [
@@ -25,6 +26,7 @@ const CATEGORIES_LIST = [
 const SELLER_ORIGIN_DISTRICTS = ['All Districts', 'Colombo', 'Kandy', 'Galle', 'Gampaha', 'Jaffna'];
 
 export default function ProductsPage() {
+  const { categories = [] } = useMarketplace();
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [pagination, setPagination] = useState({ total: 0, page: 1, totalPages: 1 });
@@ -33,6 +35,11 @@ export default function ProductsPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const sentinelRef = useRef(null);
+
+  const dynamicCategories =
+    categories.length > 0
+      ? [{ slug: '', label: 'All Departments' }, ...categories.map((c) => ({ slug: c.slug, label: c.name }))]
+      : CATEGORIES_LIST;
 
   const q = searchParams.get('q') || '';
   const category = searchParams.get('category') || '';
@@ -150,7 +157,7 @@ export default function ProductsPage() {
       <div>
         <h3 className="font-bold text-slate-900 uppercase tracking-wider mb-2">Department</h3>
         <div className="space-y-1">
-          {CATEGORIES_LIST.map((c) => (
+          {dynamicCategories.map((c) => (
             <button
               key={c.slug}
               type="button"
@@ -270,7 +277,7 @@ export default function ProductsPage() {
               ? 'Sri Lankan Homemade & Cottage Products'
               : deals === 'true'
               ? "Today's Value Deals in LKR"
-              : CATEGORIES_LIST.find((c) => c.slug === category)?.label || 'All Marketplace Products'}
+              : dynamicCategories.find((c) => c.slug === category)?.label || 'All Marketplace Products'}
           </h1>
           <p className="text-xs text-slate-500">
             Showing {products.length} of {pagination.total} verified listings • Cash on Delivery Available

@@ -1,6 +1,7 @@
 import express from 'express';
 import { getStore, persistStore, generateId } from '../config/db.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
+import { uploadMiddleware, uploadToCloudinary } from '../config/cloudinary.js';
 
 const router = express.Router();
 
@@ -423,6 +424,25 @@ router.delete('/categories/:categoryId', (req, res) => {
     }`,
     categoryId
   });
+});
+
+// POST /api/admin/upload-image
+// Uploads category cover or general admin media to Cloudinary CDN
+router.post('/upload-image', uploadMiddleware.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No image file was provided.' });
+    }
+    const uploaded = await uploadToCloudinary(req.file.buffer, {
+      folder: 'yaans_lk/categories',
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      req
+    });
+    return res.status(201).json(uploaded);
+  } catch (err) {
+    return res.status(500).json({ message: err.message || 'Image upload failed.' });
+  }
 });
 
 // POST /api/admin/settlements/payout

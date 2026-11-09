@@ -45,6 +45,8 @@ export default function AdminDashboardPage() {
   // Category Edit Modal State
   const [editingCategory, setEditingCategory] = useState(null);
   const [savingCategory, setSavingCategory] = useState(false);
+  const [uploadingCatCover, setUploadingCatCover] = useState(false);
+  const [uploadingSubCatIndex, setUploadingSubCatIndex] = useState(null);
   const [catEditForm, setCatEditForm] = useState({
     name: '',
     quadHeadline: '',
@@ -399,6 +401,45 @@ export default function AdminDashboardPage() {
       next[index] = { ...next[index], [field]: value };
       return { ...prev, subCategories: next };
     });
+  };
+
+  const handleCatCoverUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('image', file);
+    try {
+      setUploadingCatCover(true);
+      const res = await apiRequest('/admin/upload-image', {
+        method: 'POST',
+        body: formData
+      });
+      setCatEditForm((prev) => ({ ...prev, imageUrl: res.url }));
+      showToast('Department cover image uploaded to Cloudinary!');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setUploadingCatCover(false);
+    }
+  };
+
+  const handleSubCatImageUpload = async (index, file) => {
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('image', file);
+    try {
+      setUploadingSubCatIndex(index);
+      const res = await apiRequest('/admin/upload-image', {
+        method: 'POST',
+        body: formData
+      });
+      handleSubCatChange(index, 'imageUrl', res.url);
+      showToast(`Tile #${index + 1} image uploaded to Cloudinary!`);
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setUploadingSubCatIndex(null);
+    }
   };
 
   const handleSaveCategory = async (e) => {
@@ -1730,17 +1771,49 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Department Banner / Cover Image URL
-                </label>
-                <input
-                  type="url"
-                  value={catEditForm.imageUrl}
-                  onChange={(e) => setCatEditForm({ ...catEditForm, imageUrl: e.target.value })}
-                  placeholder="https://images.unsplash.com/..."
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300"
-                />
+              {/* Department Banner / Cover Image with Device Upload to Cloudinary */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-amber-600" />
+                    Department Banner / Cover Image (Cloudinary Upload or CDN URL)
+                  </label>
+                  {uploadingCatCover && (
+                    <span className="text-amber-700 font-bold animate-pulse flex items-center gap-1">
+                      <Upload className="w-3.5 h-3.5 animate-spin" /> Uploading to Cloudinary CDN...
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <img
+                    src={
+                      catEditForm.imageUrl ||
+                      'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=300&q=80'
+                    }
+                    alt="Department Cover Preview"
+                    className="w-24 h-16 object-cover rounded-lg border border-slate-200 bg-white shadow-xs shrink-0"
+                    onError={(e) => {
+                      e.target.src =
+                        'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=300&q=80';
+                    }}
+                  />
+                  <div className="flex-1 space-y-1.5">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleCatCoverUpload}
+                      disabled={uploadingCatCover}
+                      className="w-full text-xs file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-amber-500 file:text-slate-900 hover:file:bg-amber-600 file:cursor-pointer disabled:opacity-50"
+                    />
+                    <input
+                      type="url"
+                      value={catEditForm.imageUrl}
+                      onChange={(e) => setCatEditForm({ ...catEditForm, imageUrl: e.target.value })}
+                      placeholder="https://res.cloudinary.com/... or https://images.unsplash.com/..."
+                      className="w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white font-mono text-[11px]"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -1782,6 +1855,9 @@ export default function AdminDashboardPage() {
                             src={sub.imageUrl}
                             alt=""
                             className="w-6 h-6 object-cover rounded border border-slate-200"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                            }}
                           />
                         )}
                       </div>
@@ -1796,13 +1872,26 @@ export default function AdminDashboardPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Image URL</label>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <label className="block text-[10px] font-bold text-slate-500">Image</label>
+                          <label className="cursor-pointer text-[10px] font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1">
+                            <Upload className="w-2.5 h-2.5" />
+                            {uploadingSubCatIndex === idx ? 'Uploading...' : 'Upload'}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              disabled={uploadingSubCatIndex === idx}
+                              className="hidden"
+                              onChange={(e) => handleSubCatImageUpload(idx, e.target.files?.[0])}
+                            />
+                          </label>
+                        </div>
                         <input
                           type="url"
                           value={sub.imageUrl}
                           onChange={(e) => handleSubCatChange(idx, 'imageUrl', e.target.value)}
-                          placeholder="https://..."
-                          className="w-full px-2 py-1.5 rounded border border-slate-300 text-[11px]"
+                          placeholder="https://res.cloudinary.com/... or URL"
+                          className="w-full px-2 py-1.5 rounded border border-slate-300 text-[11px] font-mono"
                         />
                       </div>
                     </div>

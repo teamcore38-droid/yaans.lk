@@ -10,6 +10,7 @@
     "build": "npm --prefix frontend run build",
     "test": "node --test frontend/tests/*.test.js backend/tests/*.test.js",
     "seed": "npm --prefix backend run seed",
+    "backup": "node backend/scripts/backup_db.js",
     "start": "npm --prefix backend start"
   },
   "dependencies": {

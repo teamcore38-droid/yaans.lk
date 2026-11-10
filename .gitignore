@@ -7,6 +7,8 @@ dist/
 .vercel/
 **/.vercel/
 backend/data/yaans_db.json
+backups/
+*.backup.json
 backend/uploads/*
 !backend/uploads/.gitkeep
 *.log

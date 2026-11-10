@@ -52,7 +52,9 @@ router.get('/home', (req, res) => {
     recommendedProducts,
     verifiedSellers,
     districts: store.platformConfig.districts,
-    codEnabledGlobally: store.platformConfig.codEnabledGlobally
+    codEnabledGlobally: store.platformConfig.codEnabledGlobally,
+    shippingMode: store.platformConfig.shippingMode || 'custom',
+    flatShippingRateLkr: store.platformConfig.flatShippingRateLkr ?? 350
   });
 });
 
@@ -62,7 +64,9 @@ router.get('/districts', (_req, res) => {
   return res.json({
     districts: store.platformConfig.districts,
     codEnabledGlobally: store.platformConfig.codEnabledGlobally,
-    globalFreeShippingMinLkr: store.platformConfig.globalFreeShippingMinLkr
+    globalFreeShippingMinLkr: store.platformConfig.globalFreeShippingMinLkr,
+    shippingMode: store.platformConfig.shippingMode || 'custom',
+    flatShippingRateLkr: store.platformConfig.flatShippingRateLkr ?? 350
   });
 });
 
@@ -218,7 +222,9 @@ router.get('/products/:idOrSlug', (req, res) => {
     totalItemCount: 1,
     sellerShippingPolicy: seller ? seller.shippingPolicy : {},
     districtConfigs: store.platformConfig.districts,
-    globalFreeShippingMinLkr: store.platformConfig.globalFreeShippingMinLkr
+    globalFreeShippingMinLkr: store.platformConfig.globalFreeShippingMinLkr,
+    shippingMode: store.platformConfig.shippingMode || 'custom',
+    flatShippingRateLkr: store.platformConfig.flatShippingRateLkr ?? 350
   });
 
   return res.json({

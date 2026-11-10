@@ -80,7 +80,9 @@ function buildMultiSellerCartBreakdown(cartItems = [], destinationDistrict = 'Co
       totalItemCount: bucket.totalQuantity,
       sellerShippingPolicy: bucket.seller?.shippingPolicy || {},
       districtConfigs: store.platformConfig.districts,
-      globalFreeShippingMinLkr: store.platformConfig.globalFreeShippingMinLkr
+      globalFreeShippingMinLkr: store.platformConfig.globalFreeShippingMinLkr,
+      shippingMode: store.platformConfig.shippingMode || 'custom',
+      flatShippingRateLkr: store.platformConfig.flatShippingRateLkr ?? 350
     });
 
     if (!shipping.codAvailable) {

@@ -256,6 +256,8 @@ export function getInitialSeedState() {
     codEnabledGlobally: true,
     codMaxOrderLimitLkr: 75000,
     globalFreeShippingMinLkr: 0,
+    shippingMode: 'custom', // 'custom' (25-district matrix) or 'flat' (one unified shipping rate for all places)
+    flatShippingRateLkr: 350,
     supportPhone: '+94 11 234 5678',
     supportWhatsapp: '+94 77 123 4567',
     districts: SRI_LANKA_DISTRICTS,

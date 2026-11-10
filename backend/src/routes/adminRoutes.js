@@ -213,28 +213,68 @@ router.delete('/products/:productId', (req, res) => {
 });
 
 // PUT /api/admin/config/districts
+// Updates 25-district matrix as well as active shipping strategy (flat vs custom)
 router.put('/config/districts', (req, res) => {
-  const { districts } = req.body;
-  if (!Array.isArray(districts)) {
-    return res.status(400).json({ message: 'districts array is required.' });
+  const { districts, shippingMode, flatShippingRateLkr } = req.body;
+  const store = getStore();
+
+  if (Array.isArray(districts)) {
+    store.platformConfig.districts = districts.map((d) => ({
+      code: d.code,
+      name: d.name,
+      province: d.province,
+      intraDistrictFee: Number(d.intraDistrictFee) || 280,
+      standardFee: Number(d.standardFee) || 350,
+      outstationFee: Number(d.outstationFee) || 450,
+      codAvailable: Boolean(d.codAvailable),
+      estimatedDays: d.estimatedDays || '2-3 business days'
+    }));
   }
 
-  const store = getStore();
-  store.platformConfig.districts = districts.map((d) => ({
-    code: d.code,
-    name: d.name,
-    province: d.province,
-    intraDistrictFee: Number(d.intraDistrictFee) || 280,
-    standardFee: Number(d.standardFee) || 350,
-    outstationFee: Number(d.outstationFee) || 450,
-    codAvailable: Boolean(d.codAvailable),
-    estimatedDays: d.estimatedDays || '2-3 business days'
-  }));
+  if (shippingMode === 'flat' || shippingMode === 'custom') {
+    store.platformConfig.shippingMode = shippingMode;
+  }
+
+  if (flatShippingRateLkr !== undefined) {
+    store.platformConfig.flatShippingRateLkr = Math.max(0, Number(flatShippingRateLkr) || 0);
+  }
 
   persistStore();
   return res.json({
     districts: store.platformConfig.districts,
-    message: 'Sri Lankan 25-district delivery fees and COD availability updated.'
+    shippingMode: store.platformConfig.shippingMode || 'custom',
+    flatShippingRateLkr: store.platformConfig.flatShippingRateLkr ?? 350,
+    platformConfig: store.platformConfig,
+    message:
+      store.platformConfig.shippingMode === 'flat'
+        ? `Flat Islandwide Shipping active at Rs. ${store.platformConfig.flatShippingRateLkr} for all places.`
+        : 'Custom 25-district delivery fee matrix active and saved.'
+  });
+});
+
+// PUT /api/admin/config/shipping-mode
+// Instant switch between Flat Islandwide Shipping and Custom 25-District Matrix
+router.put('/config/shipping-mode', (req, res) => {
+  const { shippingMode, flatShippingRateLkr } = req.body;
+  const store = getStore();
+
+  if (shippingMode === 'flat' || shippingMode === 'custom') {
+    store.platformConfig.shippingMode = shippingMode;
+  }
+
+  if (flatShippingRateLkr !== undefined) {
+    store.platformConfig.flatShippingRateLkr = Math.max(0, Number(flatShippingRateLkr) || 0);
+  }
+
+  persistStore();
+  return res.json({
+    shippingMode: store.platformConfig.shippingMode || 'custom',
+    flatShippingRateLkr: store.platformConfig.flatShippingRateLkr ?? 350,
+    platformConfig: store.platformConfig,
+    message:
+      store.platformConfig.shippingMode === 'flat'
+        ? `Flat Islandwide Shipping activated at Rs. ${store.platformConfig.flatShippingRateLkr} for all places. Custom district fees disabled.`
+        : 'Custom 25-District Matrix re-activated. District-specific rates are now active.'
   });
 });
 

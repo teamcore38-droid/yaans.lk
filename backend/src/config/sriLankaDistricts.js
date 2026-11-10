@@ -48,7 +48,9 @@ export function calculateSellerDeliveryFee({
   totalItemCount = 1,
   sellerShippingPolicy = {},
   districtConfigs = SRI_LANKA_DISTRICTS,
-  globalFreeShippingMinLkr = 0
+  globalFreeShippingMinLkr = 0,
+  shippingMode = 'custom',
+  flatShippingRateLkr = 350
 }) {
   const destConfig =
     districtConfigs.find((d) => d.name.toLowerCase() === String(destinationDistrict).toLowerCase()) ||
@@ -82,6 +84,23 @@ export function calculateSellerDeliveryFee({
       originDistrict: originConfig.name,
       destinationDistrict: destConfig.name,
       estimatedDays: destConfig.estimatedDays,
+      codAvailable: destConfig.codAvailable !== false
+    };
+  }
+
+  // SINGLE FLAT RATE MODE (Islandwide Unified Rate)
+  // When active, all district-specific custom rates are completely bypassed
+  if (shippingMode === 'flat') {
+    const flatRate = Math.max(0, Number(flatShippingRateLkr) || 0);
+    return {
+      deliveryFeeLkr: flatRate,
+      baseFeeLkr: flatRate,
+      weightSurchargeLkr: 0,
+      rateTier: `Islandwide Flat Rate (Rs. ${flatRate.toLocaleString()})`,
+      isFreeShipping: flatRate === 0,
+      originDistrict: originConfig.name,
+      destinationDistrict: destConfig.name,
+      estimatedDays: originConfig.name === destConfig.name ? '1-2 business days' : destConfig.estimatedDays,
       codAvailable: destConfig.codAvailable !== false
     };
   }

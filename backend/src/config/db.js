@@ -163,14 +163,28 @@ export async function syncStoreToMongo() {
       }
     };
 
-    // Wait: to preserve string IDs like 'prd_1', 'sel_kandy_1', 'usr_cust_1' in MongoDB native collection,
-    // we can use Model.collection (the native MongoDB driver collection!) which allows string _id values directly!
+    // Use atomic bulkWrite (upsert + remove deleted) to prevent race conditions and zero-document read windows
     const syncNativeCollection = async (Model, docs) => {
       const col = Model.collection;
-      await col.deleteMany({});
-      if (Array.isArray(docs) && docs.length > 0) {
-        await col.insertMany(docs.map((d) => ({ ...d })));
+      if (!Array.isArray(docs)) return;
+      if (docs.length === 0) {
+        await col.deleteMany({});
+        return;
       }
+      const activeIds = docs.map((d) => d._id);
+      const bulkOps = docs.map((doc) => ({
+        replaceOne: {
+          filter: { _id: doc._id },
+          replacement: { ...doc },
+          upsert: true
+        }
+      }));
+      bulkOps.push({
+        deleteMany: {
+          filter: { _id: { $nin: activeIds } }
+        }
+      });
+      await col.bulkWrite(bulkOps, { ordered: false });
     };
 
     await Promise.all([
@@ -185,8 +199,12 @@ export async function syncStoreToMongo() {
     ]);
 
     if (memoryStore.platformConfig) {
-      await PlatformConfigModel.collection.deleteMany({});
-      await PlatformConfigModel.collection.insertOne({ ...memoryStore.platformConfig });
+      const cfg = { ...memoryStore.platformConfig, key: 'main_config' };
+      await PlatformConfigModel.collection.updateOne(
+        { key: 'main_config' },
+        { $set: cfg },
+        { upsert: true }
+      );
     }
     lastMongoSyncTime = Date.now();
   } catch (err) {

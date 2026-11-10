@@ -24,7 +24,9 @@ import {
   Mail,
   Phone,
   Truck,
-  Ban
+  Ban,
+  RefreshCw,
+  Copy
 } from 'lucide-react';
 import { apiRequest, formatLkr } from '../utils/api.js';
 import { useMarketplace } from '../context/MarketplaceContext.jsx';
@@ -32,9 +34,16 @@ import { useMarketplace } from '../context/MarketplaceContext.jsx';
 export default function AdminDashboardPage() {
   const { user, logout, refreshUser, showToast, refreshCategories, categories: marketplaceCategories } = useMarketplace();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('sellers');
+  const [activeTab, setActiveTabState] = useState(() => {
+    return localStorage.getItem('yaans_admin_active_tab') || 'sellers';
+  });
+  const setActiveTab = (tab) => {
+    setActiveTabState(tab);
+    localStorage.setItem('yaans_admin_active_tab', tab);
+  };
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
 
   // Admin Profile & Credentials State
   const [adminProfileForm, setAdminProfileForm] = useState({
@@ -136,6 +145,7 @@ export default function AdminDashboardPage() {
   const [savingBanner, setSavingBanner] = useState(false);
   const [uploadingDesktopBanner, setUploadingDesktopBanner] = useState(false);
   const [uploadingMobileBanner, setUploadingMobileBanner] = useState(false);
+  const [syncBothBannerImages, setSyncBothBannerImages] = useState(true);
   const [bannerModalOpen, setBannerModalOpen] = useState(false);
   const [bannerForm, setBannerForm] = useState({
     title: '',
@@ -221,9 +231,10 @@ export default function AdminDashboardPage() {
     setAdminVariantRows((prev) => prev.filter((_, idx) => idx !== index));
   };
 
-  const fetchOverview = useCallback(async () => {
+  const fetchOverview = useCallback(async (isRetry = false) => {
     try {
       setLoading(true);
+      setFetchError(null);
       const res = await apiRequest(`/admin/overview?_t=${Date.now()}`);
       setData(res);
       setDistrictsState(res.platformConfig?.districts || []);
@@ -239,8 +250,15 @@ export default function AdminDashboardPage() {
           globalFreeShippingMinLkr: res.platformConfig.globalFreeShippingMinLkr ?? 0
         });
       }
-    } catch (_err) {
-      setData(null);
+    } catch (err) {
+      if (!isRetry) {
+        // Auto-retry once after 800ms for transient serverless cold-start or token check
+        setTimeout(() => {
+          fetchOverview(true);
+        }, 800);
+      } else {
+        setFetchError(err.message || 'Unable to load dashboard data.');
+      }
     } finally {
       setLoading(false);
     }
@@ -321,6 +339,30 @@ export default function AdminDashboardPage() {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="h-64 bg-white rounded-xl border border-slate-200 animate-pulse" />
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
+        <div className="w-14 h-14 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto text-amber-600">
+          <AlertTriangle className="w-7 h-7" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-900">Connecting to Admin Services</h2>
+        <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+          {fetchError || 'Establishing connection to the Yaans.lk marketplace overview.'}
+        </p>
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={() => fetchOverview(true)}
+            className="px-5 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Reload Dashboard Data
+          </button>
+        </div>
       </div>
     );
   }
@@ -693,6 +735,7 @@ export default function AdminDashboardPage() {
 
   const openAddBannerModal = () => {
     setEditingBanner(null);
+    setSyncBothBannerImages(true);
     setBannerForm({
       title: '',
       imageUrl: '',
@@ -707,10 +750,17 @@ export default function AdminDashboardPage() {
 
   const openEditBannerModal = (banner) => {
     setEditingBanner(banner);
+    const hasLegacyPinkMobile = banner.mobileImageUrl === '/mobile_hero_banner.jpg';
+    const isShared = !banner.mobileImageUrl || banner.mobileImageUrl === banner.imageUrl || hasLegacyPinkMobile;
+    setSyncBothBannerImages(isShared);
+
+    const resolvedDesktop = banner.imageUrl || banner.mobileImageUrl || '';
+    const resolvedMobile = hasLegacyPinkMobile ? resolvedDesktop : (banner.mobileImageUrl || banner.imageUrl || '');
+
     setBannerForm({
       title: banner.title || '',
-      imageUrl: banner.imageUrl || '',
-      mobileImageUrl: banner.mobileImageUrl || '',
+      imageUrl: resolvedDesktop,
+      mobileImageUrl: resolvedMobile,
       categorySlug: banner.categorySlug || '',
       ctaLink: banner.ctaLink || (banner.categorySlug ? `/products?category=${banner.categorySlug}` : '/products'),
       active: banner.active ?? true,
@@ -738,11 +788,29 @@ export default function AdminDashboardPage() {
         body: formData
       });
       if (res?.url) {
-        setBannerForm((prev) => ({ ...prev, [field]: res.url }));
+        setBannerForm((prev) => {
+          if (syncBothBannerImages) {
+            return {
+              ...prev,
+              imageUrl: res.url,
+              mobileImageUrl: res.url
+            };
+          }
+          const next = { ...prev, [field]: res.url };
+          if (!isMobile && (!prev.mobileImageUrl || prev.mobileImageUrl === '/mobile_hero_banner.jpg')) {
+            next.mobileImageUrl = res.url;
+          }
+          if (isMobile && (!prev.imageUrl || prev.imageUrl === '/mobile_hero_banner.jpg')) {
+            next.imageUrl = res.url;
+          }
+          return next;
+        });
         showToast(
-          isMobile
-            ? 'Mobile banner image uploaded to Cloudinary CDN!'
-            : 'Desktop banner image uploaded to Cloudinary CDN!'
+          syncBothBannerImages
+            ? 'Banner uploaded to Cloudinary and set for both Desktop and Mobile!'
+            : (isMobile
+                ? 'Mobile banner image uploaded to Cloudinary CDN!'
+                : 'Desktop banner image uploaded to Cloudinary CDN!')
         );
       } else {
         throw new Error('Image upload failed: no URL returned.');
@@ -761,10 +829,15 @@ export default function AdminDashboardPage() {
       showToast('Please upload or specify at least one banner image (desktop or mobile).', 'error');
       return;
     }
+    const resolvedDesktop = (bannerForm.imageUrl || bannerForm.mobileImageUrl || '').trim();
+    let resolvedMobile = (bannerForm.mobileImageUrl || bannerForm.imageUrl || '').trim();
+    if (resolvedMobile === '/mobile_hero_banner.jpg' && resolvedDesktop && resolvedDesktop !== '/mobile_hero_banner.jpg') {
+      resolvedMobile = resolvedDesktop;
+    }
     const payload = {
       ...bannerForm,
-      imageUrl: (bannerForm.imageUrl || bannerForm.mobileImageUrl).trim(),
-      mobileImageUrl: (bannerForm.mobileImageUrl || bannerForm.imageUrl).trim()
+      imageUrl: resolvedDesktop,
+      mobileImageUrl: resolvedMobile
     };
     try {
       setSavingBanner(true);
@@ -839,6 +912,16 @@ export default function AdminDashboardPage() {
         </div>
 
         <div className="flex items-center gap-3 text-xs">
+          <button
+            type="button"
+            onClick={() => fetchOverview(true)}
+            disabled={loading}
+            className="bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg border border-slate-700 text-slate-300 hover:text-white transition flex items-center gap-1.5 font-bold"
+            title="Refresh marketplace statistics and banners"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-amber-400' : 'text-slate-400'}`} />
+            <span>Refresh</span>
+          </button>
           <div className="bg-slate-800 px-3.5 py-2 rounded-lg border border-slate-700">
             <div className="text-slate-400">Pending Seller Approvals</div>
             <div className="text-base font-extrabold text-amber-400">
@@ -959,8 +1042,21 @@ export default function AdminDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {sellers.map((s) => (
-                  <tr key={s._id}>
+                {sellers.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="py-12 text-center">
+                      <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-2 text-slate-400">
+                        <Store className="w-6 h-6" />
+                      </div>
+                      <p className="text-sm font-bold text-slate-800">No Seller Applications Found</p>
+                      <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                        New seller registrations will appear here for review, district verification, and custom commission overrides.
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  sellers.map((s) => (
+                    <tr key={s._id}>
                     <td className="py-3 pr-3">
                       <div className="font-bold text-slate-900">{s.storeName}</div>
                       <div className="text-slate-500">
@@ -1024,7 +1120,7 @@ export default function AdminDashboardPage() {
                       )}
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>
@@ -1051,8 +1147,21 @@ export default function AdminDashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {products.map((p) => (
-                    <tr key={p._id}>
+                  {products.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="py-12 text-center">
+                        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-2 text-slate-400">
+                          <Package className="w-6 h-6" />
+                        </div>
+                        <p className="text-sm font-bold text-slate-800">No Product Listings Submitted Yet</p>
+                        <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                          Product listings added by verified sellers will be displayed here for catalog moderation and approval.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    products.map((p) => (
+                      <tr key={p._id}>
                       <td className="py-2.5 pr-3">
                         <div className="flex items-center gap-2.5">
                           <img
@@ -1165,8 +1274,8 @@ export default function AdminDashboardPage() {
                         )}
                       </td>
                     </tr>
-                  ))}
-                </tbody>
+                  )))}
+              </tbody>
               </table>
             </div>
           </div>
@@ -1422,6 +1531,36 @@ export default function AdminDashboardPage() {
                                 Mobile Auto-Shared
                               </span>
                             )}
+                          </div>
+
+                          {/* Dual Device Preview Mini Thumbnails */}
+                          <div className="pt-1.5 border-t border-slate-100 grid grid-cols-2 gap-2 text-[10px]">
+                            <div>
+                              <div className="flex items-center justify-between text-slate-500 font-bold mb-1">
+                                <span>Desktop View</span>
+                                <span className="text-[9px] font-mono text-sky-700 bg-sky-50 px-1 rounded">1400×390</span>
+                              </div>
+                              <div className="aspect-[3.6/1] rounded overflow-hidden border border-slate-200 bg-slate-100">
+                                <img
+                                  src={banner.imageUrl || banner.mobileImageUrl}
+                                  alt="Desktop View"
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <div className="flex items-center justify-between text-slate-500 font-bold mb-1">
+                                <span>Mobile View</span>
+                                <span className="text-[9px] font-mono text-emerald-700 bg-emerald-50 px-1 rounded">1080×460</span>
+                              </div>
+                              <div className="aspect-[2.35/1] rounded overflow-hidden border border-slate-200 bg-slate-100">
+                                <img
+                                  src={banner.mobileImageUrl || banner.imageUrl}
+                                  alt="Mobile View"
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            </div>
                           </div>
 
                           <div className="text-[11px] font-mono text-slate-500 truncate pt-0.5">
@@ -1792,7 +1931,7 @@ export default function AdminDashboardPage() {
                       </td>
                     </tr>
                   ))}
-                </tbody>
+              </tbody>
               </table>
             </div>
           </div>
@@ -2892,6 +3031,30 @@ export default function AdminDashboardPage() {
                 />
               </div>
 
+              {/* Sync Both Displays Toggle */}
+              <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl flex items-center justify-between gap-3">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-amber-950 select-none">
+                  <input
+                    type="checkbox"
+                    checked={syncBothBannerImages}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setSyncBothBannerImages(checked);
+                      if (checked && bannerForm.imageUrl) {
+                        setBannerForm((prev) => ({ ...prev, mobileImageUrl: prev.imageUrl }));
+                      }
+                    }}
+                    className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300"
+                  />
+                  <span>Use one image for both Desktop and Mobile (Recommended)</span>
+                </label>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  syncBothBannerImages ? 'bg-amber-200 text-amber-900' : 'bg-slate-200 text-slate-700'
+                }`}>
+                  {syncBothBannerImages ? 'Auto-Synced' : 'Independent'}
+                </span>
+              </div>
+
               {/* 1. Desktop Banner Image Section */}
               <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
                 <div className="flex items-center justify-between">
@@ -2906,31 +3069,53 @@ export default function AdminDashboardPage() {
                       Displayed on desktop monitors and laptop screens.
                     </p>
                   </div>
-                  <label
-                    className={`cursor-pointer text-[11px] font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg border transition ${
-                      uploadingDesktopBanner
-                        ? 'bg-amber-100 text-amber-900 border-amber-300 cursor-wait'
-                        : 'bg-white hover:bg-amber-50 text-slate-800 border-slate-300 shadow-xs'
-                    }`}
-                  >
-                    <Upload className={`w-3.5 h-3.5 ${uploadingDesktopBanner ? 'animate-bounce' : ''}`} />
-                    {uploadingDesktopBanner ? 'Uploading...' : 'Upload Desktop'}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={uploadingDesktopBanner}
-                      className="hidden"
-                      onChange={(e) => {
-                        handleBannerImageUpload('imageUrl', e.target.files?.[0]);
-                        e.target.value = '';
-                      }}
-                    />
-                  </label>
+                  <div className="flex items-center gap-2">
+                    {bannerForm.mobileImageUrl && bannerForm.mobileImageUrl !== bannerForm.imageUrl && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBannerForm((prev) => ({ ...prev, imageUrl: prev.mobileImageUrl }));
+                          showToast('Copied mobile image to desktop banner!');
+                        }}
+                        className="text-[10px] font-bold text-sky-700 hover:text-sky-900 hover:underline inline-flex items-center gap-0.5"
+                      >
+                        <Copy className="w-3 h-3" />
+                        Copy from Mobile
+                      </button>
+                    )}
+                    <label
+                      className={`cursor-pointer text-[11px] font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg border transition ${
+                        uploadingDesktopBanner
+                          ? 'bg-amber-100 text-amber-900 border-amber-300 cursor-wait'
+                          : 'bg-white hover:bg-amber-50 text-slate-800 border-slate-300 shadow-xs'
+                      }`}
+                    >
+                      <Upload className={`w-3.5 h-3.5 ${uploadingDesktopBanner ? 'animate-bounce' : ''}`} />
+                      {uploadingDesktopBanner ? 'Uploading...' : 'Upload Desktop'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={uploadingDesktopBanner}
+                        className="hidden"
+                        onChange={(e) => {
+                          handleBannerImageUpload('imageUrl', e.target.files?.[0]);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
                 </div>
                 <input
                   type="text"
                   value={bannerForm.imageUrl}
-                  onChange={(e) => setBannerForm((prev) => ({ ...prev, imageUrl: e.target.value }))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setBannerForm((prev) => ({
+                      ...prev,
+                      imageUrl: val,
+                      ...(syncBothBannerImages ? { mobileImageUrl: val } : {})
+                    }));
+                  }}
                   placeholder="https://res.cloudinary.com/... or /banners/yaans_electronics_tech.webp"
                   className="w-full px-3 py-1.5 rounded-lg border border-slate-300 font-mono text-[11px] bg-white"
                 />
@@ -2970,37 +3155,73 @@ export default function AdminDashboardPage() {
                       </span>
                     </label>
                     <p className="text-[10px] text-slate-500">
-                      Displayed on smartphone screens. Optional (falls back to desktop banner if left blank).
+                      Displayed on smartphone screens (&lt; 768px).
                     </p>
                   </div>
-                  <label
-                    className={`cursor-pointer text-[11px] font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg border transition ${
-                      uploadingMobileBanner
-                        ? 'bg-amber-100 text-amber-900 border-amber-300 cursor-wait'
-                        : 'bg-white hover:bg-amber-50 text-slate-800 border-slate-300 shadow-xs'
-                    }`}
-                  >
-                    <Upload className={`w-3.5 h-3.5 ${uploadingMobileBanner ? 'animate-bounce' : ''}`} />
-                    {uploadingMobileBanner ? 'Uploading...' : 'Upload Mobile'}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={uploadingMobileBanner}
-                      className="hidden"
-                      onChange={(e) => {
-                        handleBannerImageUpload('mobileImageUrl', e.target.files?.[0]);
-                        e.target.value = '';
-                      }}
-                    />
-                  </label>
+                  <div className="flex items-center gap-2">
+                    {bannerForm.imageUrl && bannerForm.imageUrl !== bannerForm.mobileImageUrl && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBannerForm((prev) => ({ ...prev, mobileImageUrl: prev.imageUrl }));
+                          showToast('Copied desktop image to mobile banner!');
+                        }}
+                        className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 hover:underline inline-flex items-center gap-0.5"
+                      >
+                        <Copy className="w-3 h-3" />
+                        Copy from Desktop
+                      </button>
+                    )}
+                    <label
+                      className={`cursor-pointer text-[11px] font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg border transition ${
+                        uploadingMobileBanner
+                          ? 'bg-amber-100 text-amber-900 border-amber-300 cursor-wait'
+                          : 'bg-white hover:bg-amber-50 text-slate-800 border-slate-300 shadow-xs'
+                      }`}
+                    >
+                      <Upload className={`w-3.5 h-3.5 ${uploadingMobileBanner ? 'animate-bounce' : ''}`} />
+                      {uploadingMobileBanner ? 'Uploading...' : 'Upload Mobile'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={uploadingMobileBanner}
+                        className="hidden"
+                        onChange={(e) => {
+                          handleBannerImageUpload('mobileImageUrl', e.target.files?.[0]);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
                 </div>
                 <input
                   type="text"
                   value={bannerForm.mobileImageUrl}
-                  onChange={(e) => setBannerForm((prev) => ({ ...prev, mobileImageUrl: e.target.value }))}
-                  placeholder="https://res.cloudinary.com/... or /banners/mobile_hero_banner.jpg (Optional)"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setBannerForm((prev) => ({
+                      ...prev,
+                      mobileImageUrl: val,
+                      ...(syncBothBannerImages ? { imageUrl: val } : {})
+                    }));
+                  }}
+                  placeholder="https://res.cloudinary.com/... or /banners/yaans_electronics_tech.webp"
                   className="w-full px-3 py-1.5 rounded-lg border border-slate-300 font-mono text-[11px] bg-white"
                 />
+
+                {bannerForm.mobileImageUrl === '/mobile_hero_banner.jpg' && (
+                  <div className="p-2 rounded bg-amber-50 border border-amber-200 text-[11px] text-amber-900 flex items-center justify-between">
+                    <span>Mobile is using the old placeholder image. Click to use your Desktop image instead:</span>
+                    <button
+                      type="button"
+                      onClick={() => setBannerForm((prev) => ({ ...prev, mobileImageUrl: prev.imageUrl }))}
+                      disabled={!bannerForm.imageUrl || bannerForm.imageUrl === '/mobile_hero_banner.jpg'}
+                      className="px-2 py-0.5 rounded bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold text-[10px] disabled:opacity-40"
+                    >
+                      Sync Desktop
+                    </button>
+                  </div>
+                )}
 
                 {uploadingMobileBanner && (
                   <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center gap-2 text-xs font-bold text-amber-900">

@@ -267,8 +267,8 @@ export function getInitialSeedState() {
         title: 'Sri Lankan Homemade & Everyday Essentials',
         categorySlug: 'homemade-pantry',
         ctaLink: '/products?category=homemade-pantry',
-        imageUrl: '/mobile_hero_banner.jpg',
-        mobileImageUrl: '/mobile_hero_banner.jpg',
+        imageUrl: 'https://res.cloudinary.com/dfnxiumaq/image/upload/v1794337090/yaans_lk/banners/ylk_banner_essentials_desktop_1794337086304.webp',
+        mobileImageUrl: 'https://res.cloudinary.com/dfnxiumaq/image/upload/v1794337091/yaans_lk/banners/ylk_banner_essentials_mobile_1794337090161.webp',
         active: true,
         displayOrder: 1
       },
@@ -277,8 +277,8 @@ export function getInitialSeedState() {
         title: 'Electronics & Tech Accessories',
         categorySlug: 'electronics',
         ctaLink: '/products?category=electronics',
-        imageUrl: '/banners/yaans_electronics_tech.webp',
-        mobileImageUrl: '/banners/yaans_electronics_tech.webp',
+        imageUrl: 'https://res.cloudinary.com/dfnxiumaq/image/upload/v1794337092/yaans_lk/banners/ylk_banner_electronics_desktop_1794337091218.webp',
+        mobileImageUrl: 'https://res.cloudinary.com/dfnxiumaq/image/upload/v1794337093/yaans_lk/banners/ylk_banner_electronics_mobile_1794337092146.webp',
         active: true,
         displayOrder: 2
       },
@@ -287,8 +287,8 @@ export function getInitialSeedState() {
         title: 'Ceylon Spices & Local Homemade Goods',
         categorySlug: 'homemade-pantry',
         ctaLink: '/products?category=homemade-pantry',
-        imageUrl: '/banners/yaans_spices_local_products.webp',
-        mobileImageUrl: '/banners/yaans_spices_local_products.webp',
+        imageUrl: 'https://res.cloudinary.com/dfnxiumaq/image/upload/v1794337094/yaans_lk/banners/ylk_banner_spices_desktop_1794337093073.webp',
+        mobileImageUrl: 'https://res.cloudinary.com/dfnxiumaq/image/upload/v1794337095/yaans_lk/banners/ylk_banner_spices_mobile_1794337094020.webp',
         active: true,
         displayOrder: 3
       },
@@ -297,8 +297,8 @@ export function getInitialSeedState() {
         title: 'T-Shirts, Dresses & Island Fashion',
         categorySlug: 'fashion-handloom',
         ctaLink: '/products?category=fashion-handloom',
-        imageUrl: '/banners/yaans_tshirts_dresses.webp',
-        mobileImageUrl: '/banners/yaans_tshirts_dresses.webp',
+        imageUrl: 'https://res.cloudinary.com/dfnxiumaq/image/upload/v1794337096/yaans_lk/banners/ylk_banner_fashion_desktop_1794337095049.webp',
+        mobileImageUrl: 'https://res.cloudinary.com/dfnxiumaq/image/upload/v1794337097/yaans_lk/banners/ylk_banner_fashion_mobile_1794337095980.webp',
         active: true,
         displayOrder: 4
       },
@@ -307,10 +307,30 @@ export function getInitialSeedState() {
         title: 'Tools & Home Improvement Essentials',
         categorySlug: '',
         ctaLink: '/products',
-        imageUrl: '/banners/yaans_tools_home_improvement.webp',
-        mobileImageUrl: '/banners/yaans_tools_home_improvement.webp',
+        imageUrl: 'https://res.cloudinary.com/dfnxiumaq/image/upload/v1794337099/yaans_lk/banners/ylk_banner_tools_desktop_1794337097302.webp',
+        mobileImageUrl: 'https://res.cloudinary.com/dfnxiumaq/image/upload/v1794337100/yaans_lk/banners/ylk_banner_tools_mobile_1794337099509.webp',
         active: true,
         displayOrder: 5
+      },
+      {
+        id: 'bnr_6',
+        title: 'Baby & Kids Products',
+        categorySlug: '',
+        ctaLink: '/products',
+        imageUrl: 'https://res.cloudinary.com/dfnxiumaq/image/upload/v1794337101/yaans_lk/banners/ylk_banner_baby_desktop_1794337100454.webp',
+        mobileImageUrl: 'https://res.cloudinary.com/dfnxiumaq/image/upload/v1794337102/yaans_lk/banners/ylk_banner_baby_mobile_1794337101468.webp',
+        active: true,
+        displayOrder: 6
+      },
+      {
+        id: 'bnr_7',
+        title: 'Handmade Gifts & Local Crafts',
+        categorySlug: '',
+        ctaLink: '/products',
+        imageUrl: 'https://res.cloudinary.com/dfnxiumaq/image/upload/v1794337103/yaans_lk/banners/ylk_banner_gifts_desktop_1794337102557.webp',
+        mobileImageUrl: 'https://res.cloudinary.com/dfnxiumaq/image/upload/v1794337104/yaans_lk/banners/ylk_banner_gifts_mobile_1794337103523.webp',
+        active: true,
+        displayOrder: 7
       }
     ]
   };

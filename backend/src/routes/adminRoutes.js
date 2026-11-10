@@ -485,6 +485,119 @@ router.post('/upload-image', uploadMiddleware.single('image'), async (req, res) 
   }
 });
 
+// GET /api/admin/banners
+// List all homepage banner cards
+router.get('/banners', (_req, res) => {
+  const store = getStore();
+  const banners = [...(store.platformConfig.banners || [])].sort(
+    (a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)
+  );
+  return res.json({ banners });
+});
+
+// POST /api/admin/banners
+// Add a new homepage banner card attached to a category or all products
+router.post('/banners', (req, res) => {
+  const { title, imageUrl, categorySlug = '', ctaLink = '', active = true, displayOrder } = req.body;
+  if (!imageUrl) {
+    return res.status(400).json({ message: 'Banner image is required.' });
+  }
+
+  const store = getStore();
+  if (!Array.isArray(store.platformConfig.banners)) {
+    store.platformConfig.banners = [];
+  }
+
+  const resolvedLink =
+    ctaLink || (categorySlug ? `/products?category=${categorySlug}` : '/products');
+
+  const newBanner = {
+    id: generateId('bnr'),
+    title: title?.trim() || 'Homepage Banner Card',
+    imageUrl: imageUrl.trim(),
+    categorySlug: categorySlug ? categorySlug.trim() : '',
+    ctaLink: resolvedLink.trim(),
+    active: active !== false,
+    displayOrder:
+      displayOrder !== undefined
+        ? Number(displayOrder)
+        : store.platformConfig.banners.length + 1
+  };
+
+  store.platformConfig.banners.push(newBanner);
+  persistStore();
+  return res.status(201).json({ banner: newBanner, message: 'Homepage banner card created.' });
+});
+
+// PUT /api/admin/banners/:bannerId
+// Update an existing homepage banner card
+router.put('/banners/:bannerId', (req, res) => {
+  const { bannerId } = req.params;
+  const { title, imageUrl, categorySlug, ctaLink, active, displayOrder } = req.body;
+
+  const store = getStore();
+  if (!Array.isArray(store.platformConfig.banners)) {
+    store.platformConfig.banners = [];
+  }
+
+  const banner = store.platformConfig.banners.find((b) => b.id === bannerId);
+  if (!banner) {
+    return res.status(404).json({ message: 'Banner card not found.' });
+  }
+
+  if (title !== undefined) banner.title = title.trim();
+  if (imageUrl !== undefined) banner.imageUrl = imageUrl.trim();
+  if (categorySlug !== undefined) {
+    banner.categorySlug = categorySlug ? categorySlug.trim() : '';
+    if (!ctaLink) {
+      banner.ctaLink = banner.categorySlug
+        ? `/products?category=${banner.categorySlug}`
+        : '/products';
+    }
+  }
+  if (ctaLink !== undefined) banner.ctaLink = ctaLink.trim();
+  if (active !== undefined) banner.active = Boolean(active);
+  if (displayOrder !== undefined) banner.displayOrder = Number(displayOrder);
+
+  persistStore();
+  return res.json({ banner, message: 'Homepage banner card updated.' });
+});
+
+// DELETE /api/admin/banners/:bannerId
+// Remove a homepage banner card
+router.delete('/banners/:bannerId', (req, res) => {
+  const { bannerId } = req.params;
+  const store = getStore();
+  if (!Array.isArray(store.platformConfig.banners)) {
+    store.platformConfig.banners = [];
+  }
+
+  const idx = store.platformConfig.banners.findIndex((b) => b.id === bannerId);
+  if (idx === -1) {
+    return res.status(404).json({ message: 'Banner card not found.' });
+  }
+
+  store.platformConfig.banners.splice(idx, 1);
+  persistStore();
+  return res.json({ message: 'Banner card removed from homepage.' });
+});
+
+// PUT /api/admin/config/banners
+// Batch update or reorder banners
+router.put('/config/banners', (req, res) => {
+  const { banners } = req.body;
+  if (!Array.isArray(banners)) {
+    return res.status(400).json({ message: 'banners array is required.' });
+  }
+  const store = getStore();
+  store.platformConfig.banners = banners;
+  persistStore();
+  return res.json({
+    banners: store.platformConfig.banners,
+    message: 'Homepage banners successfully updated.'
+  });
+});
+
 // POST /api/admin/settlements/payout
 // Reconciles and settles all eligible_for_payout SubOrders for a given seller
 router.post('/settlements/payout', (req, res) => {

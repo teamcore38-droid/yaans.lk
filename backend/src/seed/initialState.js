@@ -264,39 +264,48 @@ export function getInitialSeedState() {
     banners: [
       {
         id: 'bnr_1',
-        badge: 'ISLANDWIDE CASH ON DELIVERY',
-        title: 'Authentic Sri Lankan Homemade & Everyday Essentials',
-        subtitle:
-          'Shop directly from home kitchens in Kandy, artisans in Galle, and verified tech sellers in Colombo — delivered across all 25 districts.',
-        ctaText: 'Explore Homemade Finds',
-        ctaLink: '/products?homemade=true',
-        imageUrl: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=1000&q=80',
-        bgClass: 'bg-slate-900',
-        active: true
+        title: 'Sri Lankan Homemade & Everyday Essentials',
+        categorySlug: 'homemade-pantry',
+        ctaLink: '/products?category=homemade-pantry',
+        imageUrl: '/mobile_hero_banner.jpg',
+        active: true,
+        displayOrder: 1
       },
       {
         id: 'bnr_2',
-        badge: 'DAILY VALUE DEALS IN LKR',
-        title: 'Work From Home & Tech Accessories Under Rs. 9,000',
-        subtitle:
-          'Genuine power banks, noise-cancelling headphones, and laptop stands with seller warranty and same-day Colombo dispatch.',
-        ctaText: 'Shop Tech Deals',
+        title: 'Electronics & Tech Accessories',
+        categorySlug: 'electronics',
         ctaLink: '/products?category=electronics',
-        imageUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1000&q=80',
-        bgClass: 'bg-slate-800',
-        active: true
+        imageUrl: '/banners/yaans_electronics_tech.webp',
+        active: true,
+        displayOrder: 2
       },
       {
         id: 'bnr_3',
-        badge: 'EMPOWERING LOCAL VENDORS',
-        title: 'Sell on Yaans.lk – Home-Based Sellers & Small Businesses Welcome',
-        subtitle:
-          'Low 5% homemade commission, automated district delivery fee calculation, and weekly bank settlements.',
-        ctaText: 'Become a Seller',
-        ctaLink: '/seller/register',
-        imageUrl: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=1000&q=80',
-        bgClass: 'bg-neutral-900',
-        active: true
+        title: 'Ceylon Spices & Local Homemade Goods',
+        categorySlug: 'homemade-pantry',
+        ctaLink: '/products?category=homemade-pantry',
+        imageUrl: '/banners/yaans_spices_local_products.webp',
+        active: true,
+        displayOrder: 3
+      },
+      {
+        id: 'bnr_4',
+        title: 'T-Shirts, Dresses & Island Fashion',
+        categorySlug: 'fashion-handloom',
+        ctaLink: '/products?category=fashion-handloom',
+        imageUrl: '/banners/yaans_tshirts_dresses.webp',
+        active: true,
+        displayOrder: 4
+      },
+      {
+        id: 'bnr_5',
+        title: 'Tools & Home Improvement Essentials',
+        categorySlug: '',
+        ctaLink: '/products',
+        imageUrl: '/banners/yaans_tools_home_improvement.webp',
+        active: true,
+        displayOrder: 5
       }
     ]
   };

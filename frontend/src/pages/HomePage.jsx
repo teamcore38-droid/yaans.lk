@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ChevronRight,
+  ChevronLeft,
   Sparkles,
   Tag,
   Store,
@@ -18,7 +19,9 @@ export default function HomePage() {
   const { user, selectedDistrict } = useMarketplace();
   const [homeData, setHomeData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [bannerIdx, setBannerIdx] = useState(0);
+  const [activeBannerIdx, setActiveBannerIdx] = useState(0);
+  const [isBannerPaused, setIsBannerPaused] = useState(false);
+  const [touchStartX, setTouchStartX] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -35,6 +38,45 @@ export default function HomePage() {
     };
   }, []);
 
+  const banners = homeData?.banners || [];
+
+  // Auto-swipe every 4.5 seconds
+  useEffect(() => {
+    if (banners.length <= 1 || isBannerPaused) return;
+    const interval = setInterval(() => {
+      setActiveBannerIdx((prev) => (prev + 1) % banners.length);
+    }, 4500);
+    return () => clearInterval(interval);
+  }, [banners.length, isBannerPaused]);
+
+  const handlePrevBanner = (e) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    setActiveBannerIdx((prev) => (prev - 1 + banners.length) % banners.length);
+  };
+
+  const handleNextBanner = (e) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    setActiveBannerIdx((prev) => (prev + 1) % banners.length);
+  };
+
+  const handleTouchStart = (e) => {
+    setTouchStartX(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e) => {
+    if (touchStartX === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchStartX - touchEndX;
+    if (diff > 45) {
+      handleNextBanner();
+    } else if (diff < -45) {
+      handlePrevBanner();
+    }
+    setTouchStartX(null);
+  };
+
   if (loading && !homeData) {
     return (
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-6 space-y-6">
@@ -48,31 +90,96 @@ export default function HomePage() {
     );
   }
 
-  const banners = homeData?.banners || [];
   const categories = homeData?.categories || [];
   const homemadeProducts = homeData?.homemadeProducts || [];
   const dealProducts = homeData?.dealProducts || [];
   const recommendedProducts = homeData?.recommendedProducts || [];
   const verifiedSellers = homeData?.verifiedSellers || [];
 
-  const activeBanner = banners[bannerIdx % Math.max(1, banners.length)];
-
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 space-y-4 sm:space-y-5">
-      {/* Top Practical Hero Banner (Unified for Desktop and Mobile) */}
-      {activeBanner && (
-        <div className="relative bg-[#fff1f3] rounded-xl border border-[#edd7df] overflow-hidden shadow-xs">
-          <Link
-            to={activeBanner.ctaLink || '/products'}
-            aria-label="Sri Lankan Homemade & Everyday Essentials - Shop Now"
-            className="block w-full overflow-hidden group focus:outline-none"
-          >
-            <img
-              src="/mobile_hero_banner.jpg"
-              alt="Sri Lankan Homemade & Everyday Essentials - Cash on Delivery"
-              className="w-full h-auto object-cover block group-hover:opacity-95 transition-opacity"
-            />
-          </Link>
+      {/* Top Practical Auto-Swipeable Hero Banner (Unified for Desktop and Mobile) */}
+      {banners.length > 0 && (
+        <div
+          className="relative bg-[#fff1f3] rounded-xl border border-[#edd7df] overflow-hidden shadow-xs select-none group"
+          onMouseEnter={() => setIsBannerPaused(true)}
+          onMouseLeave={() => setIsBannerPaused(false)}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Slides Carousel Container */}
+          <div className="relative w-full aspect-[2.35/1] overflow-hidden flex items-center justify-center">
+            {banners.map((banner, idx) => {
+              const isCurrent = idx === activeBannerIdx;
+              return (
+                <Link
+                  key={banner.id || idx}
+                  to={
+                    banner.ctaLink ||
+                    (banner.categorySlug
+                      ? `/products?category=${banner.categorySlug}`
+                      : '/products')
+                  }
+                  aria-label={banner.title || 'Sri Lankan Homemade & Everyday Essentials - Shop Now'}
+                  className={`absolute inset-0 w-full h-full transition-opacity duration-700 ease-in-out ${
+                    isCurrent
+                      ? 'opacity-100 z-10 pointer-events-auto'
+                      : 'opacity-0 z-0 pointer-events-none'
+                  }`}
+                >
+                  <img
+                    src={banner.imageUrl}
+                    alt={banner.title || 'Sri Lankan Homemade & Everyday Essentials'}
+                    className="w-full h-full object-cover block"
+                    loading={idx === 0 ? 'eager' : 'lazy'}
+                  />
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Previous / Next Arrow Controls */}
+          {banners.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={handlePrevBanner}
+                aria-label="Previous banner card"
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/85 hover:bg-white text-slate-900 shadow-md flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+              >
+                <ChevronLeft className="w-5 h-5 text-slate-800" />
+              </button>
+              <button
+                type="button"
+                onClick={handleNextBanner}
+                aria-label="Next banner card"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/85 hover:bg-white text-slate-900 shadow-md flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+              >
+                <ChevronRight className="w-5 h-5 text-slate-800" />
+              </button>
+
+              {/* Bottom Pagination Dots */}
+              <div className="absolute bottom-2.5 sm:bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/25 backdrop-blur-xs">
+                {banners.map((_, dotIdx) => (
+                  <button
+                    key={dotIdx}
+                    type="button"
+                    aria-label={`Slide ${dotIdx + 1}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setActiveBannerIdx(dotIdx);
+                    }}
+                    className={`transition-all duration-300 rounded-full ${
+                      dotIdx === activeBannerIdx
+                        ? 'w-5 h-2 bg-amber-400 shadow-xs'
+                        : 'w-2 h-2 bg-white/70 hover:bg-white'
+                    }`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 

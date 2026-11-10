@@ -17,7 +17,9 @@ router.get('/home', (req, res) => {
   );
 
   const categories = [...store.categories].sort((a, b) => a.displayOrder - b.displayOrder);
-  const banners = (store.platformConfig.banners || []).filter((b) => b.active !== false);
+  const banners = [...(store.platformConfig.banners || [])]
+    .filter((b) => b.active !== false)
+    .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
 
   const homemadeProducts = liveProducts.filter((p) => p.isHomemade).slice(0, 8);
   const dealProducts = liveProducts

@@ -10,5 +10,6 @@ backend/data/yaans_db.json
 backend/uploads/*
 !backend/uploads/.gitkeep
 *.log
+Banner images yaans.lk/
 .DS_Store
 Thumbs.db

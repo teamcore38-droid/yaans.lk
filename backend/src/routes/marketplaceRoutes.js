@@ -8,6 +8,7 @@ const router = express.Router();
 // GET /api/marketplace/home
 // Returns categories (with 2x2 quad cards), active banners, homemade showcase, daily deals, featured products, and districts
 router.get('/home', (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   const store = getStore();
   const approvedSellerIds = new Set(
     store.sellers.filter((s) => s.status === 'approved').map((s) => s._id)
@@ -17,7 +18,8 @@ router.get('/home', (req, res) => {
   );
 
   const categories = [...store.categories].sort((a, b) => a.displayOrder - b.displayOrder);
-  const banners = [...(store.platformConfig.banners || [])]
+  const banners = [...(store.platformConfig?.banners || [])]
+    .map((b, idx) => ({ ...b, id: b.id || (b._id ? String(b._id) : `bnr_${idx + 1}`) }))
     .filter((b) => b.active !== false)
     .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
 

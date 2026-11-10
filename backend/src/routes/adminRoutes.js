@@ -474,7 +474,7 @@ router.post('/upload-image', uploadMiddleware.single('image'), async (req, res) 
       return res.status(400).json({ message: 'No image file was provided.' });
     }
     const uploaded = await uploadToCloudinary(req.file.buffer, {
-      folder: 'yaans_lk/categories',
+      folder: 'yaans_lk/banners',
       originalname: req.file.originalname,
       mimetype: req.file.mimetype,
       req
@@ -488,10 +488,11 @@ router.post('/upload-image', uploadMiddleware.single('image'), async (req, res) 
 // GET /api/admin/banners
 // List all homepage banner cards
 router.get('/banners', (_req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   const store = getStore();
-  const banners = [...(store.platformConfig.banners || [])].sort(
-    (a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)
-  );
+  const banners = [...(store.platformConfig?.banners || [])]
+    .map((b, idx) => ({ ...b, id: b.id || (b._id ? String(b._id) : `bnr_${idx + 1}`) }))
+    .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
   return res.json({ banners });
 });
 
@@ -540,11 +541,25 @@ router.put('/banners/:bannerId', (req, res) => {
     store.platformConfig.banners = [];
   }
 
-  const banner = store.platformConfig.banners.find((b) => b.id === bannerId);
+  let banner = store.platformConfig.banners.find(
+    (b) =>
+      (b.id && b.id === bannerId) ||
+      (b._id && String(b._id) === String(bannerId)) ||
+      String(b.id) === String(bannerId)
+  );
+
+  if (!banner && /^\d+$/.test(bannerId)) {
+    const idx = parseInt(bannerId, 10);
+    if (store.platformConfig.banners[idx]) {
+      banner = store.platformConfig.banners[idx];
+    }
+  }
+
   if (!banner) {
     return res.status(404).json({ message: 'Banner card not found.' });
   }
 
+  if (!banner.id) banner.id = bannerId || generateId('bnr');
   if (title !== undefined) banner.title = title.trim();
   if (imageUrl !== undefined) banner.imageUrl = imageUrl.trim();
   if (categorySlug !== undefined) {
@@ -572,7 +587,20 @@ router.delete('/banners/:bannerId', (req, res) => {
     store.platformConfig.banners = [];
   }
 
-  const idx = store.platformConfig.banners.findIndex((b) => b.id === bannerId);
+  let idx = store.platformConfig.banners.findIndex(
+    (b) =>
+      (b.id && b.id === bannerId) ||
+      (b._id && String(b._id) === String(bannerId)) ||
+      String(b.id) === String(bannerId)
+  );
+
+  if (idx === -1 && /^\d+$/.test(bannerId)) {
+    const numIdx = parseInt(bannerId, 10);
+    if (store.platformConfig.banners[numIdx]) {
+      idx = numIdx;
+    }
+  }
+
   if (idx === -1) {
     return res.status(404).json({ message: 'Banner card not found.' });
   }

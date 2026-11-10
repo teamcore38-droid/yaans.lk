@@ -25,7 +25,7 @@ export default function HomePage() {
 
   useEffect(() => {
     let mounted = true;
-    apiRequest('/marketplace/home')
+    apiRequest(`/marketplace/home?_t=${Date.now()}`)
       .then((data) => {
         if (mounted) setHomeData(data);
       })
@@ -107,8 +107,8 @@ export default function HomePage() {
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
-          {/* Slides Carousel Container */}
-          <div className="relative w-full aspect-[2.35/1] overflow-hidden flex items-center justify-center">
+          {/* Slides Carousel Container - Sleek height proportion, reduced on desktop */}
+          <div className="relative w-full aspect-[2.35/1] sm:aspect-[2.7/1] md:aspect-[3.2/1] lg:aspect-[3.6/1] max-h-[290px] sm:max-h-[300px] overflow-hidden flex items-center justify-center">
             {banners.map((banner, idx) => {
               const isCurrent = idx === activeBannerIdx;
               return (
@@ -130,7 +130,7 @@ export default function HomePage() {
                   <img
                     src={banner.imageUrl}
                     alt={banner.title || 'Sri Lankan Homemade & Everyday Essentials'}
-                    className="w-full h-full object-cover block"
+                    className="w-full h-full object-cover object-center block"
                     loading={idx === 0 ? 'eager' : 'lazy'}
                   />
                 </Link>

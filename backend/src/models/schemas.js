@@ -314,6 +314,8 @@ const PlatformConfigSchema = new Schema(
     globalFreeShippingMinLkr: { type: Number, default: 0 },
     supportPhone: { type: String, default: '+94 11 234 5678' },
     supportWhatsapp: { type: String, default: '+94 77 123 4567' },
+    shippingMode: { type: String, default: 'custom' },
+    flatShippingRateLkr: { type: Number, default: 350 },
     districts: [
       {
         code: String,
@@ -328,19 +330,17 @@ const PlatformConfigSchema = new Schema(
     ],
     banners: [
       {
-        id: String,
-        badge: String,
-        title: String,
-        subtitle: String,
-        ctaText: String,
-        ctaLink: String,
-        imageUrl: String,
-        bgClass: String,
-        active: Boolean
+        id: { type: String },
+        title: { type: String, default: '' },
+        imageUrl: { type: String, default: '' },
+        categorySlug: { type: String, default: '' },
+        ctaLink: { type: String, default: '/products' },
+        active: { type: Boolean, default: true },
+        displayOrder: { type: Number, default: 1 }
       }
     ]
   },
-  { timestamps: true }
+  { timestamps: true, strict: false }
 );
 
 export const UserModel = mongoose.models.User || mongoose.model('User', UserSchema);

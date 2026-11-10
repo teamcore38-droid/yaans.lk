@@ -116,7 +116,14 @@ export async function loadStoreFromMongo() {
       orders: orders.map((d) => ({ ...d, _id: String(d._id) })),
       settlements: settlements.map((d) => ({ ...d, _id: String(d._id) })),
       platformConfig: platformConfigDoc
-        ? { ...platformConfigDoc, _id: String(platformConfigDoc._id) }
+        ? {
+            ...platformConfigDoc,
+            _id: String(platformConfigDoc._id),
+            banners:
+              Array.isArray(platformConfigDoc.banners) && platformConfigDoc.banners.length > 0
+                ? platformConfigDoc.banners
+                : seedFallback.platformConfig?.banners || []
+          }
         : seedFallback.platformConfig
     };
     lastMongoSyncTime = Date.now();

@@ -222,7 +222,7 @@ export default function AdminDashboardPage() {
   const fetchOverview = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await apiRequest('/admin/overview');
+      const res = await apiRequest(`/admin/overview?_t=${Date.now()}`);
       setData(res);
       setDistrictsState(res.platformConfig?.districts || []);
       setBannersState(res.platformConfig?.banners || []);
@@ -731,12 +731,17 @@ export default function AdminDashboardPage() {
         method: 'POST',
         body: formData
       });
-      setBannerForm((prev) => ({ ...prev, imageUrl: res.url }));
-      showToast('Banner image uploaded to Cloudinary!');
+      if (res?.url) {
+        setBannerForm((prev) => ({ ...prev, imageUrl: res.url }));
+        showToast('Banner image uploaded to Cloudinary CDN successfully!');
+      } else {
+        throw new Error('Image upload failed: no URL returned.');
+      }
     } catch (err) {
-      showToast(err.message, 'error');
+      showToast(err.message || 'Banner upload failed.', 'error');
     } finally {
       setUploadingBannerImage(false);
+      if (e.target) e.target.value = '';
     }
   };
 
@@ -748,12 +753,13 @@ export default function AdminDashboardPage() {
     }
     try {
       setSavingBanner(true);
-      if (editingBanner) {
-        await apiRequest(`/admin/banners/${editingBanner.id}`, {
+      const targetId = editingBanner?.id || editingBanner?._id;
+      if (editingBanner && targetId) {
+        await apiRequest(`/admin/banners/${targetId}`, {
           method: 'PUT',
           body: JSON.stringify(bannerForm)
         });
-        showToast('Homepage banner card updated!');
+        showToast('Homepage banner card updated successfully!');
       } else {
         await apiRequest('/admin/banners', {
           method: 'POST',
@@ -762,7 +768,7 @@ export default function AdminDashboardPage() {
         showToast('New homepage banner card created!');
       }
       closeBannerModal();
-      fetchOverview();
+      await fetchOverview();
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -771,6 +777,7 @@ export default function AdminDashboardPage() {
   };
 
   const handleDeleteBanner = async (bannerId, title) => {
+    if (!bannerId) return;
     if (!window.confirm(`Are you sure you want to remove the banner "${title || 'Untitled'}"?`)) {
       return;
     }
@@ -779,7 +786,7 @@ export default function AdminDashboardPage() {
         method: 'DELETE'
       });
       showToast('Banner card removed from homepage.');
-      fetchOverview();
+      await fetchOverview();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -787,12 +794,14 @@ export default function AdminDashboardPage() {
 
   const handleToggleBannerActive = async (banner) => {
     try {
-      await apiRequest(`/admin/banners/${banner.id}`, {
+      const targetId = banner.id || banner._id;
+      if (!targetId) return;
+      await apiRequest(`/admin/banners/${targetId}`, {
         method: 'PUT',
         body: JSON.stringify({ active: !banner.active })
       });
       showToast(`Banner "${banner.title || 'Untitled'}" ${banner.active ? 'hidden' : 'activated'}.`);
-      fetchOverview();
+      await fetchOverview();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -1409,7 +1418,7 @@ export default function AdminDashboardPage() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleDeleteBanner(banner.id, banner.title)}
+                              onClick={() => handleDeleteBanner(banner.id || banner._id, banner.title)}
                               className="p-1.5 rounded border border-red-200 text-red-600 hover:bg-red-50 transition"
                               title="Delete Banner"
                             >
@@ -2853,8 +2862,14 @@ export default function AdminDashboardPage() {
                   <label className="text-xs font-bold text-slate-700">
                     Banner Image (Desktop & Mobile) *
                   </label>
-                  <label className="cursor-pointer text-[11px] font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1">
-                    <Upload className="w-3 h-3" />
+                  <label
+                    className={`cursor-pointer text-[11px] font-bold flex items-center gap-1.5 px-3 py-1 rounded-lg border transition ${
+                      uploadingBannerImage
+                        ? 'bg-amber-100 text-amber-900 border-amber-300 cursor-wait'
+                        : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
+                    }`}
+                  >
+                    <Upload className={`w-3.5 h-3.5 ${uploadingBannerImage ? 'animate-bounce' : ''}`} />
                     {uploadingBannerImage ? 'Uploading to Cloudinary...' : 'Upload from Device'}
                     <input
                       type="file"
@@ -2874,11 +2889,18 @@ export default function AdminDashboardPage() {
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono text-[11px]"
                 />
                 <p className="text-[10px] text-slate-400 mt-1">
-                  Recommended ratio ~2.35:1 (e.g. 995x422 or 1200x510). Uploading from device automatically saves to Cloudinary.
+                  Upload an image from your device to save instantly to Cloudinary CDN, or paste any image URL.
                 </p>
 
-                {bannerForm.imageUrl && (
-                  <div className="mt-2 rounded-lg overflow-hidden border border-slate-200 aspect-[2.35/1] bg-slate-100">
+                {uploadingBannerImage && (
+                  <div className="mt-2 p-3 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center gap-2 text-xs font-bold text-amber-900">
+                    <span className="w-3.5 h-3.5 rounded-full border-2 border-amber-600 border-t-transparent animate-spin"></span>
+                    Uploading banner to Cloudinary CDN, please wait...
+                  </div>
+                )}
+
+                {bannerForm.imageUrl && !uploadingBannerImage && (
+                  <div className="mt-2 rounded-lg overflow-hidden border border-slate-200 aspect-[3/1] max-h-[140px] bg-slate-100 relative group">
                     <img
                       src={bannerForm.imageUrl}
                       alt="Banner Preview"
@@ -2887,6 +2909,9 @@ export default function AdminDashboardPage() {
                         e.target.style.display = 'none';
                       }}
                     />
+                    <div className="absolute bottom-1.5 right-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-900/80 text-white">
+                      Image Ready
+                    </div>
                   </div>
                 )}
               </div>

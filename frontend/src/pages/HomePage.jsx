@@ -111,6 +111,8 @@ export default function HomePage() {
           <div className="relative w-full aspect-[2.35/1] sm:aspect-[2.7/1] md:aspect-[3.2/1] lg:aspect-[3.6/1] max-h-[290px] sm:max-h-[300px] overflow-hidden flex items-center justify-center">
             {banners.map((banner, idx) => {
               const isCurrent = idx === activeBannerIdx;
+              const desktopImg = banner.imageUrl || banner.mobileImageUrl || '';
+              const mobileImg = banner.mobileImageUrl || banner.imageUrl || '';
               return (
                 <Link
                   key={banner.id || idx}
@@ -127,12 +129,17 @@ export default function HomePage() {
                       : 'opacity-0 z-0 pointer-events-none'
                   }`}
                 >
-                  <img
-                    src={banner.imageUrl}
-                    alt={banner.title || 'Sri Lankan Homemade & Everyday Essentials'}
-                    className="w-full h-full object-cover object-center block"
-                    loading={idx === 0 ? 'eager' : 'lazy'}
-                  />
+                  <picture className="w-full h-full block">
+                    {/* Desktop source for screens >= 768px */}
+                    {desktopImg && <source media="(min-width: 768px)" srcSet={desktopImg} />}
+                    {/* Mobile image for screens < 768px (falls back to desktopImg if mobileImg not specified) */}
+                    <img
+                      src={mobileImg || desktopImg}
+                      alt={banner.title || 'Sri Lankan Homemade & Everyday Essentials'}
+                      className="w-full h-full object-cover object-center block"
+                      loading={idx === 0 ? 'eager' : 'lazy'}
+                    />
+                  </picture>
                 </Link>
               );
             })}

@@ -19,7 +19,12 @@ router.get('/home', (req, res) => {
 
   const categories = [...store.categories].sort((a, b) => a.displayOrder - b.displayOrder);
   const banners = [...(store.platformConfig?.banners || [])]
-    .map((b, idx) => ({ ...b, id: b.id || (b._id ? String(b._id) : `bnr_${idx + 1}`) }))
+    .map((b, idx) => ({
+      ...b,
+      id: b.id || (b._id ? String(b._id) : `bnr_${idx + 1}`),
+      imageUrl: b.imageUrl || b.mobileImageUrl || '',
+      mobileImageUrl: b.mobileImageUrl || b.imageUrl || ''
+    }))
     .filter((b) => b.active !== false)
     .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
 

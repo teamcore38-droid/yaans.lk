@@ -333,6 +333,7 @@ const PlatformConfigSchema = new Schema(
         id: { type: String },
         title: { type: String, default: '' },
         imageUrl: { type: String, default: '' },
+        mobileImageUrl: { type: String, default: '' },
         categorySlug: { type: String, default: '' },
         ctaLink: { type: String, default: '/products' },
         active: { type: Boolean, default: true },

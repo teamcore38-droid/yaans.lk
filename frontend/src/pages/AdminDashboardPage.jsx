@@ -134,11 +134,13 @@ export default function AdminDashboardPage() {
   const [bannersState, setBannersState] = useState([]);
   const [editingBanner, setEditingBanner] = useState(null);
   const [savingBanner, setSavingBanner] = useState(false);
-  const [uploadingBannerImage, setUploadingBannerImage] = useState(false);
+  const [uploadingDesktopBanner, setUploadingDesktopBanner] = useState(false);
+  const [uploadingMobileBanner, setUploadingMobileBanner] = useState(false);
   const [bannerModalOpen, setBannerModalOpen] = useState(false);
   const [bannerForm, setBannerForm] = useState({
     title: '',
     imageUrl: '',
+    mobileImageUrl: '',
     categorySlug: '',
     ctaLink: '',
     active: true,
@@ -694,6 +696,7 @@ export default function AdminDashboardPage() {
     setBannerForm({
       title: '',
       imageUrl: '',
+      mobileImageUrl: '',
       categorySlug: '',
       ctaLink: '/products',
       active: true,
@@ -707,6 +710,7 @@ export default function AdminDashboardPage() {
     setBannerForm({
       title: banner.title || '',
       imageUrl: banner.imageUrl || '',
+      mobileImageUrl: banner.mobileImageUrl || '',
       categorySlug: banner.categorySlug || '',
       ctaLink: banner.ctaLink || (banner.categorySlug ? `/products?category=${banner.categorySlug}` : '/products'),
       active: banner.active ?? true,
@@ -720,50 +724,61 @@ export default function AdminDashboardPage() {
     setEditingBanner(null);
   };
 
-  const handleBannerImageUpload = async (e) => {
-    const file = e.target.files?.[0];
+  const handleBannerImageUpload = async (field, file) => {
     if (!file) return;
     const formData = new FormData();
     formData.append('image', file);
+    const isMobile = field === 'mobileImageUrl';
     try {
-      setUploadingBannerImage(true);
+      if (isMobile) setUploadingMobileBanner(true);
+      else setUploadingDesktopBanner(true);
+
       const res = await apiRequest('/admin/upload-image', {
         method: 'POST',
         body: formData
       });
       if (res?.url) {
-        setBannerForm((prev) => ({ ...prev, imageUrl: res.url }));
-        showToast('Banner image uploaded to Cloudinary CDN successfully!');
+        setBannerForm((prev) => ({ ...prev, [field]: res.url }));
+        showToast(
+          isMobile
+            ? 'Mobile banner image uploaded to Cloudinary CDN!'
+            : 'Desktop banner image uploaded to Cloudinary CDN!'
+        );
       } else {
         throw new Error('Image upload failed: no URL returned.');
       }
     } catch (err) {
       showToast(err.message || 'Banner upload failed.', 'error');
     } finally {
-      setUploadingBannerImage(false);
-      if (e.target) e.target.value = '';
+      if (isMobile) setUploadingMobileBanner(false);
+      else setUploadingDesktopBanner(false);
     }
   };
 
   const handleSaveBanner = async (e) => {
     e.preventDefault();
-    if (!bannerForm.imageUrl) {
-      showToast('Please upload or specify a banner image.', 'error');
+    if (!bannerForm.imageUrl && !bannerForm.mobileImageUrl) {
+      showToast('Please upload or specify at least one banner image (desktop or mobile).', 'error');
       return;
     }
+    const payload = {
+      ...bannerForm,
+      imageUrl: (bannerForm.imageUrl || bannerForm.mobileImageUrl).trim(),
+      mobileImageUrl: (bannerForm.mobileImageUrl || bannerForm.imageUrl).trim()
+    };
     try {
       setSavingBanner(true);
       const targetId = editingBanner?.id || editingBanner?._id;
       if (editingBanner && targetId) {
         await apiRequest(`/admin/banners/${targetId}`, {
           method: 'PUT',
-          body: JSON.stringify(bannerForm)
+          body: JSON.stringify(payload)
         });
         showToast('Homepage banner card updated successfully!');
       } else {
         await apiRequest('/admin/banners', {
           method: 'POST',
-          body: JSON.stringify(bannerForm)
+          body: JSON.stringify(payload)
         });
         showToast('New homepage banner card created!');
       }
@@ -1342,9 +1357,9 @@ export default function AdminDashboardPage() {
                       }`}
                     >
                       {/* Banner Image Preview */}
-                      <div className="relative aspect-[2.35/1] bg-slate-100 overflow-hidden group">
+                      <div className="relative aspect-[3.2/1] bg-slate-100 overflow-hidden group">
                         <img
-                          src={banner.imageUrl}
+                          src={banner.imageUrl || banner.mobileImageUrl}
                           alt={banner.title || 'Banner'}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -1366,6 +1381,12 @@ export default function AdminDashboardPage() {
                             </span>
                           )}
                         </div>
+
+                        {banner.mobileImageUrl && (
+                          <div className="absolute bottom-1.5 right-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 text-emerald-200 backdrop-blur-xs border border-emerald-400/30">
+                            Dual Desktop + Mobile
+                          </div>
+                        )}
                       </div>
 
                       {/* Banner Details */}
@@ -1388,7 +1409,22 @@ export default function AdminDashboardPage() {
                             )}
                           </div>
 
-                          <div className="text-[11px] font-mono text-slate-500 truncate">
+                          <div className="flex items-center gap-1.5 flex-wrap text-[10px] pt-0.5">
+                            <span className="px-1.5 py-0.5 rounded font-bold bg-sky-50 text-sky-700 border border-sky-200">
+                              Desktop Banner Active
+                            </span>
+                            {banner.mobileImageUrl ? (
+                              <span className="px-1.5 py-0.5 rounded font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Mobile Custom
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded font-medium bg-slate-100 text-slate-600">
+                                Mobile Auto-Shared
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="text-[11px] font-mono text-slate-500 truncate pt-0.5">
                             Link: {banner.ctaLink || '/products'}
                           </div>
                         </div>
@@ -2856,61 +2892,135 @@ export default function AdminDashboardPage() {
                 />
               </div>
 
-              {/* Banner Image URL + Cloudinary Upload */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-slate-700">
-                    Banner Image (Desktop & Mobile) *
-                  </label>
+              {/* 1. Desktop Banner Image Section */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <span>Desktop Banner Image</span>
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-sky-100 text-sky-800">
+                        1400 × 390 px (~3.6:1)
+                      </span>
+                    </label>
+                    <p className="text-[10px] text-slate-500">
+                      Displayed on desktop monitors and laptop screens.
+                    </p>
+                  </div>
                   <label
-                    className={`cursor-pointer text-[11px] font-bold flex items-center gap-1.5 px-3 py-1 rounded-lg border transition ${
-                      uploadingBannerImage
+                    className={`cursor-pointer text-[11px] font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg border transition ${
+                      uploadingDesktopBanner
                         ? 'bg-amber-100 text-amber-900 border-amber-300 cursor-wait'
-                        : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
+                        : 'bg-white hover:bg-amber-50 text-slate-800 border-slate-300 shadow-xs'
                     }`}
                   >
-                    <Upload className={`w-3.5 h-3.5 ${uploadingBannerImage ? 'animate-bounce' : ''}`} />
-                    {uploadingBannerImage ? 'Uploading to Cloudinary...' : 'Upload from Device'}
+                    <Upload className={`w-3.5 h-3.5 ${uploadingDesktopBanner ? 'animate-bounce' : ''}`} />
+                    {uploadingDesktopBanner ? 'Uploading...' : 'Upload Desktop'}
                     <input
                       type="file"
                       accept="image/*"
-                      disabled={uploadingBannerImage}
+                      disabled={uploadingDesktopBanner}
                       className="hidden"
-                      onChange={handleBannerImageUpload}
+                      onChange={(e) => {
+                        handleBannerImageUpload('imageUrl', e.target.files?.[0]);
+                        e.target.value = '';
+                      }}
                     />
                   </label>
                 </div>
                 <input
                   type="text"
-                  required
                   value={bannerForm.imageUrl}
                   onChange={(e) => setBannerForm((prev) => ({ ...prev, imageUrl: e.target.value }))}
                   placeholder="https://res.cloudinary.com/... or /banners/yaans_electronics_tech.webp"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono text-[11px]"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 font-mono text-[11px] bg-white"
                 />
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Upload an image from your device to save instantly to Cloudinary CDN, or paste any image URL.
-                </p>
 
-                {uploadingBannerImage && (
-                  <div className="mt-2 p-3 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center gap-2 text-xs font-bold text-amber-900">
+                {uploadingDesktopBanner && (
+                  <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center gap-2 text-xs font-bold text-amber-900">
                     <span className="w-3.5 h-3.5 rounded-full border-2 border-amber-600 border-t-transparent animate-spin"></span>
-                    Uploading banner to Cloudinary CDN, please wait...
+                    Uploading desktop banner to Cloudinary...
                   </div>
                 )}
 
-                {bannerForm.imageUrl && !uploadingBannerImage && (
-                  <div className="mt-2 rounded-lg overflow-hidden border border-slate-200 aspect-[3/1] max-h-[140px] bg-slate-100 relative group">
+                {bannerForm.imageUrl && !uploadingDesktopBanner && (
+                  <div className="rounded-lg overflow-hidden border border-slate-200 aspect-[3.6/1] max-h-[110px] bg-slate-100 relative group">
                     <img
                       src={bannerForm.imageUrl}
-                      alt="Banner Preview"
+                      alt="Desktop Banner Preview"
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         e.target.style.display = 'none';
                       }}
                     />
-                    <div className="absolute bottom-1.5 right-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-900/80 text-white">
-                      Image Ready
+                    <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-900/80 text-white">
+                      Desktop Ready
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. Mobile Banner Image Section */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <span>Mobile Banner Image</span>
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                        1080 × 460 px (~2.35:1)
+                      </span>
+                    </label>
+                    <p className="text-[10px] text-slate-500">
+                      Displayed on smartphone screens. Optional (falls back to desktop banner if left blank).
+                    </p>
+                  </div>
+                  <label
+                    className={`cursor-pointer text-[11px] font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg border transition ${
+                      uploadingMobileBanner
+                        ? 'bg-amber-100 text-amber-900 border-amber-300 cursor-wait'
+                        : 'bg-white hover:bg-amber-50 text-slate-800 border-slate-300 shadow-xs'
+                    }`}
+                  >
+                    <Upload className={`w-3.5 h-3.5 ${uploadingMobileBanner ? 'animate-bounce' : ''}`} />
+                    {uploadingMobileBanner ? 'Uploading...' : 'Upload Mobile'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={uploadingMobileBanner}
+                      className="hidden"
+                      onChange={(e) => {
+                        handleBannerImageUpload('mobileImageUrl', e.target.files?.[0]);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                </div>
+                <input
+                  type="text"
+                  value={bannerForm.mobileImageUrl}
+                  onChange={(e) => setBannerForm((prev) => ({ ...prev, mobileImageUrl: e.target.value }))}
+                  placeholder="https://res.cloudinary.com/... or /banners/mobile_hero_banner.jpg (Optional)"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 font-mono text-[11px] bg-white"
+                />
+
+                {uploadingMobileBanner && (
+                  <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center gap-2 text-xs font-bold text-amber-900">
+                    <span className="w-3.5 h-3.5 rounded-full border-2 border-amber-600 border-t-transparent animate-spin"></span>
+                    Uploading mobile banner to Cloudinary...
+                  </div>
+                )}
+
+                {bannerForm.mobileImageUrl && !uploadingMobileBanner && (
+                  <div className="rounded-lg overflow-hidden border border-slate-200 aspect-[2.35/1] max-h-[110px] bg-slate-100 relative group">
+                    <img
+                      src={bannerForm.mobileImageUrl}
+                      alt="Mobile Banner Preview"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                    <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-900/80 text-white">
+                      Mobile Ready
                     </div>
                   </div>
                 )}

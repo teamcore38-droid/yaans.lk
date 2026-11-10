@@ -268,6 +268,7 @@ export function getInitialSeedState() {
         categorySlug: 'homemade-pantry',
         ctaLink: '/products?category=homemade-pantry',
         imageUrl: '/mobile_hero_banner.jpg',
+        mobileImageUrl: '/mobile_hero_banner.jpg',
         active: true,
         displayOrder: 1
       },
@@ -277,6 +278,7 @@ export function getInitialSeedState() {
         categorySlug: 'electronics',
         ctaLink: '/products?category=electronics',
         imageUrl: '/banners/yaans_electronics_tech.webp',
+        mobileImageUrl: '/banners/yaans_electronics_tech.webp',
         active: true,
         displayOrder: 2
       },
@@ -286,6 +288,7 @@ export function getInitialSeedState() {
         categorySlug: 'homemade-pantry',
         ctaLink: '/products?category=homemade-pantry',
         imageUrl: '/banners/yaans_spices_local_products.webp',
+        mobileImageUrl: '/banners/yaans_spices_local_products.webp',
         active: true,
         displayOrder: 3
       },
@@ -295,6 +298,7 @@ export function getInitialSeedState() {
         categorySlug: 'fashion-handloom',
         ctaLink: '/products?category=fashion-handloom',
         imageUrl: '/banners/yaans_tshirts_dresses.webp',
+        mobileImageUrl: '/banners/yaans_tshirts_dresses.webp',
         active: true,
         displayOrder: 4
       },
@@ -304,6 +308,7 @@ export function getInitialSeedState() {
         categorySlug: '',
         ctaLink: '/products',
         imageUrl: '/banners/yaans_tools_home_improvement.webp',
+        mobileImageUrl: '/banners/yaans_tools_home_improvement.webp',
         active: true,
         displayOrder: 5
       }

@@ -499,9 +499,21 @@ router.get('/banners', (_req, res) => {
 // POST /api/admin/banners
 // Add a new homepage banner card attached to a category or all products
 router.post('/banners', (req, res) => {
-  const { title, imageUrl, categorySlug = '', ctaLink = '', active = true, displayOrder } = req.body;
-  if (!imageUrl) {
-    return res.status(400).json({ message: 'Banner image is required.' });
+  const {
+    title,
+    imageUrl = '',
+    mobileImageUrl = '',
+    categorySlug = '',
+    ctaLink = '',
+    active = true,
+    displayOrder
+  } = req.body;
+
+  const finalDesktopImg = (imageUrl || mobileImageUrl || '').trim();
+  const finalMobileImg = (mobileImageUrl || imageUrl || '').trim();
+
+  if (!finalDesktopImg && !finalMobileImg) {
+    return res.status(400).json({ message: 'Banner image is required (desktop or mobile).' });
   }
 
   const store = getStore();
@@ -515,7 +527,8 @@ router.post('/banners', (req, res) => {
   const newBanner = {
     id: generateId('bnr'),
     title: title?.trim() || 'Homepage Banner Card',
-    imageUrl: imageUrl.trim(),
+    imageUrl: finalDesktopImg,
+    mobileImageUrl: finalMobileImg,
     categorySlug: categorySlug ? categorySlug.trim() : '',
     ctaLink: resolvedLink.trim(),
     active: active !== false,
@@ -534,7 +547,7 @@ router.post('/banners', (req, res) => {
 // Update an existing homepage banner card
 router.put('/banners/:bannerId', (req, res) => {
   const { bannerId } = req.params;
-  const { title, imageUrl, categorySlug, ctaLink, active, displayOrder } = req.body;
+  const { title, imageUrl, mobileImageUrl, categorySlug, ctaLink, active, displayOrder } = req.body;
 
   const store = getStore();
   if (!Array.isArray(store.platformConfig.banners)) {
@@ -562,6 +575,7 @@ router.put('/banners/:bannerId', (req, res) => {
   if (!banner.id) banner.id = bannerId || generateId('bnr');
   if (title !== undefined) banner.title = title.trim();
   if (imageUrl !== undefined) banner.imageUrl = imageUrl.trim();
+  if (mobileImageUrl !== undefined) banner.mobileImageUrl = mobileImageUrl.trim();
   if (categorySlug !== undefined) {
     banner.categorySlug = categorySlug ? categorySlug.trim() : '';
     if (!ctaLink) {

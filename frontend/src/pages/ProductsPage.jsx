@@ -9,7 +9,8 @@ import {
   ArrowUp,
   Loader2
 } from 'lucide-react';
-import { apiRequest } from '../utils/api.js';
+import { apiRequest, getCachedApiResponse } from '../utils/api.js';
+import { productsEndpoint } from '../utils/navigation.js';
 import { useMarketplace } from '../context/MarketplaceContext.jsx';
 import ProductCard from '../components/ProductCard.jsx';
 
@@ -28,13 +29,18 @@ const SELLER_ORIGIN_DISTRICTS = ['All Districts', 'Colombo', 'Kandy', 'Galle', '
 export default function ProductsPage() {
   const { categories = [] } = useMarketplace();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [products, setProducts] = useState([]);
-  const [pagination, setPagination] = useState({ total: 0, page: 1, totalPages: 1 });
+  const firstPageEndpoint = productsEndpoint(searchParams);
+  const cachedPage = getCachedApiResponse(firstPageEndpoint);
+  const [products, setProducts] = useState(() => cachedPage?.products || []);
+  const [pagination, setPagination] = useState(() => cachedPage?.pagination || { total: 0, page: 1, totalPages: 1 });
   const [currentPage, setCurrentPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedPage);
   const [loadingMore, setLoadingMore] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const sentinelRef = useRef(null);
+  const filterKeyRef = useRef(firstPageEndpoint);
+  const loadMoreRequest = useRef(null);
+  filterKeyRef.current = firstPageEndpoint;
 
   const dynamicCategories =
     categories.length > 0
@@ -53,16 +59,15 @@ export default function ProductsPage() {
   // Initial fetch on filter change
   useEffect(() => {
     let active = true;
-    setLoading(true);
+    const cached = getCachedApiResponse(firstPageEndpoint);
+    setLoading(!cached);
     setLoadingMore(false);
     setCurrentPage(1);
+    loadMoreRequest.current = null;
+    setProducts(cached?.products || []);
+    setPagination(cached?.pagination || { total: 0, page: 1, totalPages: 1 });
 
-    const params = new URLSearchParams(searchParams);
-    params.delete('page');
-    params.set('page', '1');
-    params.set('limit', '12');
-
-    apiRequest(`/marketplace/products?${params.toString()}`)
+    apiRequest(firstPageEndpoint)
       .then((res) => {
         if (active) {
           setProducts(res.products || []);
@@ -78,11 +83,14 @@ export default function ProductsPage() {
     return () => {
       active = false;
     };
-  }, [q, category, subCategory, homemade, deals, district, maxPrice, sort]);
+  }, [firstPageEndpoint]);
 
   // Load more products for continuous infinite scrolling
   const loadMoreProducts = useCallback(async () => {
-    if (loading || loadingMore || currentPage >= pagination.totalPages) return;
+    if (loading || loadingMore || loadMoreRequest.current || currentPage >= pagination.totalPages) return;
+    const filterKey = firstPageEndpoint;
+    const requestId = {};
+    loadMoreRequest.current = requestId;
     try {
       setLoadingMore(true);
       const nextPage = currentPage + 1;
@@ -92,6 +100,7 @@ export default function ProductsPage() {
       params.set('limit', '12');
 
       const res = await apiRequest(`/marketplace/products?${params.toString()}`);
+      if (filterKeyRef.current !== filterKey || loadMoreRequest.current !== requestId) return;
       if (res.products && res.products.length > 0) {
         setProducts((prev) => {
           const existingIds = new Set(prev.map((p) => p._id));
@@ -106,9 +115,12 @@ export default function ProductsPage() {
     } catch (_err) {
       // ignore
     } finally {
-      setLoadingMore(false);
+      if (loadMoreRequest.current === requestId) {
+        loadMoreRequest.current = null;
+        setLoadingMore(false);
+      }
     }
-  }, [loading, loadingMore, currentPage, pagination.totalPages, searchParams]);
+  }, [loading, loadingMore, currentPage, pagination.totalPages, searchParams, firstPageEndpoint]);
 
   // IntersectionObserver to auto-trigger loadMoreProducts as user scrolls near bottom
   useEffect(() => {
@@ -342,8 +354,8 @@ export default function ProductsPage() {
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-                {products.map((product) => (
-                  <ProductCard key={product._id} product={product} />
+                {products.map((product, index) => (
+                  <ProductCard key={product._id} product={product} priority={index < 2} />
                 ))}
               </div>
 

@@ -14,6 +14,8 @@ import {
 import { apiRequest, formatLkr } from '../utils/api.js';
 import { useMarketplace, DEFAULT_SL_DISTRICTS } from '../context/MarketplaceContext.jsx';
 import ProductCard from '../components/ProductCard.jsx';
+import { useCatalogResource } from '../hooks/useCatalogResource.js';
+import { imageUrl, imageSrcSet } from '../utils/images.js';
 
 export default function ProductDetailPage() {
   const { idOrSlug } = useParams();
@@ -28,8 +30,8 @@ export default function ProductDetailPage() {
     showToast
   } = useMarketplace();
 
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const endpoint = `/marketplace/products/${idOrSlug}?destinationDistrict=${encodeURIComponent(selectedDistrict)}`;
+  const { data, setData, loading } = useCatalogResource(endpoint);
   const [activeImage, setActiveImage] = useState(0);
   const [selectedVariant, setSelectedVariant] = useState('');
   const [quantity, setQuantity] = useState(1);
@@ -42,27 +44,10 @@ export default function ProductDetailPage() {
   const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
-    let active = true;
-    setLoading(true);
-    apiRequest(
-      `/marketplace/products/${idOrSlug}?destinationDistrict=${encodeURIComponent(selectedDistrict)}`
-    )
-      .then((res) => {
-        if (active) {
-          setData(res);
-          setActiveImage(0);
-          const firstVar = res.product?.variants?.[0]?.values?.[0]?.label || 'Standard';
-          setSelectedVariant(firstVar);
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [idOrSlug, selectedDistrict]);
+    setActiveImage(0);
+    setQuantity(1);
+    setSelectedVariant(data?.product?.variants?.[0]?.values?.[0]?.label || 'Standard');
+  }, [data?.product?._id]);
 
   if (loading && !data) {
     return (
@@ -158,8 +143,12 @@ export default function ProductDetailPage() {
         <div className="lg:col-span-5 space-y-3">
           <div className="aspect-square rounded-xl border border-slate-200 bg-slate-50 overflow-hidden">
             <img
-              src={product.images?.[activeImage] || product.images?.[0]}
+              src={imageUrl(product.images?.[activeImage] || product.images?.[0], 1200)}
+              srcSet={imageSrcSet(product.images?.[activeImage] || product.images?.[0], [480, 640, 960, 1200])}
+              sizes="(min-width: 1024px) 480px, 90vw"
               alt={product.title}
+              fetchPriority="high"
+              decoding="async"
               className="w-full h-full object-cover"
             />
           </div>
@@ -174,7 +163,7 @@ export default function ProductDetailPage() {
                     activeImage === idx ? 'border-slate-900' : 'border-slate-200'
                   }`}
                 >
-                  <img src={imgUrl} alt="" className="w-full h-full object-cover" />
+                  <img src={imgUrl} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>

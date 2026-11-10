@@ -10,35 +10,26 @@ import {
   Star,
   ShieldCheck
 } from 'lucide-react';
-import { apiRequest } from '../utils/api.js';
+import { useCatalogResource } from '../hooks/useCatalogResource.js';
 import { useMarketplace } from '../context/MarketplaceContext.jsx';
 import CategoryQuadCard from '../components/CategoryQuadCard.jsx';
 import ProductCard from '../components/ProductCard.jsx';
+import { imageUrl, imageSrcSet } from '../utils/images.js';
 
 export default function HomePage() {
   const { user, selectedDistrict } = useMarketplace();
-  const [homeData, setHomeData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { data: homeData, loading } = useCatalogResource('/marketplace/home');
   const [activeBannerIdx, setActiveBannerIdx] = useState(0);
   const [isBannerPaused, setIsBannerPaused] = useState(false);
   const [touchStartX, setTouchStartX] = useState(null);
-
-  useEffect(() => {
-    let mounted = true;
-    apiRequest(`/marketplace/home?_t=${Date.now()}`)
-      .then((data) => {
-        if (mounted) setHomeData(data);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const [visitedBanners, setVisitedBanners] = useState(() => new Set([0]));
 
   const banners = homeData?.banners || [];
+
+  useEffect(() => {
+    setVisitedBanners((previous) => previous.has(activeBannerIdx)
+      ? previous : new Set([...previous, activeBannerIdx]));
+  }, [activeBannerIdx]);
 
   // Auto-swipe every 4.5 seconds
   useEffect(() => {
@@ -129,17 +120,21 @@ export default function HomePage() {
                       : 'opacity-0 z-0 pointer-events-none'
                   }`}
                 >
-                  <picture className="w-full h-full block">
+                  {(isCurrent || visitedBanners.has(idx) || idx === (activeBannerIdx + 1) % banners.length) && <picture className="w-full h-full block">
                     {/* Desktop source for screens >= 768px */}
-                    {desktopImg && <source media="(min-width: 768px)" srcSet={desktopImg} />}
+                    {desktopImg && <source media="(min-width: 768px)" srcSet={imageSrcSet(desktopImg, [768, 1024, 1280, 1920]) || desktopImg} sizes="(min-width: 1280px) 1232px, 100vw" />}
                     {/* Mobile image for screens < 768px (falls back to desktopImg if mobileImg not specified) */}
                     <img
-                      src={mobileImg || desktopImg}
+                      src={imageUrl(mobileImg || desktopImg, 960)}
+                      srcSet={imageSrcSet(mobileImg || desktopImg, [320, 480, 640, 960])}
+                      sizes="100vw"
                       alt={banner.title || 'Sri Lankan Homemade & Everyday Essentials'}
                       className="w-full h-full object-cover object-center block"
                       loading={idx === 0 ? 'eager' : 'lazy'}
+                      fetchPriority={isCurrent ? 'high' : 'low'}
+                      decoding="async"
                     />
-                  </picture>
+                  </picture>}
                 </Link>
               );
             })}

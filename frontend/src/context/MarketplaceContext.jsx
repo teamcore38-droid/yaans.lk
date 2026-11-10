@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { apiRequest } from '../utils/api.js';
+import { apiRequest, getCachedApiResponse } from '../utils/api.js';
 
 const MarketplaceContext = createContext(null);
 
@@ -46,11 +46,15 @@ export function MarketplaceProvider({ children }) {
   const [cartQuote, setCartQuote] = useState(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [toast, setToast] = useState(null);
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState(() =>
+    getCachedApiResponse('/marketplace/categories')?.categories ||
+    getCachedApiResponse('/marketplace/home')?.categories || []
+  );
 
-  const fetchCategories = useCallback(async () => {
+  const fetchCategories = useCallback(async (force = true) => {
     try {
-      const res = await apiRequest('/marketplace/categories');
+      const endpoint = !force && window.location.pathname === '/' ? '/marketplace/home' : '/marketplace/categories';
+      const res = await apiRequest(endpoint, force ? { cache: 'reload' } : {});
       if (res.categories) {
         setCategories(res.categories);
       }
@@ -60,7 +64,7 @@ export function MarketplaceProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    fetchCategories();
+    fetchCategories(false);
   }, [fetchCategories]);
 
   const showToast = useCallback((message, type = 'success') => {
@@ -87,7 +91,8 @@ export function MarketplaceProvider({ children }) {
             setSelectedDistrict(res.user.defaultDistrict);
           }
         })
-        .catch(() => {
+        .catch((error) => {
+          if (error.status !== 401 && error.status !== 403) return;
           localStorage.removeItem('yaans_token');
           localStorage.removeItem('yaans_user');
           setUser(null);
@@ -104,6 +109,7 @@ export function MarketplaceProvider({ children }) {
   useEffect(() => {
     if (cartItems.length === 0) {
       setCartQuote(null);
+      setQuoteLoading(false);
       return;
     }
     let active = true;

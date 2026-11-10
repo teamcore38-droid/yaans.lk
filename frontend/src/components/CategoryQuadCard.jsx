@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
+import { imageUrl, imageSrcSet } from '../utils/images.js';
 
 /**
  * Modeled directly after the second supplied reference image:
@@ -36,9 +37,12 @@ export default function CategoryQuadCard({ category }) {
                 style={{ backgroundColor: tile.bgTint || '#F3F4F6' }}
               >
                 <img
-                  src={tile.imageUrl}
+                  src={imageUrl(tile.imageUrl, 480)}
+                  srcSet={imageSrcSet(tile.imageUrl, [160, 240, 320, 480])}
+                  sizes="(max-width: 639px) 45vw, (max-width: 1023px) 22vw, 180px"
                   alt={tile.name}
                   loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                 />
               </div>

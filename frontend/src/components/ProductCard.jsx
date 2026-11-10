@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { Star, Heart, ShoppingCart, MapPin, Check } from 'lucide-react';
 import { formatLkr } from '../utils/api.js';
 import { useMarketplace } from '../context/MarketplaceContext.jsx';
+import { imageUrl, imageSrcSet } from '../utils/images.js';
 
-export default function ProductCard({ product, compact = false }) {
+export default function ProductCard({ product, compact = false, priority = false }) {
   const { addToCart, wishlistIds, toggleWishlist } = useMarketplace();
   const isWishlisted = wishlistIds.includes(product._id);
 
@@ -20,9 +21,13 @@ export default function ProductCard({ product, compact = false }) {
         <div className="relative aspect-square bg-slate-100 overflow-hidden">
           <Link to={`/product/${product.slug || product._id}`} className="block w-full h-full">
             <img
-              src={product.images?.[0]}
+              src={imageUrl(product.images?.[0], 640)}
+              srcSet={imageSrcSet(product.images?.[0])}
+              sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 320px"
               alt={product.title}
-              loading="lazy"
+              loading={priority ? 'eager' : 'lazy'}
+              fetchPriority={priority ? 'high' : 'auto'}
+              decoding="async"
               className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
             />
           </Link>

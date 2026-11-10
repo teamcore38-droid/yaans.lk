@@ -32,6 +32,8 @@ let connectionPromise = null;
 let memoryStore = null;
 let isDirty = false;
 let lastMongoSyncTime = 0;
+let refreshPromise = null;
+let storeRevision = 0;
 
 const MODEL_MAP = {
   users: UserModel,
@@ -77,8 +79,15 @@ function ensureLocalStoreLoaded(forceReset = false) {
 /**
  * Loads all collections from MongoDB Atlas into memoryStore
  */
-export async function loadStoreFromMongo() {
+export function loadStoreFromMongo() {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = readStoreFromMongo().finally(() => { refreshPromise = null; });
+  return refreshPromise;
+}
+
+async function readStoreFromMongo() {
   if (!isMongoConnected) return ensureLocalStoreLoaded(false);
+  const revisionAtStart = storeRevision;
   try {
     const [
       users,
@@ -102,6 +111,9 @@ export async function loadStoreFromMongo() {
       PlatformConfigModel.findOne({ key: 'main_config' }).lean()
     ]);
 
+    // A checkout or admin edit may have completed while these queries ran.
+    // Keep that newer in-memory state instead of replacing it with older reads.
+    if (storeRevision !== revisionAtStart || isDirty) return memoryStore;
     const seedFallback = getInitialSeedState();
     const resolvedUsers =
       users.length > 0 ? users.map((d) => ({ ...d, _id: String(d._id) })) : seedFallback.users;
@@ -214,6 +226,7 @@ export async function syncStoreToMongo() {
 
 export function persistStore() {
   if (!memoryStore) return;
+  storeRevision++;
   isDirty = true;
   safeWriteLocalCache(memoryStore);
   if (isMongoConnected) {

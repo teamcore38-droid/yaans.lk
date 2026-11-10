@@ -1,29 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Store, MapPin, Star, Truck, Sparkles, CheckCircle2 } from 'lucide-react';
-import { apiRequest, formatLkr } from '../utils/api.js';
+import { formatLkr } from '../utils/api.js';
 import ProductCard from '../components/ProductCard.jsx';
+import { useCatalogResource } from '../hooks/useCatalogResource.js';
 
 export default function SellerStorefrontPage() {
   const { slugOrId } = useParams();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    apiRequest(`/marketplace/sellers/${slugOrId}`)
-      .then((res) => {
-        if (active) setData(res);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [slugOrId]);
+  const { data, loading } = useCatalogResource(`/marketplace/sellers/${slugOrId}`);
 
   if (loading) {
     return (

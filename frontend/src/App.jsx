@@ -3,31 +3,33 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { MarketplaceProvider, useMarketplace } from './context/MarketplaceContext.jsx';
 import Navbar from './components/Navbar.jsx';
 import Footer from './components/Footer.jsx';
-import HomePage from './pages/HomePage.jsx';
+import NavigationPrefetch from './components/NavigationPrefetch.jsx';
+import { pageLoaders } from './utils/navigation.js';
 
-const ProductsPage = lazy(() => import('./pages/ProductsPage.jsx'));
-const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage.jsx'));
-const CartPage = lazy(() => import('./pages/CartPage.jsx'));
-const CheckoutPage = lazy(() => import('./pages/CheckoutPage.jsx'));
-const TrackOrderPage = lazy(() => import('./pages/TrackOrderPage.jsx'));
-const SellerStorefrontPage = lazy(() => import('./pages/SellerStorefrontPage.jsx'));
-const SellerDashboardPage = lazy(() => import('./pages/SellerDashboardPage.jsx'));
-const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage.jsx'));
+const HomePage = lazy(pageLoaders.home);
+const ProductsPage = lazy(pageLoaders.products);
+const ProductDetailPage = lazy(pageLoaders.product);
+const CartPage = lazy(pageLoaders.cart);
+const CheckoutPage = lazy(pageLoaders.checkout);
+const TrackOrderPage = lazy(pageLoaders.tracking);
+const SellerStorefrontPage = lazy(pageLoaders.store);
+const SellerDashboardPage = lazy(pageLoaders.seller);
+const AdminDashboardPage = lazy(pageLoaders.admin);
 
 const LoginPage = lazy(() =>
-  import('./pages/AuthAccountPages.jsx').then((m) => ({ default: m.LoginPage }))
+  pageLoaders.account().then((m) => ({ default: m.LoginPage }))
 );
 const RegisterCustomerPage = lazy(() =>
-  import('./pages/AuthAccountPages.jsx').then((m) => ({ default: m.RegisterCustomerPage }))
+  pageLoaders.account().then((m) => ({ default: m.RegisterCustomerPage }))
 );
 const SellerRegisterPage = lazy(() =>
-  import('./pages/AuthAccountPages.jsx').then((m) => ({ default: m.SellerRegisterPage }))
+  pageLoaders.account().then((m) => ({ default: m.SellerRegisterPage }))
 );
 const CustomerAccountPage = lazy(() =>
-  import('./pages/AuthAccountPages.jsx').then((m) => ({ default: m.CustomerAccountPage }))
+  pageLoaders.account().then((m) => ({ default: m.CustomerAccountPage }))
 );
 const WishlistPage = lazy(() =>
-  import('./pages/AuthAccountPages.jsx').then((m) => ({ default: m.WishlistPage }))
+  pageLoaders.account().then((m) => ({ default: m.WishlistPage }))
 );
 
 function ScrollToTop() {
@@ -58,6 +60,7 @@ export default function App() {
     <MarketplaceProvider>
       <BrowserRouter>
         <ScrollToTop />
+        <NavigationPrefetch />
         <div className="min-h-screen flex flex-col bg-[#F3F4F6] text-slate-900">
           <Navbar />
           <main className="flex-1">

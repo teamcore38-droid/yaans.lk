@@ -42,3 +42,13 @@ npm run dev:backend
 # Start Frontend Vite Server (http://localhost:5173)
 npm run dev:frontend
 ```
+
+## Performance and verification
+
+- Page code and public catalog data load in parallel. Hovering, focusing, or touching an internal link warms its next page; speculative requests are skipped on data-saving and 2G connections.
+- Public catalog responses share in-flight requests and stay cached for 15 seconds (categories: 60 seconds). The homepage and categories also use a small session cache. Successful edits and checkout invalidate catalog caches; account and order responses are never cached.
+- Checkout recalculates prices and shipping on the server. Cached product prices are only for browsing.
+- Visible images receive priority, hidden banner slides load progressively, and Cloudinary delivers responsive images with the same artwork and crop. Fonts load without blocking the first render.
+- Concurrent MongoDB refreshes share one read batch, and seed password hashing runs once per process.
+
+Run `npm test` for cache/freshness/isolation and mocked database concurrency checks, and `npm run build` for the production frontend build. Tests do not connect to the configured MongoDB database.

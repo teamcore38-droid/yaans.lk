@@ -1,8 +1,12 @@
 import bcrypt from 'bcryptjs';
 import { SRI_LANKA_DISTRICTS } from '../config/sriLankaDistricts.js';
 
+// Generate this once per process, rather than blocking the event loop with
+// bcrypt on every Mongo refresh or authentication fallback.
+let defaultAdminHash;
+
 export function getInitialSeedState() {
-  const adminHash = bcrypt.hashSync('Admin@123', 8);
+  const adminHash = defaultAdminHash ||= bcrypt.hashSync('Admin@123', 8);
 
   const users = [
     {

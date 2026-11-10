@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { getStore } from '../config/db.js';
+import { getInitialSeedState } from '../seed/initialState.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'yaans_lk_sri_lanka_marketplace_jwt_secret_2026';
 
@@ -25,8 +26,30 @@ export function authenticate(req, res, next) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const store = getStore();
-    const user = store.users.find((u) => u._id === decoded.id);
-    if (!user || !user.isActive) {
+    let user = store.users.find(
+      (u) =>
+        u._id === decoded.id ||
+        String(u._id) === String(decoded.id) ||
+        u.id === decoded.id ||
+        (decoded.email && u.email && u.email.toLowerCase() === decoded.email.toLowerCase())
+    );
+
+    // Fallback: If not found in active store, check seed defaults (e.g. initial admin)
+    if (!user) {
+      const seed = getInitialSeedState();
+      const matchedSeedUser = seed.users.find(
+        (u) =>
+          u._id === decoded.id ||
+          String(u._id) === String(decoded.id) ||
+          (decoded.email && u.email && u.email.toLowerCase() === decoded.email.toLowerCase())
+      );
+      if (matchedSeedUser) {
+        store.users.unshift(matchedSeedUser);
+        user = matchedSeedUser;
+      }
+    }
+
+    if (!user || user.isActive === false) {
       return res.status(401).json({ message: 'User account not found or inactive.' });
     }
     req.user = user;
@@ -43,8 +66,22 @@ export function optionalAuthenticate(req, _res, next) {
     try {
       const decoded = jwt.verify(token, JWT_SECRET);
       const store = getStore();
-      const user = store.users.find((u) => u._id === decoded.id);
-      if (user && user.isActive) {
+      let user = store.users.find(
+        (u) =>
+          u._id === decoded.id ||
+          String(u._id) === String(decoded.id) ||
+          u.id === decoded.id ||
+          (decoded.email && u.email && u.email.toLowerCase() === decoded.email.toLowerCase())
+      );
+      if (!user) {
+        const seed = getInitialSeedState();
+        user = seed.users.find(
+          (u) =>
+            u._id === decoded.id ||
+            (decoded.email && u.email && u.email.toLowerCase() === decoded.email.toLowerCase())
+        );
+      }
+      if (user && user.isActive !== false) {
         req.user = user;
       }
     } catch (_err) {

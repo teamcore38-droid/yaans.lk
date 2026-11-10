@@ -103,14 +103,24 @@ export async function loadStoreFromMongo() {
     ]);
 
     const seedFallback = getInitialSeedState();
+    const resolvedUsers =
+      users.length > 0 ? users.map((d) => ({ ...d, _id: String(d._id) })) : seedFallback.users;
+    if (!resolvedUsers.some((u) => u.role === 'admin' || (u.email && u.email.toLowerCase() === 'admin@yaans.lk'))) {
+      const defaultAdmin = seedFallback.users.find((u) => u.role === 'admin');
+      if (defaultAdmin) resolvedUsers.unshift(defaultAdmin);
+    }
+
     memoryStore = {
-      users: users.map((d) => ({ ...d, _id: String(d._id) })),
-      sellers: sellers.map((d) => ({ ...d, _id: String(d._id) })),
+      users: resolvedUsers,
+      sellers: sellers.length > 0 ? sellers.map((d) => ({ ...d, _id: String(d._id) })) : seedFallback.sellers,
       categories:
         categories.length > 0
           ? categories.map((d) => ({ ...d, _id: String(d._id) }))
           : seedFallback.categories,
-      products: products.map((d) => ({ ...d, _id: String(d._id) })),
+      products:
+        products.length > 0
+          ? products.map((d) => ({ ...d, _id: String(d._id) }))
+          : seedFallback.products,
       reviews: reviews.map((d) => ({ ...d, _id: String(d._id) })),
       subOrders: subOrders.map((d) => ({ ...d, _id: String(d._id) })),
       orders: orders.map((d) => ({ ...d, _id: String(d._id) })),

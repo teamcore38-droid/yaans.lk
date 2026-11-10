@@ -3110,7 +3110,7 @@ export default function AdminDashboardPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={savingBanner || uploadingBannerImage}
+                  disabled={savingBanner || uploadingDesktopBanner || uploadingMobileBanner}
                   className="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold inline-flex items-center gap-1.5 shadow-sm transition disabled:opacity-50"
                 >
                   <Check className="w-4 h-4 text-slate-900" />

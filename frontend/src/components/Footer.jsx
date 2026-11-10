@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ShieldCheck, Truck, Banknote, Store } from 'lucide-react';
+import { ShieldCheck, Truck, Banknote, Store, Scale, Cookie } from 'lucide-react';
 
 export default function Footer() {
   return (
@@ -51,7 +51,7 @@ export default function Footer() {
       </div>
 
       {/* Main Footer Links */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 text-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 text-sm">
         <div>
           <img
             src="/brand/yaans-logo-horizontal-dark.png"
@@ -99,10 +99,58 @@ export default function Footer() {
             <li><Link to="/admin" className="hover:text-slate-900">Marketplace Admin Portal</Link></li>
           </ul>
         </div>
+
+        <div>
+          <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider mb-3">
+            Legal & Sri Lanka Trust
+          </h4>
+          <ul className="space-y-2 text-xs text-slate-600">
+            <li>
+              <Link to="/terms" className="hover:text-slate-900 flex items-center gap-1.5 font-medium">
+                <Scale className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                Terms & Conditions
+              </Link>
+            </li>
+            <li>
+              <Link to="/privacy" className="hover:text-slate-900 flex items-center gap-1.5 font-medium">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                Privacy Policy (PDPA)
+              </Link>
+            </li>
+            <li>
+              <Link to="/cookies" className="hover:text-slate-900 flex items-center gap-1.5 font-medium">
+                <Cookie className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                Cookie & Storage Policy
+              </Link>
+            </li>
+            <li className="pt-2 border-t border-slate-100">
+              <span className="text-[11px] text-slate-500 leading-relaxed block">
+                Governed by Sri Lanka PDPA No. 9 of 2022 & Electronic Transactions Act.
+              </span>
+            </li>
+          </ul>
+        </div>
       </div>
 
-      <div className="border-t border-slate-200 bg-slate-50 py-4 text-center text-xs text-slate-500">
-        © {new Date().getFullYear()} Yaans.lk Multi-Vendor Marketplace • Built for Sri Lanka • All prices in LKR (Rs.) with No Tax Surcharge.
+      <div className="border-t border-slate-200 bg-slate-50 py-4 text-xs text-slate-500">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-3 text-center md:text-left">
+          <div>
+            © {new Date().getFullYear()} Yaans.lk Multi-Vendor Marketplace • Built for Sri Lanka • All prices in LKR (Rs.) with No Tax Surcharge.
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-slate-600 font-medium">
+            <Link to="/terms" className="hover:text-slate-900 hover:underline">
+              Terms & Conditions
+            </Link>
+            <span>•</span>
+            <Link to="/privacy" className="hover:text-slate-900 hover:underline">
+              Privacy Policy (PDPA)
+            </Link>
+            <span>•</span>
+            <Link to="/cookies" className="hover:text-slate-900 hover:underline">
+              Cookie Policy
+            </Link>
+          </div>
+        </div>
       </div>
     </footer>
   );

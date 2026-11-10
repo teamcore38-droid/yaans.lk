@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { MarketplaceProvider, useMarketplace } from './context/MarketplaceContext.jsx';
 import Navbar from './components/Navbar.jsx';
 import Footer from './components/Footer.jsx';
+import CookieNotice from './components/CookieNotice.jsx';
 import NavigationPrefetch from './components/NavigationPrefetch.jsx';
 import { pageLoaders } from './utils/navigation.js';
 
@@ -15,6 +16,9 @@ const TrackOrderPage = lazy(pageLoaders.tracking);
 const SellerStorefrontPage = lazy(pageLoaders.store);
 const SellerDashboardPage = lazy(pageLoaders.seller);
 const AdminDashboardPage = lazy(pageLoaders.admin);
+const PrivacyPolicyPage = lazy(pageLoaders.privacy);
+const TermsConditionsPage = lazy(pageLoaders.terms);
+const CookiePolicyPage = lazy(pageLoaders.cookies);
 
 const LoginPage = lazy(() =>
   pageLoaders.account().then((m) => ({ default: m.LoginPage }))
@@ -86,10 +90,17 @@ export default function App() {
                 <Route path="/admin" element={<AdminDashboardPage />} />
                 <Route path="/account" element={<CustomerAccountPage />} />
                 <Route path="/wishlist" element={<WishlistPage />} />
+                <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                <Route path="/terms" element={<TermsConditionsPage />} />
+                <Route path="/terms-and-conditions" element={<TermsConditionsPage />} />
+                <Route path="/cookies" element={<CookiePolicyPage />} />
+                <Route path="/cookies-policy" element={<CookiePolicyPage />} />
               </Routes>
             </Suspense>
           </main>
           <Footer />
+          <CookieNotice />
           <ToastBanner />
         </div>
       </BrowserRouter>

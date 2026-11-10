@@ -200,6 +200,12 @@ export function RegisterCustomerPage() {
           >
             {loading ? 'Creating Account...' : 'Create Customer Account'}
           </button>
+          <p className="text-[11px] text-slate-500 text-center leading-relaxed">
+            By creating an account, you agree to our{' '}
+            <Link to="/terms" target="_blank" className="text-sky-700 underline font-medium">Terms</Link>
+            {' '}and acknowledge our{' '}
+            <Link to="/privacy" target="_blank" className="text-sky-700 underline font-medium">Privacy Policy</Link>.
+          </p>
         </form>
         <div className="text-xs text-center text-slate-600 pt-2 border-t border-slate-100">
           Already have an account?{' '}
@@ -455,6 +461,12 @@ export function SellerRegisterPage() {
           >
             {submitting ? 'Submitting Seller Application...' : 'Submit Seller Application'}
           </button>
+          <p className="text-[11px] text-slate-500 text-center leading-relaxed">
+            By submitting, you agree to the Yaans.lk{' '}
+            <Link to="/terms" target="_blank" className="text-sky-700 underline font-semibold">Seller Terms & Conditions</Link>
+            {' '}and acknowledge our{' '}
+            <Link to="/privacy" target="_blank" className="text-sky-700 underline font-semibold">Privacy Policy</Link>.
+          </p>
         </form>
       </div>
     </div>

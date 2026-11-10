@@ -10,7 +10,10 @@ export const pageLoaders = {
   store: () => import('../pages/SellerStorefrontPage.jsx'),
   seller: () => import('../pages/SellerDashboardPage.jsx'),
   admin: () => import('../pages/AdminDashboardPage.jsx'),
-  account: () => import('../pages/AuthAccountPages.jsx')
+  account: () => import('../pages/AuthAccountPages.jsx'),
+  privacy: () => import('../pages/PrivacyPolicyPage.jsx'),
+  terms: () => import('../pages/TermsConditionsPage.jsx'),
+  cookies: () => import('../pages/CookiePolicyPage.jsx')
 };
 
 export function productsEndpoint(search) {
@@ -44,7 +47,10 @@ export function prefetchPage(href) {
     page = {
       '/cart': 'cart', '/checkout': 'checkout', '/track-order': 'tracking',
       '/seller/dashboard': 'seller', '/admin': 'admin', '/login': 'account',
-      '/register': 'account', '/seller/register': 'account', '/account': 'account', '/wishlist': 'account'
+      '/register': 'account', '/seller/register': 'account', '/account': 'account', '/wishlist': 'account',
+      '/privacy': 'privacy', '/privacy-policy': 'privacy',
+      '/terms': 'terms', '/terms-and-conditions': 'terms',
+      '/cookies': 'cookies', '/cookies-policy': 'cookies'
     }[pathname];
   }
   if (page) pageLoaders[page]().catch(() => {});

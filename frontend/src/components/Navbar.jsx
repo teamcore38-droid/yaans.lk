@@ -471,6 +471,30 @@ export default function Navbar() {
                   Open Admin Dashboard
                 </Link>
               )}
+
+              <div className="pt-3 border-t border-slate-200 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                <Link
+                  to="/terms"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="hover:text-slate-900 underline"
+                >
+                  Terms
+                </Link>
+                <Link
+                  to="/privacy"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="hover:text-slate-900 underline"
+                >
+                  Privacy (PDPA)
+                </Link>
+                <Link
+                  to="/cookies"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="hover:text-slate-900 underline"
+                >
+                  Cookies
+                </Link>
+              </div>
             </div>
           </div>
         </div>

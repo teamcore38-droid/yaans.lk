@@ -526,6 +526,17 @@ export default function CheckoutPage() {
               ? 'Splitting & Confirming Order...'
               : `Confirm COD Order (${formatLkr(cartQuote?.grandTotalLkr || 0)})`}
           </button>
+
+          <p className="text-[11px] text-slate-500 text-center leading-relaxed">
+            By placing your order, you agree to Yaans.lk{' '}
+            <Link to="/terms" target="_blank" className="underline hover:text-slate-800 font-medium">
+              Terms & Conditions
+            </Link>
+            {' '}and{' '}
+            <Link to="/privacy" target="_blank" className="underline hover:text-slate-800 font-medium">
+              Privacy Policy
+            </Link>.
+          </p>
         </div>
       </form>
     </div>

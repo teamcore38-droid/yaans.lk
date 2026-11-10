@@ -2,28 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ChevronRight,
-  ChevronLeft,
   Sparkles,
   Tag,
   Store,
   MapPin,
   Star,
-  ShieldCheck,
-  Truck
+  ShieldCheck
 } from 'lucide-react';
 import { apiRequest } from '../utils/api.js';
 import { useMarketplace } from '../context/MarketplaceContext.jsx';
 import CategoryQuadCard from '../components/CategoryQuadCard.jsx';
 import ProductCard from '../components/ProductCard.jsx';
-import BannerProductCarousel, { BANNER_CAROUSEL_CARDS } from '../components/BannerProductCarousel.jsx';
 
 export default function HomePage() {
   const { user, selectedDistrict } = useMarketplace();
   const [homeData, setHomeData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [bannerIdx, setBannerIdx] = useState(0);
-  const [activeCardIndex, setActiveCardIndex] = useState(0);
-  const [isCarouselPaused, setIsCarouselPaused] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -64,103 +59,20 @@ export default function HomePage() {
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 space-y-4 sm:space-y-5">
-      {/* Top Practical Hero Banner */}
+      {/* Top Practical Hero Banner (Unified for Desktop and Mobile) */}
       {activeBanner && (
-        <div className="relative bg-white rounded-xl border border-[#edd7df] overflow-hidden shadow-xs">
-          <div className="grid grid-cols-1 lg:grid-cols-12 items-stretch">
-            {/* Mobile-Only Hero Banner (Replaces marked text section on mobile screens) */}
-            <Link
-              to={activeBanner.ctaLink || '/products'}
-              aria-label="Sri Lankan Homemade & Everyday Essentials - Shop Now"
-              className="block lg:hidden w-full bg-[#fff1f3] overflow-hidden"
-            >
-              <img
-                src="/mobile_hero_banner.jpg"
-                alt="Sri Lankan Homemade & Everyday Essentials - Cash on Delivery"
-                className="w-full h-auto object-cover block"
-              />
-            </Link>
-
-            {/* Desktop Left Column: Marketplace highlights & Action CTAs - vertically centered with full-height background */}
-            <div className="hidden lg:flex p-5 sm:p-6 lg:p-7 lg:col-span-6 xl:col-span-6 flex-col justify-center space-y-2.5 sm:space-y-3 bg-[#fff1f3]/60">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#fde8ec] border border-[#faccd6] text-[#72495c] text-[11px] font-bold tracking-wide uppercase w-fit">
-                <Truck className="w-3.5 h-3.5 text-[#72495c]" />
-                {activeBanner.badge}
-              </div>
-              <h1 className="text-xl sm:text-2xl lg:text-[26px] xl:text-3xl font-extrabold text-[#2b1b25] leading-tight">
-                {activeBanner.title}
-              </h1>
-              <p className="text-xs sm:text-[13px] text-[#664b58] max-w-xl leading-relaxed">
-                {activeBanner.subtitle}
-              </p>
-              <div className="pt-0.5 flex flex-wrap items-center gap-2.5">
-                <Link
-                  to={activeBanner.ctaLink || '/products'}
-                  className="px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs sm:text-sm inline-flex items-center gap-1.5 transition shadow-sm"
-                >
-                  {activeBanner.ctaText || 'Shop Now'}
-                  <ChevronRight className="w-4 h-4" />
-                </Link>
-                <Link
-                  to="/products?homemade=true"
-                  className="px-4 py-2 rounded-lg bg-white hover:bg-[#fff0f3] text-[#72495c] border border-[#faccd6] font-semibold text-xs sm:text-sm transition shadow-2xs"
-                >
-                  Browse Homemade SL
-                </Link>
-              </div>
-            </div>
-
-            {/* Right Column: Compact Auto-scrollable Product Cards with consistent height */}
-            <div className="lg:col-span-6 xl:col-span-6 bg-[#fff7f9] p-2.5 sm:p-3.5 border-t lg:border-t-0 lg:border-l border-[#f0dce3] overflow-hidden flex flex-col justify-center">
-              <BannerProductCarousel
-                activeCardIndex={activeCardIndex}
-                onCardChange={setActiveCardIndex}
-                isPaused={isCarouselPaused}
-                setIsPaused={setIsCarouselPaused}
-              />
-            </div>
-          </div>
-
-          {/* Bottom Bar with District Status and Interactive Product Card Controls */}
-          <div className="px-4 sm:px-6 py-2.5 bg-[#fdf6f7] border-t border-[#f0dce3] flex flex-wrap items-center justify-between gap-2 text-xs text-[#6b4d5a]">
-            <span>
-              Delivering to <strong className="text-[#2b1b25]">{selectedDistrict} District</strong> • Cash on Delivery Enabled
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-[#72495c] hidden sm:inline">
-                Viewing: <strong className="text-[#3e2230]">{BANNER_CAROUSEL_CARDS[activeCardIndex]?.category}</strong>
-              </span>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  aria-label="Previous product card"
-                  onClick={() =>
-                    setActiveCardIndex(
-                      (prev) => (prev - 1 + BANNER_CAROUSEL_CARDS.length) % BANNER_CAROUSEL_CARDS.length
-                    )
-                  }
-                  className="p-1 rounded bg-white border border-[#eed6df] hover:bg-[#fff0f3] text-[#482c39] transition shadow-2xs"
-                  title="Previous product card"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span className="text-[11px] font-bold text-[#2b1b25] px-1 min-w-[34px] text-center">
-                  {activeCardIndex + 1} / {BANNER_CAROUSEL_CARDS.length}
-                </span>
-                <button
-                  type="button"
-                  aria-label="Next product card"
-                  onClick={() =>
-                    setActiveCardIndex((prev) => (prev + 1) % BANNER_CAROUSEL_CARDS.length)
-                  }
-                  className="p-1 rounded bg-white border border-[#eed6df] hover:bg-[#fff0f3] text-[#482c39] transition shadow-2xs"
-                  title="Next product card"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
+        <div className="relative bg-[#fff1f3] rounded-xl border border-[#edd7df] overflow-hidden shadow-xs">
+          <Link
+            to={activeBanner.ctaLink || '/products'}
+            aria-label="Sri Lankan Homemade & Everyday Essentials - Shop Now"
+            className="block w-full overflow-hidden group focus:outline-none"
+          >
+            <img
+              src="/mobile_hero_banner.jpg"
+              alt="Sri Lankan Homemade & Everyday Essentials - Cash on Delivery"
+              className="w-full h-auto object-cover block group-hover:opacity-95 transition-opacity"
+            />
+          </Link>
         </div>
       )}
 

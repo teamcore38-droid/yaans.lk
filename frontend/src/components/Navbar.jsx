@@ -52,24 +52,24 @@ export default function Navbar() {
   return (
     <>
       {/* Top Utility Bar: Practical Sri Lankan Marketplace Info & Quick Role Access */}
-      <div className="bg-[#482c39] text-[#eddfe6] text-xs border-b border-[#3a212d]">
+      <div className="bg-[#6b0f16] text-[#fce4e7] text-xs border-b border-[#520a10]">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 h-8 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 overflow-x-auto no-scrollbar whitespace-nowrap">
             <span className="inline-flex items-center gap-1 font-medium text-white">
               <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
               Islandwide Delivery (25 Districts)
             </span>
-            <span className="text-[#6d4659] hidden sm:inline">|</span>
-            <span className="hidden sm:inline text-[#e6d0db]">
+            <span className="text-[#8f1e26] hidden sm:inline">|</span>
+            <span className="hidden sm:inline text-[#fcd2d7]">
               Cash on Delivery (COD) Available • Prices in LKR (Rs.)
             </span>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 whitespace-nowrap">
-            <Link to="/track-order" className="text-[#eddfe6] hover:text-white transition-colors font-medium">
+            <Link to="/track-order" className="text-[#fce4e7] hover:text-white transition-colors font-medium">
               Track Order
             </Link>
-            <span className="text-[#6d4659]">|</span>
+            <span className="text-[#8f1e26]">|</span>
             <Link to="/seller/register" className="hover:text-amber-200 text-amber-300 font-medium">
               Sell on Yaans.lk
             </Link>
@@ -274,24 +274,24 @@ export default function Navbar() {
         </div>
 
         {/* Sub-Header Quick Navigation Links + Mobile Location Bar */}
-        <div className="bg-[#72495c] border-t border-[#603b4d] border-b border-[#603b4d]">
-          <div className="max-w-7xl mx-auto px-3 sm:px-6 flex items-center justify-between gap-3 py-1.5 overflow-x-auto no-scrollbar text-xs font-medium text-[#fff0f5] whitespace-nowrap">
+        <div className="bg-[#8b141d] border-t border-[#730f17] border-b border-[#730f17]">
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 flex items-center justify-between gap-3 py-1.5 overflow-x-auto no-scrollbar text-xs font-medium text-[#fff0f2] whitespace-nowrap">
             <div className="flex items-center gap-4">
               <button
                 type="button"
                 onClick={() => setDistrictModalOpen(true)}
-                className="inline-flex lg:hidden items-center gap-1 text-white font-semibold bg-[#5c3748] px-2 py-1 rounded border border-[#85586d]"
+                className="inline-flex lg:hidden items-center gap-1 text-white font-semibold bg-[#730f17] px-2 py-1 rounded border border-[#9b1d26]"
               >
                 <MapPin className="w-3.5 h-3.5 text-white" />
                 Deliver to {selectedDistrict} ▾
               </button>
 
-              <Link to="/products" className="hover:text-white font-semibold flex items-center gap-1 bg-[#5c3748] hover:bg-[#502e3e] text-white px-2.5 py-1 rounded-md transition-colors">
+              <Link to="/products" className="hover:text-white font-semibold flex items-center gap-1 bg-[#730f17] hover:bg-[#5e0a10] text-white px-2.5 py-1 rounded-md transition-colors">
                 All Products
               </Link>
               <Link
                 to="/products?homemade=true"
-                className="hover:text-white font-semibold text-[#fff0f5] hover:bg-[#85586d]/40 px-2 py-0.5 rounded transition-colors"
+                className="hover:text-white font-semibold text-[#fff0f2] hover:bg-[#730f17]/60 px-2 py-0.5 rounded transition-colors"
               >
                 Homemade Sri Lanka
               </Link>
@@ -305,7 +305,7 @@ export default function Navbar() {
                 <Link
                   key={c.slug}
                   to={`/products?category=${c.slug}`}
-                  className="text-[#fce7f0] hover:text-white transition-colors"
+                  className="text-[#fce5e8] hover:text-white transition-colors"
                 >
                   {c.name}
                 </Link>

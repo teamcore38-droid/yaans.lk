@@ -455,6 +455,24 @@ test('security, durable orders and recovery with real MongoDB transactions', { t
     finally { app.mongo.collection = original; }
   });
 
+  await t.test('staging setup creates private synthetic accounts and business indexes without replacing existing orders', async () => {
+    const script = fileURLToPath(new URL('../scripts/seed-staging.js', import.meta.url));
+    const environment = { ...process.env, MONGODB_URI: app.mongoUri, APP_ENV: 'staging', MONGODB_DB_NAME: 'yaans_staging_lk',
+      STAGING_ACCOUNT_PASSWORD: 'PrivateSyntheticStagingPassword@123' };
+    await assert.rejects(runFile(process.execPath, [script], { env: { ...environment, MONGODB_DB_NAME: 'yaans_lk' } }));
+    await runFile(process.execPath, [script], { env: environment });
+    const stage = app.mongo.client.db('yaans_staging_lk');
+    assert.equal(await stage.collection('users').countDocuments(), 4);
+    const admin = await stage.collection('users').findOne({ email: accounts.admin });
+    assert.equal(await bcrypt.compare(TEST_PASSWORD, admin.passwordHash), false);
+    assert.equal(await bcrypt.compare(environment.STAGING_ACCOUNT_PASSWORD, admin.passwordHash), true);
+    await assert.rejects(stage.collection('users').insertOne({ _id: 'duplicate-email', email: accounts.admin }), (error) => error.code === 11000);
+    await stage.collection('orders').insertOne({ _id: 'staging-order-to-preserve' });
+    await runFile(process.execPath, [script], { env: environment });
+    assert.equal(await stage.collection('orders').countDocuments({ _id: 'staging-order-to-preserve' }), 1);
+    assert.equal(await app.mongo.collection('users').countDocuments(), 4);
+  });
+
   await t.test('encrypted backups restore BSON IDs, dates and indexes into a separate empty database without erasing production-like data', async () => {
     const root = path.resolve(os.tmpdir()); const directory = await fs.mkdtemp(path.join(root, 'yaans-backup-test-'));
     const keys = generateKeyPairSync('rsa', { modulusLength: 3072,

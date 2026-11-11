@@ -73,7 +73,9 @@ const SellerSchema = new Schema(
     },
     rating: { type: Number, default: 4.8 },
     reviewCount: { type: Number, default: 0 },
-    totalSalesCount: { type: Number, default: 0 }
+    totalSalesCount: { type: Number, default: 0 },
+    isVacationMode: { type: Boolean, default: false },
+    vacationNotice: { type: String, default: '' }
   },
   { timestamps: true }
 );

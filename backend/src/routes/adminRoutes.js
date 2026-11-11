@@ -2,10 +2,20 @@ import express from 'express';
 import { getStore, persistStore, generateId } from '../config/db.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { uploadMiddleware, uploadToCloudinary } from '../config/cloudinary.js';
+import { recordAdminAuditLog } from '../config/auditLogger.js';
 
 const router = express.Router();
 
 router.use(authenticate, requireRole('admin'));
+
+// GET /api/admin/audit-logs
+router.get('/audit-logs', (req, res) => {
+  const store = getStore();
+  const logs = Array.isArray(store.platformConfig?.adminAuditLogs)
+    ? store.platformConfig.adminAuditLogs
+    : [];
+  return res.json({ auditLogs: logs });
+});
 
 // GET /api/admin/overview
 router.get('/overview', (_req, res) => {
@@ -83,6 +93,19 @@ router.put('/sellers/:sellerId/status', (req, res) => {
         : Number(commissionRateOverride);
   }
 
+  recordAdminAuditLog(store, {
+    action: 'seller_status_change',
+    adminEmail: req.user.email,
+    adminId: req.user._id,
+    ip: req.ip || req.headers['x-forwarded-for'] || '127.0.0.1',
+    details: `Seller "${seller.storeName}" status updated to "${seller.status}" (Commission: ${
+      seller.commissionRateOverride !== null && seller.commissionRateOverride !== undefined
+        ? `${seller.commissionRateOverride}%`
+        : 'Default'
+    })`,
+    metadata: { sellerId, status: seller.status, commissionRateOverride: seller.commissionRateOverride }
+  });
+
   persistStore();
   return res.json({
     seller,
@@ -104,6 +127,15 @@ router.put('/products/:productId/moderation', (req, res) => {
   if (approvalStatus) product.approvalStatus = approvalStatus;
   if (isFeatured !== undefined) product.isFeatured = Boolean(isFeatured);
   if (isDeal !== undefined) product.isDeal = Boolean(isDeal);
+
+  recordAdminAuditLog(store, {
+    action: 'product_moderation',
+    adminEmail: req.user.email,
+    adminId: req.user._id,
+    ip: req.ip || req.headers['x-forwarded-for'] || '127.0.0.1',
+    details: `Product "${product.title}" moderation updated (Status: ${product.approvalStatus}, Featured: ${product.isFeatured}, Deal: ${product.isDeal})`,
+    metadata: { productId, approvalStatus: product.approvalStatus, isFeatured: product.isFeatured, isDeal: product.isDeal }
+  });
 
   persistStore();
   return res.json({
@@ -187,6 +219,15 @@ router.put('/products/:productId', (req, res) => {
   product.lastEditedBy = 'admin';
   product.lastEditedAt = new Date().toISOString();
 
+  recordAdminAuditLog(store, {
+    action: 'product_override',
+    adminEmail: req.user.email,
+    adminId: req.user._id,
+    ip: req.ip || req.headers['x-forwarded-for'] || '127.0.0.1',
+    details: `Admin overrode product listing "${product.title}" (Price: Rs. ${product.priceLkr}, Stock: ${product.stock}, Status: ${product.approvalStatus})`,
+    metadata: { productId, priceLkr: product.priceLkr, stock: product.stock, approvalStatus: product.approvalStatus }
+  });
+
   persistStore();
   return res.json({
     product,
@@ -205,6 +246,16 @@ router.delete('/products/:productId', (req, res) => {
   }
 
   const removed = store.products.splice(idx, 1)[0];
+
+  recordAdminAuditLog(store, {
+    action: 'product_delete',
+    adminEmail: req.user.email,
+    adminId: req.user._id,
+    ip: req.ip || req.headers['x-forwarded-for'] || '127.0.0.1',
+    details: `Admin delisted and deleted product "${removed.title}" (Seller: ${removed.sellerName || removed.sellerId})`,
+    metadata: { productId, title: removed.title, sellerId: removed.sellerId }
+  });
+
   persistStore();
   return res.json({
     message: `Product "${removed.title}" removed from Yaans.lk marketplace by Admin.`,
@@ -239,6 +290,15 @@ router.put('/config/districts', (req, res) => {
     store.platformConfig.flatShippingRateLkr = Math.max(0, Number(flatShippingRateLkr) || 0);
   }
 
+  recordAdminAuditLog(store, {
+    action: 'shipping_config_update',
+    adminEmail: req.user.email,
+    adminId: req.user._id,
+    ip: req.ip || req.headers['x-forwarded-for'] || '127.0.0.1',
+    details: `Updated platform shipping settings (Mode: ${store.platformConfig.shippingMode}, Flat Rate: Rs. ${store.platformConfig.flatShippingRateLkr})`,
+    metadata: { shippingMode: store.platformConfig.shippingMode, flatShippingRateLkr: store.platformConfig.flatShippingRateLkr }
+  });
+
   persistStore();
   return res.json({
     districts: store.platformConfig.districts,
@@ -265,6 +325,15 @@ router.put('/config/shipping-mode', (req, res) => {
   if (flatShippingRateLkr !== undefined) {
     store.platformConfig.flatShippingRateLkr = Math.max(0, Number(flatShippingRateLkr) || 0);
   }
+
+  recordAdminAuditLog(store, {
+    action: 'shipping_mode_toggle',
+    adminEmail: req.user.email,
+    adminId: req.user._id,
+    ip: req.ip || req.headers['x-forwarded-for'] || '127.0.0.1',
+    details: `Switched shipping mode to "${store.platformConfig.shippingMode}" (Flat: Rs. ${store.platformConfig.flatShippingRateLkr})`,
+    metadata: { shippingMode: store.platformConfig.shippingMode, flatShippingRateLkr: store.platformConfig.flatShippingRateLkr }
+  });
 
   persistStore();
   return res.json({
@@ -310,6 +379,15 @@ router.put('/config/general', (req, res) => {
   if (Array.isArray(banners)) {
     cfg.banners = banners;
   }
+
+  recordAdminAuditLog(store, {
+    action: 'commission_rules_update',
+    adminEmail: req.user.email,
+    adminId: req.user._id,
+    ip: req.ip || req.headers['x-forwarded-for'] || '127.0.0.1',
+    details: `Updated marketplace rules (Standard Commission: ${cfg.defaultCommissionPercent}%, Homemade: ${cfg.homemadeCommissionPercent}%, Global COD: ${cfg.codEnabledGlobally})`,
+    metadata: { defaultCommissionPercent: cfg.defaultCommissionPercent, homemadeCommissionPercent: cfg.homemadeCommissionPercent, codEnabledGlobally: cfg.codEnabledGlobally }
+  });
 
   persistStore();
   return res.json({
@@ -700,6 +778,16 @@ router.post('/settlements/payout', (req, res) => {
   });
 
   store.settlements.unshift(newSettlement);
+
+  recordAdminAuditLog(store, {
+    action: 'seller_payout',
+    adminEmail: req.user.email,
+    adminId: req.user._id,
+    ip: req.ip || req.headers['x-forwarded-for'] || '127.0.0.1',
+    details: `Settled bank payout ${settlementReference} for Rs. ${netPayoutLkr.toLocaleString()} to seller "${seller.storeName}" (${eligibleSubs.length} sub-orders reconciled)`,
+    metadata: { sellerId, settlementReference, netPayoutLkr, subOrderCount: eligibleSubs.length }
+  });
+
   persistStore();
 
   return res.status(201).json({

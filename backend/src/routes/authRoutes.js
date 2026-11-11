@@ -2,6 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import { getStore, persistStore, generateId } from '../config/db.js';
 import { authenticate, signToken, signAdminToken } from '../middleware/auth.js';
+import { recordAdminAuditLog } from '../config/auditLogger.js';
 
 const router = express.Router();
 
@@ -46,21 +47,6 @@ function recordFailedAdminAttempt(key) {
 
 function clearAdminFailedAttempts(key) {
   adminFailedAttempts.delete(key);
-}
-
-function recordAdminAuditLog(store, entry) {
-  if (!store.platformConfig) return;
-  if (!Array.isArray(store.platformConfig.adminAuditLogs)) {
-    store.platformConfig.adminAuditLogs = [];
-  }
-  store.platformConfig.adminAuditLogs.unshift({
-    id: generateId('aud'),
-    timestamp: new Date().toISOString(),
-    ...entry
-  });
-  if (store.platformConfig.adminAuditLogs.length > 100) {
-    store.platformConfig.adminAuditLogs = store.platformConfig.adminAuditLogs.slice(0, 100);
-  }
 }
 
 function sanitizeUser(user, store) {

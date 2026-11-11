@@ -63,6 +63,8 @@ router.get('/dashboard', (req, res) => {
       totalProducts: products.length,
       approvedProducts: products.filter((p) => p.approvalStatus === 'approved').length,
       pendingProducts: products.filter((p) => p.approvalStatus === 'pending').length,
+      lowStockCount: products.filter((p) => Number(p.stock) > 0 && Number(p.stock) <= 5).length,
+      outOfStockCount: products.filter((p) => Number(p.stock) <= 0).length,
       totalSubOrders: subOrders.length,
       pendingDeliveryOrdersCount,
       grossSalesLkr,
@@ -258,6 +260,134 @@ router.delete('/products/:productId', (req, res) => {
   return res.json({ message: 'Product deleted.' });
 });
 
+// PATCH /api/seller/products/:productId/stock
+// Quick inline inventory restock
+router.patch('/products/:productId/stock', (req, res) => {
+  const store = getStore();
+  const seller = resolveSellerForRequest(req, store);
+  const product = store.products.find((p) => p._id === req.params.productId);
+
+  if (!product) {
+    return res.status(404).json({ message: 'Product not found.' });
+  }
+  if (req.user.role !== 'admin' && (!seller || product.sellerId !== seller._id)) {
+    return res.status(403).json({ message: 'You can only update stock for your own products.' });
+  }
+
+  const { stock, delta } = req.body;
+  if (stock !== undefined) {
+    product.stock = Math.max(0, Number(stock) || 0);
+  } else if (delta !== undefined) {
+    product.stock = Math.max(0, (Number(product.stock) || 0) + Number(delta));
+  } else {
+    return res.status(400).json({ message: 'Provide new stock number or delta.' });
+  }
+
+  persistStore();
+  return res.json({
+    productId: product._id,
+    stock: product.stock,
+    message: `Stock updated for "${product.title}" to ${product.stock} units.`
+  });
+});
+
+// POST /api/seller/products/bulk-import
+// Bulk import product catalog from CSV
+router.post('/products/bulk-import', (req, res) => {
+  const store = getStore();
+  const seller = resolveSellerForRequest(req, store);
+  if (!seller) {
+    return res.status(404).json({ message: 'Seller profile not found.' });
+  }
+
+  const { items } = req.body;
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ message: 'No product rows provided for bulk import.' });
+  }
+
+  const createdProducts = [];
+  const errors = [];
+
+  items.forEach((item, index) => {
+    const rowNum = index + 1;
+    const title = item.title?.trim();
+    const priceLkr = Number(item.priceLkr || item.price);
+    const description = item.description?.trim();
+
+    if (!title || !priceLkr || isNaN(priceLkr) || priceLkr <= 0 || !description) {
+      errors.push(`Row ${rowNum}: Missing valid title, price (LKR), or description.`);
+      return;
+    }
+
+    const slugBase = title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
+    const newProd = {
+      _id: generateId('prd'),
+      sellerId: seller._id,
+      sellerName: seller.storeName,
+      sellerSlug: seller.slug,
+      sellerDistrict: seller.district,
+      sellerType: seller.sellerType,
+      title,
+      slug: `${slugBase}-${Date.now().toString(36).slice(-4)}-${index}`,
+      sku: item.sku?.trim() || `YLK-${Date.now().toString().slice(-4)}-${index + 1}`,
+      categorySlug: item.categorySlug?.trim() || 'homemade-pantry',
+      subCategorySlug: item.subCategorySlug?.trim() || '',
+      description,
+      highlights: Array.isArray(item.highlights)
+        ? item.highlights.filter(Boolean)
+        : String(item.highlights || '')
+            .split(/[\n;]/)
+            .map((s) => s.trim())
+            .filter(Boolean),
+      priceLkr,
+      compareAtPriceLkr: item.compareAtPriceLkr ? Number(item.compareAtPriceLkr) : null,
+      stock: item.stock !== undefined ? Math.max(0, Number(item.stock) || 0) : 15,
+      images: Array.isArray(item.images) && item.images.length > 0
+        ? item.images
+        : item.imageUrl
+        ? [item.imageUrl.trim()]
+        : ['https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=800&q=80'],
+      variants: Array.isArray(item.variants) ? item.variants : [],
+      isHomemade: item.isHomemade !== undefined ? Boolean(item.isHomemade) : seller.isHomemadeVendor,
+      isFeatured: false,
+      isDeal: Boolean(item.compareAtPriceLkr && Number(item.compareAtPriceLkr) > priceLkr),
+      codEligible: item.codEligible !== false,
+      approvalStatus: seller.status === 'approved' ? 'approved' : 'pending',
+      rating: 5.0,
+      reviewCount: 0,
+      soldCount: 0,
+      tags: Array.isArray(item.tags)
+        ? item.tags
+        : String(item.tags || '')
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean),
+      createdAt: new Date().toISOString()
+    };
+
+    store.products.unshift(newProd);
+    createdProducts.push(newProd);
+  });
+
+  if (createdProducts.length > 0) {
+    persistStore();
+  }
+
+  return res.status(201).json({
+    importedCount: createdProducts.length,
+    failedCount: errors.length,
+    errors,
+    products: createdProducts,
+    message: `Successfully imported ${createdProducts.length} product(s).${
+      errors.length > 0 ? ` (${errors.length} skipped due to invalid fields)` : ''
+    }`
+  });
+});
+
 // PUT /api/seller/suborders/:subOrderId/status
 // Seller updates fulfillment status, tracking number, and COD cash collection status
 router.put('/suborders/:subOrderId/status', (req, res) => {
@@ -338,6 +468,28 @@ router.put('/suborders/:subOrderId/status', (req, res) => {
   });
 });
 
+// PUT /api/seller/vacation-mode
+// Instant toggle for seller storefront vacation mode
+router.put('/vacation-mode', (req, res) => {
+  const store = getStore();
+  const seller = resolveSellerForRequest(req, store);
+  if (!seller) {
+    return res.status(404).json({ message: 'Seller profile not found.' });
+  }
+
+  const { isVacationMode, vacationNotice = '' } = req.body;
+  seller.isVacationMode = Boolean(isVacationMode);
+  seller.vacationNotice = vacationNotice ? vacationNotice.trim() : '';
+
+  persistStore();
+  return res.json({
+    seller,
+    message: seller.isVacationMode
+      ? `Store is now on Vacation Mode. Customers are notified on your storefront.`
+      : `Vacation Mode deactivated. Your store is open for regular orders.`
+  });
+});
+
 // PUT /api/seller/profile
 router.put('/profile', (req, res) => {
   const store = getStore();
@@ -357,7 +509,9 @@ router.put('/profile', (req, res) => {
     logoUrl,
     bannerUrl,
     shippingPolicy,
-    bankDetails
+    bankDetails,
+    isVacationMode,
+    vacationNotice
   } = req.body;
 
   if (storeName) seller.storeName = storeName.trim();
@@ -372,6 +526,8 @@ router.put('/profile', (req, res) => {
   if (businessAddress) seller.businessAddress = businessAddress.trim();
   if (logoUrl) seller.logoUrl = logoUrl;
   if (bannerUrl) seller.bannerUrl = bannerUrl;
+  if (isVacationMode !== undefined) seller.isVacationMode = Boolean(isVacationMode);
+  if (vacationNotice !== undefined) seller.vacationNotice = vacationNotice.trim();
   if (shippingPolicy) {
     seller.shippingPolicy = {
       ...seller.shippingPolicy,

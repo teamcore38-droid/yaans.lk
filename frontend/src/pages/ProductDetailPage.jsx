@@ -351,6 +351,19 @@ export default function ProductDetailPage() {
               </div>
             </div>
 
+            {/* Vacation Notice if Seller is away */}
+            {seller?.isVacationMode && (
+              <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-lg text-amber-900 text-xs flex items-center gap-2">
+                <span className="text-base shrink-0">🌴</span>
+                <div className="leading-snug">
+                  <strong className="text-amber-950 font-bold">Seller is on Vacation:</strong>{' '}
+                  <span className="text-amber-900">
+                    {seller.vacationNotice || 'Orders will be fulfilled once the seller returns.'}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Primary CTAs */}
             <div className="space-y-2">
               <button

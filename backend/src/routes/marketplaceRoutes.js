@@ -251,7 +251,9 @@ router.get('/products/:idOrSlug', (req, res) => {
           city: seller.city,
           rating: seller.rating,
           reviewCount: seller.reviewCount,
-          shippingPolicy: seller.shippingPolicy
+          shippingPolicy: seller.shippingPolicy,
+          isVacationMode: Boolean(seller.isVacationMode),
+          vacationNotice: seller.vacationNotice || ''
         }
       : null,
     reviews,
@@ -336,6 +338,8 @@ router.get('/sellers/:slugOrId', (req, res) => {
       reviewCount: seller.reviewCount,
       totalSalesCount: seller.totalSalesCount,
       shippingPolicy: seller.shippingPolicy,
+      isVacationMode: Boolean(seller.isVacationMode),
+      vacationNotice: seller.vacationNotice || '',
       createdAt: seller.createdAt
     },
     products: sellerProducts

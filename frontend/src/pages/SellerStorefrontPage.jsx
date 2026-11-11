@@ -95,6 +95,25 @@ export default function SellerStorefrontPage() {
         </div>
       </div>
 
+      {/* Seller Vacation Notice Banner */}
+      {seller.isVacationMode && (
+        <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-xl p-4 flex items-start sm:items-center gap-3.5 shadow-xs">
+          <span className="text-2xl sm:text-3xl shrink-0">🌴</span>
+          <div className="flex-1">
+            <div className="font-extrabold text-sm text-amber-950 flex items-center gap-2">
+              <span>Store is Currently on Vacation</span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-amber-400 text-slate-950">
+                Temporary Pause
+              </span>
+            </div>
+            <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+              {seller.vacationNotice ||
+                'This seller is taking a temporary break. You can still explore the catalog, and new orders will be processed when the seller returns.'}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Seller Catalog */}
       <section>
         <h2 className="text-base sm:text-lg font-extrabold text-slate-900 mb-3">

@@ -10,7 +10,8 @@ import {
   XCircle,
   Image as ImageIcon,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  ShieldAlert
 } from 'lucide-react';
 import { apiRequest, formatLkr } from '../utils/api.js';
 import { useMarketplace } from '../context/MarketplaceContext.jsx';
@@ -22,6 +23,7 @@ const DistrictShippingTab = lazy(() => import('./admin/DistrictShippingTab.jsx')
 const SettlementsTab = lazy(() => import('./admin/SettlementsTab.jsx'));
 const OrdersTab = lazy(() => import('./admin/OrdersTab.jsx'));
 const AdminAccountTab = lazy(() => import('./admin/AdminAccountTab.jsx'));
+const AdminAuditLogTab = lazy(() => import('./admin/AdminAuditLogTab.jsx'));
 
 export default function AdminDashboardPage() {
   const {
@@ -299,7 +301,8 @@ export default function AdminDashboardPage() {
           },
           { id: 'settlements', label: 'Commissions & Seller Settlements', icon: Banknote },
           { id: 'orders', label: `All Split Orders (${orders.length})`, icon: Package },
-          { id: 'account', label: 'Admin Account & Security', icon: ShieldCheck }
+          { id: 'account', label: 'Admin Account & Security', icon: ShieldCheck },
+          { id: 'audit', label: `Security & Audit Logs (${data?.platformConfig?.adminAuditLogs?.length || 0})`, icon: ShieldAlert }
         ].map((tab) => {
           const Icon = tab.icon;
           return (
@@ -388,6 +391,11 @@ export default function AdminDashboardPage() {
         {/* TAB 7: ADMIN ACCOUNT & SECURITY CREDENTIALS */}
         {activeTab === 'account' && (
           <AdminAccountTab user={user} refreshUser={refreshUser} showToast={showToast} />
+        )}
+
+        {/* TAB 8: SECURITY & AUDIT LOGS */}
+        {activeTab === 'audit' && (
+          <AdminAuditLogTab auditLogs={data?.platformConfig?.adminAuditLogs || []} />
         )}
       </Suspense>
     </div>

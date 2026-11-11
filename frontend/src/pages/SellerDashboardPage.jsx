@@ -112,6 +112,7 @@ export default function SellerDashboardPage() {
   const [activeTab, setActiveTab] = useState('orders');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
 
   // Product Form State
   const [editingProductId, setEditingProductId] = useState(null);
@@ -203,6 +204,7 @@ export default function SellerDashboardPage() {
   const fetchDashboard = useCallback(async () => {
     try {
       setLoading(true);
+      setFetchError(null);
       const res = await apiRequest('/seller/dashboard');
       setData(res);
       if (res.seller) {
@@ -225,8 +227,9 @@ export default function SellerDashboardPage() {
         });
         setVacationNoticeInput(res.seller.vacationNotice || '');
       }
-    } catch (_err) {
+    } catch (err) {
       setData(null);
+      setFetchError(err.message || 'Unable to load seller store information.');
     } finally {
       setLoading(false);
     }
@@ -308,6 +311,30 @@ export default function SellerDashboardPage() {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="h-64 bg-white rounded-xl border border-slate-200 animate-pulse" />
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
+        <div className="w-14 h-14 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto text-amber-600">
+          <AlertTriangle className="w-7 h-7" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-900">Connecting to Seller Portal</h2>
+        <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+          {fetchError || 'Unable to establish connection to your seller profile and store listings.'}
+        </p>
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={() => fetchDashboard()}
+            className="px-5 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Reload Seller Dashboard
+          </button>
+        </div>
       </div>
     );
   }

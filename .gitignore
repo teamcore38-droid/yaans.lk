@@ -15,3 +15,9 @@ backend/uploads/*
 Banner images yaans.lk/
 .DS_Store
 Thumbs.db
+coverage/
+**/coverage/
+.vitest/
+**/.vitest/
+playwright-report/
+test-results/

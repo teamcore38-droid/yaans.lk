@@ -3,6 +3,14 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  preview: {
+    proxy: {
+      '/api': {
+        target: process.env.YAANS_TEST_API_TARGET || 'http://localhost:5000',
+        changeOrigin: true
+      }
+    }
+  },
   server: {
     port: 5173,
     proxy: {

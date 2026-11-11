@@ -3,12 +3,22 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
   "description": "Yaans.lk – Sri Lankan Multi-Vendor E-Commerce Marketplace (MERN Stack)",
   "scripts": {
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "build": "npm --prefix frontend run build",
     "test": "node --test frontend/tests/*.test.js backend/tests/*.test.js",
+    "test:ui": "npm --prefix frontend run test:ui",
+    "test:integration": "node --test backend/tests/*.integration.js",
+    "test:e2e": "playwright test",
+    "test:e2e:report": "playwright show-report",
+    "verify:fast": "npm test && npm run test:ui",
+    "verify:deploy": "npm run verify:fast && npm run build",
+    "verify": "npm run verify:fast && npm run test:integration && npm run build && npm run test:e2e",
     "seed": "npm --prefix backend run seed",
     "backup": "node backend/scripts/backup_db.js",
     "start": "npm --prefix backend start"
@@ -25,5 +35,9 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.9.5",
     "multer": "^1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.0",
+    "mongodb-memory-server-core": "^11.3.0"
   }
 }

@@ -51,4 +51,4 @@ npm run dev:frontend
 - Visible images receive priority, hidden banner slides load progressively, and Cloudinary delivers responsive images with the same artwork and crop. Fonts load without blocking the first render.
 - Concurrent MongoDB refreshes share one read batch, and seed password hashing runs once per process.
 
-Run `npm test` for cache/freshness/isolation and mocked database concurrency checks, and `npm run build` for the production frontend build. Tests do not connect to the configured MongoDB database.
+Run `npm run verify` before releasing: it runs the existing Node tests, React interaction tests, API integration tests against disposable MongoDB, the production frontend build, and Chromium journeys at desktop and mobile sizes. Tests never use the configured application database. See [TESTING.md](TESTING.md) for setup, individual commands, coverage, and the required GitHub/Vercel release settings.

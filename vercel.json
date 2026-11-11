@@ -1,6 +1,6 @@
 {
-  "installCommand": "npm install --no-audit --no-fund && npm --prefix frontend install --no-audit --no-fund",
-  "buildCommand": "npm --prefix frontend run build",
+  "installCommand": "npm ci --include=dev --no-audit --no-fund && npm --prefix backend ci --omit=dev --no-audit --no-fund && npm --prefix frontend ci --include=dev --no-audit --no-fund",
+  "buildCommand": "npm run verify:deploy",
   "outputDirectory": "frontend/dist",
   "headers": [
     {

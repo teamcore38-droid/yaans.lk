@@ -306,14 +306,17 @@ test('security, durable orders and recovery with real MongoDB transactions', { t
   await t.test('administrator recovery uses secure input, revokes old sessions and does not print a password', async () => {
     const token = await login(accounts.admin, true), password = 'A-unique-recovery-password-123!';
     const script = fileURLToPath(new URL('../scripts/provision-admin.js', import.meta.url));
-    const child = execFile(process.execPath, [script, `--email=${accounts.admin}`, '--reset-existing', '--password-stdin'], {
-      env: { ...process.env, MONGODB_URI: app.mongoUri }, encoding: 'utf8'
-    });
-    child.stdin.end(password);
-    const result = await new Promise((resolve, reject) => {
+    const recover = (email) => new Promise((resolve, reject) => {
+      const child = execFile(process.execPath, [script, `--email=${email}`, '--reset-existing', '--password-stdin'], {
+        env: { ...process.env, MONGODB_URI: app.mongoUri }, encoding: 'utf8'
+      });
+      child.stdin.end(password);
       let output = ''; child.stdout.on('data', (data) => { output += data; }); child.stderr.on('data', (data) => { output += data; });
       child.on('error', reject); child.on('exit', (code) => code === 0 ? resolve(output) : reject(new Error(output)));
     });
+    await assert.rejects(recover('missing-admin@test.invalid'), /not found/);
+    assert.equal(await app.mongo.collection('users').countDocuments({ role: 'admin' }), 1);
+    const result = await recover(accounts.admin);
     assert.ok(!result.includes(password));
     assert.equal((await request('/admin/overview', { token })).status, 401);
     const replacement = await login(accounts.admin, true, password);

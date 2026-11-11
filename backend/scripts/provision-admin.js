@@ -41,6 +41,7 @@ try {
   if (password.length < 14 || password.length > 256) throw new Error('Use a unique administrator password of 14–256 characters.');
   await connectDatabase();
   const existing = await MODEL_MAP.users.collection.findOne({ email });
+  if (!existing && args.includes('--reset-existing')) throw new Error('The administrator was not found. Check the email before attempting recovery.');
   if (existing && (existing.role !== 'admin' || !args.includes('--reset-existing'))) throw new Error('Existing administrators require --reset-existing. A customer/seller account cannot be promoted by this command.');
   const passwordHash = await bcrypt.hash(password, 12);
   if (existing) {

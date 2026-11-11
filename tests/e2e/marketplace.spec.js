@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 import { accounts, TEST_PASSWORD, shippingAddress } from '../support/fixtures.js';
 
 let browserErrors;
@@ -89,6 +90,53 @@ test('checkout failure preserves the cart and a retry can succeed', async ({ pag
   await expect(page.getByRole('heading', { name: /Thank you! Your Order/ })).toBeVisible();
 });
 
+test('a lost success response is recovered without creating another order', async ({ page }) => {
+  await page.goto('/product/test-ceylon-spice');
+  await page.getByRole('button', { name: 'Buy Now (Cash on Delivery)', exact: true }).click();
+  await fillAddress(page);
+  let firstOrder;
+  let firstKey;
+  let dropFirstResponse = true;
+  await page.route('**/api/orders/checkout', async (route) => {
+    if (!dropFirstResponse) return route.continue();
+    dropFirstResponse = false;
+    firstKey = route.request().headers()['idempotency-key'];
+    const response = await route.fetch();
+    expect(response.status()).toBe(201);
+    firstOrder = (await response.json()).order;
+    await route.abort('failed');
+  });
+  await page.getByRole('button', { name: /Confirm COD Order/ }).click();
+  await expect(page.getByRole('button', { name: /Confirm COD Order/ })).toBeEnabled();
+  const repeated = page.waitForResponse((response) => response.url().endsWith('/api/orders/checkout') && response.request().method() === 'POST');
+  await page.getByRole('button', { name: /Confirm COD Order/ }).click();
+  const response = await repeated;
+  expect(response.status()).toBe(200);
+  const result = await response.json();
+  expect(result.order._id).toBe(firstOrder._id);
+  expect(response.request().headers()['idempotency-key']).toBe(firstKey);
+  await expect(page.getByRole('heading', { name: new RegExp(firstOrder.orderNumber) })).toBeVisible();
+});
+
+test('a guest needs the private code to track and cancel an order', async ({ page, request }) => {
+  const created = await request.post('/api/orders/checkout', { headers: { 'Idempotency-Key': randomUUID() },
+    data: { items: [{ productId: 'prd_test_lamp', quantity: 1 }], shippingAddress,
+      customerEmail: 'tracking@test.yaans.invalid', paymentMethod: 'COD', codConfirmedByCustomer: true } });
+  expect(created.status()).toBe(201);
+  const { order, guestAccessToken, subOrders } = await created.json();
+  expect((await request.get(`/api/orders/track?orderNumber=${order.orderNumber}&phone=${shippingAddress.phone}`)).status()).toBe(403);
+  expect((await request.post(`/api/orders/suborders/${subOrders[0]._id}/customer-action`, { data: { action: 'cancel' } })).status()).toBe(403);
+  await page.goto(`/track-order?orderNumber=${order.orderNumber}`);
+  await expect(page.getByText('Test Customer', { exact: true })).not.toBeVisible();
+  await page.getByLabel('Guest tracking access code').fill(guestAccessToken);
+  await page.getByRole('button', { name: 'Track Order', exact: true }).click();
+  await expect(page.getByText(`Package 1: ${subOrders[0].subOrderNumber}`, { exact: true })).toBeVisible();
+  const cancel = page.waitForResponse((response) => response.url().includes('/customer-action'));
+  await page.getByRole('button', { name: /Cancel/ }).click();
+  expect((await cancel).status()).toBe(200);
+  await expect(page.getByText('cancelled', { exact: true }).first()).toBeVisible();
+});
+
 test('customer sign-in restores the session and does not grant admin access', async ({ page }) => {
   await login(page, accounts.customer);
   await expect(page).toHaveURL(/\/account$/);
@@ -108,9 +156,9 @@ test('invalid credentials show an error and leave sign-in available', async ({ p
 });
 
 test('seller fulfillment and admin payout are reflected in the settlement ledger', async ({ page, request }) => {
-  const created = await request.post('/api/orders/checkout', { data: {
+  const created = await request.post('/api/orders/checkout', { headers: { 'Idempotency-Key': randomUUID() }, data: {
     items: [{ productId: 'prd_test_spice', variantLabel: '100 g', quantity: 1 }],
-    shippingAddress, customerEmail: 'fulfillment@test.yaans.invalid', paymentMethod: 'COD'
+    shippingAddress, customerEmail: 'fulfillment@test.yaans.invalid', paymentMethod: 'COD', codConfirmedByCustomer: true
   } });
   expect(created.status()).toBe(201);
   const { subOrders: [subOrder] } = await created.json();

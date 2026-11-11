@@ -17,10 +17,14 @@ const AddressSchema = new Schema({
 
 const UserSchema = new Schema(
   {
+    _id: { type: Schema.Types.Mixed, required: true },
+    _writeVersion: { type: Number, default: 0, select: false },
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     phone: { type: String, required: true, trim: true },
     passwordHash: { type: String, required: true },
+    tokenVersion: { type: Number, default: 0 },
+    credentialsUpdatedAt: { type: Date, default: null },
     role: { type: String, enum: ['customer', 'seller', 'admin'], default: 'customer' },
     sellerId: { type: String, default: null },
     defaultDistrict: { type: String, default: 'Colombo' },
@@ -34,6 +38,8 @@ const UserSchema = new Schema(
 // 2. Seller Schema (Supports Home-based sellers, Small Businesses, and Retail Vendors)
 const SellerSchema = new Schema(
   {
+    _id: { type: Schema.Types.Mixed, required: true },
+    _writeVersion: { type: Number, default: 0, select: false },
     userId: { type: String, required: true, index: true },
     storeName: { type: String, required: true, trim: true },
     slug: { type: String, required: true, unique: true, lowercase: true },
@@ -90,6 +96,8 @@ const SubCategoryTileSchema = new Schema({
 
 const CategorySchema = new Schema(
   {
+    _id: { type: Schema.Types.Mixed, required: true },
+    _writeVersion: { type: Number, default: 0, select: false },
     name: { type: String, required: true },
     slug: { type: String, required: true, unique: true },
     quadHeadline: { type: String, required: true }, // e.g., "Sri Lankan Homemade & Spices"
@@ -116,6 +124,8 @@ const VariantOptionSchema = new Schema({
 
 const ProductSchema = new Schema(
   {
+    _id: { type: Schema.Types.Mixed, required: true },
+    _writeVersion: { type: Number, default: 0, select: false },
     sellerId: { type: String, required: true, index: true },
     sellerName: { type: String, required: true },
     sellerSlug: { type: String, required: true },
@@ -157,6 +167,8 @@ const ProductSchema = new Schema(
 // 5. Review Schema
 const ReviewSchema = new Schema(
   {
+    _id: { type: Schema.Types.Mixed, required: true },
+    _writeVersion: { type: Number, default: 0, select: false },
     productId: { type: String, required: true, index: true },
     userId: { type: String, default: null },
     customerName: { type: String, required: true },
@@ -186,6 +198,10 @@ const OrderItemSchema = new Schema({
 
 const SubOrderSchema = new Schema(
   {
+    _id: { type: Schema.Types.Mixed, required: true },
+    _writeVersion: { type: Number, default: 0, select: false },
+    inventoryReservedAt: { type: Date, default: null },
+    inventoryReleasedAt: { type: Date, default: null },
     subOrderNumber: { type: String, required: true, unique: true }, // e.g., YLK-2026-1001-S1
     parentOrderId: { type: String, required: true, index: true },
     parentOrderNumber: { type: String, required: true, index: true },
@@ -255,9 +271,13 @@ const SubOrderSchema = new Schema(
 // 7. Master Order Schema (Customer-facing Order that groups 1..N Seller SubOrders)
 const OrderSchema = new Schema(
   {
+    _id: { type: Schema.Types.Mixed, required: true },
+    _writeVersion: { type: Number, default: 0, select: false },
     orderNumber: { type: String, required: true, unique: true, index: true }, // e.g., YLK-2026-1001
     userId: { type: String, default: null, index: true }, // null for Guest Checkout
     isGuestOrder: { type: Boolean, default: false },
+    guestAccessTokenHash: { type: String, select: false },
+    guestAccessExpiresAt: { type: Date, default: null },
     customerEmail: { type: String, required: true },
     customerPhone: { type: String, required: true, index: true },
     shippingAddress: {
@@ -290,6 +310,8 @@ const OrderSchema = new Schema(
 // 8. Seller Settlement Schema
 const SettlementSchema = new Schema(
   {
+    _id: { type: Schema.Types.Mixed, required: true },
+    _writeVersion: { type: Number, default: 0, select: false },
     settlementReference: { type: String, required: true, unique: true },
     sellerId: { type: String, required: true, index: true },
     sellerName: { type: String, required: true },
@@ -308,6 +330,8 @@ const SettlementSchema = new Schema(
 // 9. Platform Config Schema (Commissions, 25 Sri Lankan Districts, Banners, COD rules)
 const PlatformConfigSchema = new Schema(
   {
+    _id: { type: Schema.Types.Mixed, required: true },
+    _writeVersion: { type: Number, default: 0, select: false },
     key: { type: String, default: 'main_config', unique: true },
     defaultCommissionPercent: { type: Number, default: 8.0 },
     homemadeCommissionPercent: { type: Number, default: 5.0 }, // Lower commission to empower Sri Lankan home-based sellers

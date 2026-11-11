@@ -17,7 +17,7 @@
     "test:e2e": "playwright test",
     "test:e2e:report": "playwright show-report",
     "verify:fast": "npm test && npm run test:ui",
-    "verify:deploy": "npm run verify:fast && npm run build",
+    "verify:deploy": "node scripts/require-production-verification.mjs && npm run verify:fast && npm run build",
     "verify": "npm run verify:fast && npm run test:integration && npm run build && npm run test:e2e",
     "seed": "npm --prefix backend run seed",
     "backup": "node backend/scripts/backup_db.js",

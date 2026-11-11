@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, useLocation, Link } from 'react-router-dom';
 import {
   Search,
   Package,
@@ -11,28 +11,34 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { apiRequest, formatLkr } from '../utils/api.js';
+import { guestAccess, rememberGuestAccess } from '../utils/orderAccess.js';
 import { useMarketplace } from '../context/MarketplaceContext.jsx';
 
 export default function TrackOrderPage() {
   const [searchParams] = useSearchParams();
-  const { showToast } = useMarketplace();
+  const { showToast, user } = useMarketplace();
+  const location = useLocation();
 
   const [orderNumber, setOrderNumber] = useState(
-    searchParams.get('orderNumber') || 'YLK-2026-1001'
+    searchParams.get('orderNumber') || ''
   );
-  const [phone, setPhone] = useState('');
+  const [accessCode, setAccessCode] = useState(() =>
+    new URLSearchParams(location.hash.slice(1)).get('access') || guestAccess(searchParams.get('orderNumber'))
+  );
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const fetchTracking = async (ordNum, ph = '') => {
+  const fetchTracking = async (ordNum, code = '') => {
     if (!ordNum) return;
     try {
       setLoading(true);
       setError('');
       const res = await apiRequest(
-        `/orders/track?orderNumber=${encodeURIComponent(ordNum)}&phone=${encodeURIComponent(ph)}`
+        `/orders/track?orderNumber=${encodeURIComponent(ordNum)}`,
+        code ? { headers: { 'X-Order-Access-Token': code } } : {}
       );
+      rememberGuestAccess(ordNum, code);
       setResult(res);
     } catch (err) {
       setResult(null);
@@ -43,9 +49,16 @@ export default function TrackOrderPage() {
   };
 
   useEffect(() => {
-    const initialOrd = searchParams.get('orderNumber') || 'YLK-2026-1001';
-    fetchTracking(initialOrd, '');
-  }, [searchParams]);
+    const initialOrder = searchParams.get('orderNumber') || '';
+    const code = new URLSearchParams(location.hash.slice(1)).get('access') || guestAccess(initialOrder);
+    setOrderNumber(initialOrder);
+    setAccessCode(code);
+    if (code) {
+      rememberGuestAccess(initialOrder, code);
+      window.history.replaceState(window.history.state, '', `${location.pathname}${location.search}`);
+    }
+    if (initialOrder && (user || code)) fetchTracking(initialOrder, code);
+  }, [searchParams, user?._id]);
 
   const handleCustomerPackageAction = async (subOrderId, action) => {
     const reason =
@@ -55,10 +68,11 @@ export default function TrackOrderPage() {
     try {
       await apiRequest(`/orders/suborders/${subOrderId}/customer-action`, {
         method: 'POST',
+        headers: accessCode ? { 'X-Order-Access-Token': accessCode } : {},
         body: JSON.stringify({ action, reason })
       });
       showToast('Package status updated!');
-      fetchTracking(orderNumber, phone);
+      fetchTracking(orderNumber, accessCode);
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -72,36 +86,14 @@ export default function TrackOrderPage() {
             Track Your Yaans.lk Multi-Seller Order
           </h1>
           <p className="text-xs text-slate-600">
-            Enter your Order ID (try sample multi-seller orders{' '}
-            <button
-              type="button"
-              onClick={() => {
-                setOrderNumber('YLK-2026-1001');
-                fetchTracking('YLK-2026-1001');
-              }}
-              className="text-sky-700 font-bold underline"
-            >
-              YLK-2026-1001
-            </button>{' '}
-            or{' '}
-            <button
-              type="button"
-              onClick={() => {
-                setOrderNumber('YLK-2026-1002');
-                fetchTracking('YLK-2026-1002');
-              }}
-              className="text-sky-700 font-bold underline"
-            >
-              YLK-2026-1002
-            </button>
-            ) to inspect each seller&apos;s package status.
+            Sign in to track your own orders. For a guest order, enter the order number and private access code from your order confirmation.
           </p>
         </div>
 
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            fetchTracking(orderNumber, phone);
+            fetchTracking(orderNumber, accessCode);
           }}
           className="grid grid-cols-1 sm:grid-cols-12 gap-3"
         >
@@ -109,14 +101,16 @@ export default function TrackOrderPage() {
             type="text"
             value={orderNumber}
             onChange={(e) => setOrderNumber(e.target.value)}
-            placeholder="Order Number (e.g., YLK-2026-1001)"
+            placeholder="Order Number"
+            aria-label="Order Number"
             className="sm:col-span-5 px-3.5 py-2.5 rounded-lg border border-slate-300 text-xs sm:text-sm font-semibold"
           />
           <input
             type="text"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="Recipient Phone (Optional verification)"
+            value={accessCode}
+            onChange={(e) => setAccessCode(e.target.value.trim())}
+            placeholder="Guest tracking access code"
+            aria-label="Guest tracking access code"
             className="sm:col-span-4 px-3.5 py-2.5 rounded-lg border border-slate-300 text-xs sm:text-sm"
           />
           <button

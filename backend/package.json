@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node src/server.js",
-    "seed": "node src/seed/seedData.js --reset"
+    "seed": "node src/seed/seedData.js",
+    "admin:provision": "node scripts/provision-admin.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

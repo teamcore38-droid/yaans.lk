@@ -1,119 +1,71 @@
 import jwt from 'jsonwebtoken';
-import { getStore } from '../config/db.js';
-import { getInitialSeedState } from '../seed/initialState.js';
+import bcrypt from 'bcryptjs';
+import { createHash } from 'node:crypto';
+import { revokedCredentialDigests } from '../config/revokedCredentials.js';
+import { findUserById } from '../config/db.js';
+import { httpError } from '../config/errors.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'yaans_lk_sri_lanka_marketplace_jwt_secret_2026';
+export function getJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32 || secret === 'yaans_lk_sri_lanka_marketplace_jwt_secret_2026') {
+    throw httpError(503, 'Authentication is not configured securely.');
+  }
+  return secret;
+}
+
+export async function usesDefaultAdminPassword(user) {
+  return credentialsRevoked(user) || (user?.role === 'admin' && await bcrypt.compare('Admin@123', user.passwordHash || ''));
+}
+
+export function credentialsRevoked(user) {
+  return typeof user?.passwordHash === 'string' && revokedCredentialDigests.has(createHash('sha256').update(user.passwordHash).digest('hex'));
+}
 
 export function signToken(user) {
-  return jwt.sign(
-    {
-      id: user._id,
-      email: user.email,
-      role: user.role,
-      sellerId: user.sellerId || null
-    },
-    JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+  if (user.role === 'admin') return signAdminToken(user);
+  return jwt.sign({ id: user._id, version: 2, tokenVersion: user.tokenVersion || 0 }, getJwtSecret(), {
+    algorithm: 'HS256', expiresIn: '7d', issuer: 'yaans.lk', audience: 'yaans.lk'
+  });
 }
 
 export function signAdminToken(user) {
-  return jwt.sign(
-    {
-      id: user._id,
-      email: user.email,
-      role: 'admin',
-      isAdminSession: true
-    },
-    JWT_SECRET,
-    { expiresIn: '6h' }
-  );
+  return jwt.sign({ id: user._id, version: 2, tokenVersion: user.tokenVersion || 0, isAdminSession: true }, getJwtSecret(), {
+    algorithm: 'HS256', expiresIn: '6h', issuer: 'yaans.lk', audience: 'yaans.lk'
+  });
 }
 
-export function authenticate(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'Authentication required. Please sign in.' });
-  }
-  const token = authHeader.split(' ')[1];
+async function resolveAuthentication(req) {
+  const header = req.headers.authorization;
+  if (typeof header !== 'string' || !header.startsWith('Bearer ')) throw httpError(401, 'Please sign in.');
+  let decoded;
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const store = getStore();
-    let user = store.users.find(
-      (u) =>
-        u._id === decoded.id ||
-        String(u._id) === String(decoded.id) ||
-        u.id === decoded.id ||
-        (decoded.email && u.email && u.email.toLowerCase() === decoded.email.toLowerCase())
-    );
-
-    // Fallback: If not found in active store, check seed defaults (e.g. initial admin)
-    if (!user) {
-      const seed = getInitialSeedState();
-      const matchedSeedUser = seed.users.find(
-        (u) =>
-          u._id === decoded.id ||
-          String(u._id) === String(decoded.id) ||
-          (decoded.email && u.email && u.email.toLowerCase() === decoded.email.toLowerCase())
-      );
-      if (matchedSeedUser) {
-        store.users.unshift(matchedSeedUser);
-        user = matchedSeedUser;
-      }
-    }
-
-    if (!user || user.isActive === false) {
-      return res.status(401).json({ message: 'User account not found or inactive.' });
-    }
-    req.user = user;
-    next();
-  } catch (err) {
-    return res.status(401).json({ message: 'Invalid or expired authentication token.' });
+    decoded = jwt.verify(header.slice(7), getJwtSecret(), { algorithms: ['HS256'], issuer: 'yaans.lk', audience: 'yaans.lk' });
+  } catch (error) {
+    if (error.status === 503) throw error;
+    throw httpError(401, 'Invalid or expired authentication token.');
   }
+  if (decoded.version !== 2 || typeof decoded.id !== 'string') throw httpError(401, 'Please sign in again.');
+  const user = await findUserById(decoded.id);
+  if (!user || user.isActive === false || credentialsRevoked(user) || decoded.tokenVersion !== (user.tokenVersion || 0) ||
+      (user.role === 'admin' && (!decoded.isAdminSession || await usesDefaultAdminPassword(user)))) {
+    throw httpError(401, 'User account not found, inactive, or session expired.');
+  }
+  req.user = user;
 }
 
-export function optionalAuthenticate(req, _res, next) {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.split(' ')[1];
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      const store = getStore();
-      let user = store.users.find(
-        (u) =>
-          u._id === decoded.id ||
-          String(u._id) === String(decoded.id) ||
-          u.id === decoded.id ||
-          (decoded.email && u.email && u.email.toLowerCase() === decoded.email.toLowerCase())
-      );
-      if (!user) {
-        const seed = getInitialSeedState();
-        user = seed.users.find(
-          (u) =>
-            u._id === decoded.id ||
-            (decoded.email && u.email && u.email.toLowerCase() === decoded.email.toLowerCase())
-        );
-      }
-      if (user && user.isActive !== false) {
-        req.user = user;
-      }
-    } catch (_err) {
-      // Proceed as guest
-    }
-  }
-  next();
+export async function authenticate(req, _res, next) {
+  try { await resolveAuthentication(req); next(); } catch (error) { next(error); }
+}
+
+export async function optionalAuthenticate(req, _res, next) {
+  if (!req.headers.authorization) return next();
+  try { await resolveAuthentication(req); next(); } catch (error) { next(error); }
 }
 
 export function requireRole(...roles) {
   return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ message: 'Authentication required.' });
-    }
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
-        message: `Access denied. Required role: ${roles.join(' or ')}.`
-      });
-    }
+    if (!req.user) return res.status(401).json({ message: 'Authentication required.' });
+    if (!roles.includes(req.user.role)) return res.status(403).json({ message: `Access denied. Required role: ${roles.join(' or ')}.` });
     next();
   };
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   CheckCircle2,
@@ -11,6 +11,7 @@ import {
   Package
 } from 'lucide-react';
 import { apiRequest, formatLkr } from '../utils/api.js';
+import { checkoutKey, clearCheckoutKey, rememberGuestAccess } from '../utils/orderAccess.js';
 import { useMarketplace, DEFAULT_SL_DISTRICTS } from '../context/MarketplaceContext.jsx';
 
 export default function CheckoutPage() {
@@ -37,6 +38,7 @@ export default function CheckoutPage() {
   const [codConfirmed, setCodConfirmed] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [placedResult, setPlacedResult] = useState(null);
+  const submissionLock = useRef(false);
 
   // Pre-fill default saved address when user is signed in
   useEffect(() => {
@@ -69,14 +71,25 @@ export default function CheckoutPage() {
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
+    if (submissionLock.current) return;
     if (!codConfirmed && paymentMethod === 'COD') {
       showToast('Please confirm the Cash on Delivery (COD) agreement.', 'error');
       return;
     }
+    submissionLock.current = true;
+    const scope = user?._id || 'guest';
+    const complete = (result) => {
+      rememberGuestAccess(result.order.orderNumber, result.guestAccessToken);
+      clearCheckoutKey(scope);
+      setPlacedResult(result);
+      clearCart();
+      showToast(`Order ${result.order.orderNumber} placed successfully!`);
+    };
     try {
       setSubmitting(true);
       const res = await apiRequest('/orders/checkout', {
         method: 'POST',
+        headers: { 'Idempotency-Key': checkoutKey(scope) },
         body: JSON.stringify({
           items: cartItems.map((c) => ({
             productId: c.productId,
@@ -98,12 +111,20 @@ export default function CheckoutPage() {
           codConfirmedByCustomer: codConfirmed
         })
       });
-      setPlacedResult(res);
-      clearCart();
-      showToast(`Order ${res.order.orderNumber} placed successfully!`);
+      complete(res);
     } catch (err) {
-      showToast(err.message, 'error');
+      if (err.code === 'IDEMPOTENCY_CONFLICT') {
+        try {
+          const previous = await apiRequest('/orders/checkout-result', { method: 'POST', headers: { 'Idempotency-Key': checkoutKey(scope) } });
+          complete(previous);
+          showToast('Your earlier checkout was completed. Please review the confirmed order.');
+        } catch (recoveryError) { showToast(recoveryError.message, 'error'); }
+      } else {
+        // Keep the key after an ambiguous network/server failure, including reloads.
+        showToast(err.message, 'error');
+      }
     } finally {
+      submissionLock.current = false;
       setSubmitting(false);
     }
   };
@@ -131,6 +152,14 @@ export default function CheckoutPage() {
               </p>
             </div>
           </div>
+
+          {placedResult.guestAccessToken && (
+            <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 space-y-2 text-sm">
+              <p className="font-bold">Save your guest tracking access code</p>
+              <p>You will need this code to view or cancel your order when you are not signed in. Keep it private.</p>
+              <code className="block break-all select-all font-mono">{placedResult.guestAccessToken}</code>
+            </div>
+          )}
 
           {/* Per-Seller Split Packages */}
           <div className="space-y-3">
@@ -172,7 +201,7 @@ export default function CheckoutPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Link
-                to={`/track-order?orderNumber=${order.orderNumber}`}
+                to={`/track-order?orderNumber=${order.orderNumber}${placedResult.guestAccessToken ? `#access=${encodeURIComponent(placedResult.guestAccessToken)}` : ''}`}
                 className="px-4 py-2.5 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs"
               >
                 Track Order #{order.orderNumber}

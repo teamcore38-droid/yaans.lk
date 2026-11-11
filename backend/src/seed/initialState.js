@@ -1,30 +1,7 @@
-import bcrypt from 'bcryptjs';
 import { SRI_LANKA_DISTRICTS } from '../config/sriLankaDistricts.js';
 
-// Generate this once per process, rather than blocking the event loop with
-// bcrypt on every Mongo refresh or authentication fallback.
-let defaultAdminHash;
-
 export function getInitialSeedState() {
-  const adminHash = defaultAdminHash ||= bcrypt.hashSync('Admin@123', 8);
-
-  const users = [
-    {
-      _id: 'usr_admin_1',
-      name: 'Yaans.lk Marketplace Admin',
-      email: 'admin@yaans.lk',
-      phone: '0771002000',
-      passwordHash: adminHash,
-      role: 'admin',
-      sellerId: null,
-      defaultDistrict: 'Colombo',
-      addresses: [],
-      wishlist: [],
-      isActive: true,
-      createdAt: '2026-09-01T08:00:00.000Z'
-    }
-  ];
-
+  const users = [];
   const sellers = [];
 
   const categories = [

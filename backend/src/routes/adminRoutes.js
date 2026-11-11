@@ -1,16 +1,16 @@
-import express from 'express';
-import { getStore, persistStore, generateId } from '../config/db.js';
+import { createRouter } from '../config/router.js';
+import { getStore, persistStore, generateId, idFilter } from '../config/db.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { uploadMiddleware, uploadToCloudinary } from '../config/cloudinary.js';
 import { recordAdminAuditLog } from '../config/auditLogger.js';
 
-const router = express.Router();
+const router = createRouter();
 
 router.use(authenticate, requireRole('admin'));
 
 // GET /api/admin/audit-logs
-router.get('/audit-logs', (req, res) => {
-  const store = getStore();
+router.get('/audit-logs', async (req, res) => {
+  const store = await getStore({ platformConfig: true });
   const logs = Array.isArray(store.platformConfig?.adminAuditLogs)
     ? store.platformConfig.adminAuditLogs
     : [];
@@ -18,8 +18,8 @@ router.get('/audit-logs', (req, res) => {
 });
 
 // GET /api/admin/overview
-router.get('/overview', (_req, res) => {
-  const store = getStore();
+router.get('/overview', async (_req, res) => {
+  const store = await getStore({ users: true, sellers: true, categories: true, products: true, orders: true, subOrders: true, settlements: true, platformConfig: true });
 
   const activeSubOrders = store.subOrders.filter(
     (s) => !['cancelled', 'returned'].includes(s.fulfillmentStatus)
@@ -71,10 +71,10 @@ router.get('/overview', (_req, res) => {
 });
 
 // PUT /api/admin/sellers/:sellerId/status
-router.put('/sellers/:sellerId/status', (req, res) => {
+router.put('/sellers/:sellerId/status', async (req, res) => {
   const { sellerId } = req.params;
   const { status, rejectionReason = '', commissionRateOverride } = req.body;
-  const store = getStore();
+  const store = await getStore({ sellers: idFilter(sellerId), platformConfig: true });
 
   const seller = store.sellers.find((s) => s._id === sellerId);
   if (!seller) {
@@ -106,7 +106,7 @@ router.put('/sellers/:sellerId/status', (req, res) => {
     metadata: { sellerId, status: seller.status, commissionRateOverride: seller.commissionRateOverride }
   });
 
-  persistStore();
+  await persistStore(store);
   return res.json({
     seller,
     message: `Seller "${seller.storeName}" updated (${seller.status}).`
@@ -114,10 +114,10 @@ router.put('/sellers/:sellerId/status', (req, res) => {
 });
 
 // PUT /api/admin/products/:productId/moderation
-router.put('/products/:productId/moderation', (req, res) => {
+router.put('/products/:productId/moderation', async (req, res) => {
   const { productId } = req.params;
   const { approvalStatus, isFeatured, isDeal } = req.body;
-  const store = getStore();
+  const store = await getStore({ products: idFilter(productId), platformConfig: true });
 
   const product = store.products.find((p) => p._id === productId);
   if (!product) {
@@ -137,7 +137,7 @@ router.put('/products/:productId/moderation', (req, res) => {
     metadata: { productId, approvalStatus: product.approvalStatus, isFeatured: product.isFeatured, isDeal: product.isDeal }
   });
 
-  persistStore();
+  await persistStore(store);
   return res.json({
     product,
     message: `Product "${product.title}" updated.`
@@ -145,9 +145,9 @@ router.put('/products/:productId/moderation', (req, res) => {
 });
 
 // PUT /api/admin/products/:productId (Full Admin Product Edit Override)
-router.put('/products/:productId', (req, res) => {
+router.put('/products/:productId', async (req, res) => {
   const { productId } = req.params;
-  const store = getStore();
+  const store = await getStore({ products: idFilter(productId), platformConfig: true });
 
   const product = store.products.find((p) => p._id === productId);
   if (!product) {
@@ -228,7 +228,7 @@ router.put('/products/:productId', (req, res) => {
     metadata: { productId, priceLkr: product.priceLkr, stock: product.stock, approvalStatus: product.approvalStatus }
   });
 
-  persistStore();
+  await persistStore(store);
   return res.json({
     product,
     message: `Product "${product.title}" updated by Marketplace Admin.`
@@ -236,9 +236,9 @@ router.put('/products/:productId', (req, res) => {
 });
 
 // DELETE /api/admin/products/:productId (Admin Delist/Delete Product)
-router.delete('/products/:productId', (req, res) => {
+router.delete('/products/:productId', async (req, res) => {
   const { productId } = req.params;
-  const store = getStore();
+  const store = await getStore({ products: idFilter(productId), platformConfig: true });
 
   const idx = store.products.findIndex((p) => p._id === productId);
   if (idx === -1) {
@@ -256,7 +256,7 @@ router.delete('/products/:productId', (req, res) => {
     metadata: { productId, title: removed.title, sellerId: removed.sellerId }
   });
 
-  persistStore();
+  await persistStore(store);
   return res.json({
     message: `Product "${removed.title}" removed from Yaans.lk marketplace by Admin.`,
     productId
@@ -265,9 +265,9 @@ router.delete('/products/:productId', (req, res) => {
 
 // PUT /api/admin/config/districts
 // Updates 25-district matrix as well as active shipping strategy (flat vs custom)
-router.put('/config/districts', (req, res) => {
+router.put('/config/districts', async (req, res) => {
   const { districts, shippingMode, flatShippingRateLkr } = req.body;
-  const store = getStore();
+  const store = await getStore({ platformConfig: true });
 
   if (Array.isArray(districts)) {
     store.platformConfig.districts = districts.map((d) => ({
@@ -299,7 +299,7 @@ router.put('/config/districts', (req, res) => {
     metadata: { shippingMode: store.platformConfig.shippingMode, flatShippingRateLkr: store.platformConfig.flatShippingRateLkr }
   });
 
-  persistStore();
+  await persistStore(store);
   return res.json({
     districts: store.platformConfig.districts,
     shippingMode: store.platformConfig.shippingMode || 'custom',
@@ -314,9 +314,9 @@ router.put('/config/districts', (req, res) => {
 
 // PUT /api/admin/config/shipping-mode
 // Instant switch between Flat Islandwide Shipping and Custom 25-District Matrix
-router.put('/config/shipping-mode', (req, res) => {
+router.put('/config/shipping-mode', async (req, res) => {
   const { shippingMode, flatShippingRateLkr } = req.body;
-  const store = getStore();
+  const store = await getStore({ platformConfig: true });
 
   if (shippingMode === 'flat' || shippingMode === 'custom') {
     store.platformConfig.shippingMode = shippingMode;
@@ -335,7 +335,7 @@ router.put('/config/shipping-mode', (req, res) => {
     metadata: { shippingMode: store.platformConfig.shippingMode, flatShippingRateLkr: store.platformConfig.flatShippingRateLkr }
   });
 
-  persistStore();
+  await persistStore(store);
   return res.json({
     shippingMode: store.platformConfig.shippingMode || 'custom',
     flatShippingRateLkr: store.platformConfig.flatShippingRateLkr ?? 350,
@@ -348,7 +348,7 @@ router.put('/config/shipping-mode', (req, res) => {
 });
 
 // PUT /api/admin/config/general
-router.put('/config/general', (req, res) => {
+router.put('/config/general', async (req, res) => {
   const {
     defaultCommissionPercent,
     homemadeCommissionPercent,
@@ -358,7 +358,7 @@ router.put('/config/general', (req, res) => {
     banners
   } = req.body;
 
-  const store = getStore();
+  const store = await getStore({ platformConfig: true });
   const cfg = store.platformConfig;
 
   if (defaultCommissionPercent !== undefined) {
@@ -389,7 +389,7 @@ router.put('/config/general', (req, res) => {
     metadata: { defaultCommissionPercent: cfg.defaultCommissionPercent, homemadeCommissionPercent: cfg.homemadeCommissionPercent, codEnabledGlobally: cfg.codEnabledGlobally }
   });
 
-  persistStore();
+  await persistStore(store);
   return res.json({
     platformConfig: cfg,
     message: 'Marketplace commission, COD rules, and promotional banners updated.'
@@ -397,12 +397,12 @@ router.put('/config/general', (req, res) => {
 });
 
 // POST /api/admin/categories
-router.post('/categories', (req, res) => {
+router.post('/categories', async (req, res) => {
   const { name, quadHeadline, description, imageUrl, subCategories = [] } = req.body;
   if (!name || !quadHeadline) {
     return res.status(400).json({ message: 'Category name and 2x2 quad card headline are required.' });
   }
-  const store = getStore();
+  const store = await getStore({ categories: true });
   const slug = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -451,14 +451,14 @@ router.post('/categories', (req, res) => {
   };
 
   store.categories.push(newCat);
-  persistStore();
+  await persistStore(store);
   return res.status(201).json({ category: newCat, message: 'Category created.' });
 });
 
 // PUT /api/admin/categories/:categoryId
-router.put('/categories/:categoryId', (req, res) => {
+router.put('/categories/:categoryId', async (req, res) => {
   const { categoryId } = req.params;
-  const store = getStore();
+  const store = await getStore({ categories: { $or: [idFilter(categoryId), { slug: categoryId }] } });
 
   const category = store.categories.find(
     (c) => c._id === categoryId || c.slug === categoryId
@@ -497,7 +497,7 @@ router.put('/categories/:categoryId', (req, res) => {
     }));
   }
 
-  persistStore();
+  await persistStore(store);
   return res.json({
     category,
     message: `Department "${category.name}" updated successfully.`
@@ -505,9 +505,9 @@ router.put('/categories/:categoryId', (req, res) => {
 });
 
 // DELETE /api/admin/categories/:categoryId
-router.delete('/categories/:categoryId', (req, res) => {
+router.delete('/categories/:categoryId', async (req, res) => {
   const { categoryId } = req.params;
-  const store = getStore();
+  const store = await getStore({ categories: true, products: true });
 
   const idx = store.categories.findIndex(
     (c) => c._id === categoryId || c.slug === categoryId
@@ -533,7 +533,7 @@ router.delete('/categories/:categoryId', (req, res) => {
   }
 
   store.categories.splice(idx, 1);
-  persistStore();
+  await persistStore(store);
   return res.json({
     message: `Department "${cat.name}" removed.${
       assignedProducts.length > 0
@@ -565,9 +565,9 @@ router.post('/upload-image', uploadMiddleware.single('image'), async (req, res) 
 
 // GET /api/admin/banners
 // List all homepage banner cards
-router.get('/banners', (_req, res) => {
+router.get('/banners', async (_req, res) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  const store = getStore();
+  const store = await getStore({ platformConfig: true });
   const banners = [...(store.platformConfig?.banners || [])]
     .map((b, idx) => ({ ...b, id: b.id || (b._id ? String(b._id) : `bnr_${idx + 1}`) }))
     .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
@@ -576,7 +576,7 @@ router.get('/banners', (_req, res) => {
 
 // POST /api/admin/banners
 // Add a new homepage banner card attached to a category or all products
-router.post('/banners', (req, res) => {
+router.post('/banners', async (req, res) => {
   const {
     title,
     imageUrl = '',
@@ -594,7 +594,7 @@ router.post('/banners', (req, res) => {
     return res.status(400).json({ message: 'Banner image is required (desktop or mobile).' });
   }
 
-  const store = getStore();
+  const store = await getStore({ platformConfig: true });
   if (!Array.isArray(store.platformConfig.banners)) {
     store.platformConfig.banners = [];
   }
@@ -617,17 +617,17 @@ router.post('/banners', (req, res) => {
   };
 
   store.platformConfig.banners.push(newBanner);
-  persistStore();
+  await persistStore(store);
   return res.status(201).json({ banner: newBanner, message: 'Homepage banner card created.' });
 });
 
 // PUT /api/admin/banners/:bannerId
 // Update an existing homepage banner card
-router.put('/banners/:bannerId', (req, res) => {
+router.put('/banners/:bannerId', async (req, res) => {
   const { bannerId } = req.params;
   const { title, imageUrl, mobileImageUrl, categorySlug, ctaLink, active, displayOrder } = req.body;
 
-  const store = getStore();
+  const store = await getStore({ platformConfig: true });
   if (!Array.isArray(store.platformConfig.banners)) {
     store.platformConfig.banners = [];
   }
@@ -666,15 +666,15 @@ router.put('/banners/:bannerId', (req, res) => {
   if (active !== undefined) banner.active = Boolean(active);
   if (displayOrder !== undefined) banner.displayOrder = Number(displayOrder);
 
-  persistStore();
+  await persistStore(store);
   return res.json({ banner, message: 'Homepage banner card updated.' });
 });
 
 // DELETE /api/admin/banners/:bannerId
 // Remove a homepage banner card
-router.delete('/banners/:bannerId', (req, res) => {
+router.delete('/banners/:bannerId', async (req, res) => {
   const { bannerId } = req.params;
-  const store = getStore();
+  const store = await getStore({ platformConfig: true });
   if (!Array.isArray(store.platformConfig.banners)) {
     store.platformConfig.banners = [];
   }
@@ -698,20 +698,20 @@ router.delete('/banners/:bannerId', (req, res) => {
   }
 
   store.platformConfig.banners.splice(idx, 1);
-  persistStore();
+  await persistStore(store);
   return res.json({ message: 'Banner card removed from homepage.' });
 });
 
 // PUT /api/admin/config/banners
 // Batch update or reorder banners
-router.put('/config/banners', (req, res) => {
+router.put('/config/banners', async (req, res) => {
   const { banners } = req.body;
   if (!Array.isArray(banners)) {
     return res.status(400).json({ message: 'banners array is required.' });
   }
-  const store = getStore();
+  const store = await getStore({ platformConfig: true });
   store.platformConfig.banners = banners;
-  persistStore();
+  await persistStore(store);
   return res.json({
     banners: store.platformConfig.banners,
     message: 'Homepage banners successfully updated.'
@@ -720,13 +720,13 @@ router.put('/config/banners', (req, res) => {
 
 // POST /api/admin/settlements/payout
 // Reconciles and settles all eligible_for_payout SubOrders for a given seller
-router.post('/settlements/payout', (req, res) => {
+router.post('/settlements/payout', async (req, res) => {
   const { sellerId, bankReference = '', notes = '' } = req.body;
   if (!sellerId) {
     return res.status(400).json({ message: 'sellerId is required to execute settlement.' });
   }
 
-  const store = getStore();
+  const store = await getStore({ sellers: idFilter(sellerId), subOrders: { sellerId }, settlements: { sellerId }, platformConfig: true });
   const seller = store.sellers.find((s) => s._id === sellerId);
   if (!seller) {
     return res.status(404).json({ message: 'Seller not found.' });
@@ -747,8 +747,7 @@ router.post('/settlements/payout', (req, res) => {
   const netPayoutLkr = eligibleSubs.reduce((sum, s) => sum + s.netSellerEarningsLkr, 0);
 
   const settlementId = generateId('stl');
-  const seq = String(store.settlements.length + 1).padStart(3, '0');
-  const settlementReference = `STL-YLK-2026-${seq}`;
+  const settlementReference = `STL-YLK-${new Date().getUTCFullYear()}-${settlementId.slice(4).replaceAll('-', '').toUpperCase()}`;
 
   const newSettlement = {
     _id: settlementId,
@@ -788,7 +787,7 @@ router.post('/settlements/payout', (req, res) => {
     metadata: { sellerId, settlementReference, netPayoutLkr, subOrderCount: eligibleSubs.length }
   });
 
-  persistStore();
+  await persistStore(store);
 
   return res.status(201).json({
     settlement: newSettlement,

@@ -1,10 +1,10 @@
-import express from 'express';
+import { createRouter } from '../config/router.js';
 import bcrypt from 'bcryptjs';
-import { getStore, persistStore, generateId } from '../config/db.js';
-import { authenticate, signToken, signAdminToken } from '../middleware/auth.js';
+import { getStore, persistStore, generateId, idFilter } from '../config/db.js';
+import { authenticate, signToken, signAdminToken, getJwtSecret, usesDefaultAdminPassword, credentialsRevoked } from '../middleware/auth.js';
 import { recordAdminAuditLog } from '../config/auditLogger.js';
 
-const router = express.Router();
+const router = createRouter();
 
 // Dedicated Admin Brute-Force Protection (Max 5 failed attempts per 15 minutes per IP/Email)
 const ADMIN_LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
@@ -67,15 +67,16 @@ function sanitizeUser(user, store) {
 }
 
 // POST /api/auth/login (Customer & Seller Storefront Login ONLY)
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
+  getJwtSecret();
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ message: 'Email and password are required.' });
   }
-  const store = getStore();
+  const store = await getStore({ users: { email: String(email).toLowerCase().trim() } });
   const normalizedEmail = String(email).toLowerCase().trim();
   const user = store.users.find((u) => u.email.toLowerCase() === normalizedEmail);
-  if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
+  if (!user || !await bcrypt.compare(String(password), user.passwordHash)) {
     return res.status(401).json({ message: 'Invalid email or password.' });
   }
   if (user.role === 'admin') {
@@ -83,6 +84,7 @@ router.post('/login', (req, res) => {
       message: 'Administrator accounts must sign in through the dedicated Admin Console (/admin/login).'
     });
   }
+  if (credentialsRevoked(user)) return res.status(403).json({ message: 'This account requires a secure password reset by the site owner.' });
   if (!user.isActive) {
     return res.status(403).json({ message: 'This account has been deactivated.' });
   }
@@ -95,7 +97,8 @@ router.post('/login', (req, res) => {
 });
 
 // POST /api/auth/admin/login (Dedicated Gated Marketplace Admin Authentication)
-router.post('/admin/login', (req, res) => {
+router.post('/admin/login', async (req, res) => {
+  getJwtSecret();
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ message: 'Administrator email and password are required.' });
@@ -115,10 +118,10 @@ router.post('/admin/login', (req, res) => {
     });
   }
 
-  const store = getStore();
+  const store = await getStore({ users: { email: normalizedEmail }, platformConfig: true });
   const user = store.users.find((u) => u.email.toLowerCase() === normalizedEmail);
 
-  if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
+  if (!user || !await bcrypt.compare(String(password), user.passwordHash)) {
     recordFailedAdminAttempt(ip);
     const remaining = recordFailedAdminAttempt(rateLimitKey);
     recordAdminAuditLog(store, {
@@ -128,7 +131,7 @@ router.post('/admin/login', (req, res) => {
       userAgent,
       reason: 'Invalid credentials'
     });
-    persistStore();
+    await persistStore(store);
     return res.status(401).json({
       message:
         remaining > 0
@@ -148,7 +151,7 @@ router.post('/admin/login', (req, res) => {
       userAgent,
       reason: 'Non-admin account attempted Admin Console login'
     });
-    persistStore();
+    await persistStore(store);
     return res.status(403).json({
       message: 'Access denied. This portal is strictly restricted to Yaans.lk Marketplace Administrators.'
     });
@@ -156,6 +159,10 @@ router.post('/admin/login', (req, res) => {
 
   if (!user.isActive) {
     return res.status(403).json({ message: 'This administrator account has been deactivated.' });
+  }
+
+  if (await usesDefaultAdminPassword(user)) {
+    return res.status(403).json({ message: 'This administrator account requires a secure password reset by the site owner.' });
   }
 
   clearAdminFailedAttempts(ip);
@@ -167,7 +174,7 @@ router.post('/admin/login', (req, res) => {
     ip,
     userAgent
   });
-  persistStore();
+  await persistStore(store);
 
   const token = signAdminToken(user);
   return res.json({
@@ -178,13 +185,14 @@ router.post('/admin/login', (req, res) => {
 });
 
 // POST /api/auth/register-customer
-router.post('/register-customer', (req, res) => {
+router.post('/register-customer', async (req, res) => {
+  getJwtSecret();
   const { name, email, phone, password, defaultDistrict = 'Colombo' } = req.body;
   if (!name || !email || !phone || !password) {
     return res.status(400).json({ message: 'Name, email, Sri Lankan phone number, and password are required.' });
   }
 
-  const store = getStore();
+  const store = await getStore({ users: { email: String(email).toLowerCase().trim() } });
   const exists = store.users.find((u) => u.email.toLowerCase() === String(email).toLowerCase().trim());
   if (exists) {
     return res.status(409).json({ message: 'An account with this email already exists.' });
@@ -195,7 +203,7 @@ router.post('/register-customer', (req, res) => {
     name: name.trim(),
     email: email.toLowerCase().trim(),
     phone: phone.trim(),
-    passwordHash: bcrypt.hashSync(password, 8),
+    passwordHash: await bcrypt.hash(password, 10),
     role: 'customer',
     sellerId: null,
     defaultDistrict,
@@ -206,7 +214,7 @@ router.post('/register-customer', (req, res) => {
   };
 
   store.users.push(newUser);
-  persistStore();
+  await persistStore(store);
 
   const token = signToken(newUser);
   return res.status(201).json({
@@ -216,7 +224,8 @@ router.post('/register-customer', (req, res) => {
 });
 
 // POST /api/auth/register-seller
-router.post('/register-seller', (req, res) => {
+router.post('/register-seller', async (req, res) => {
+  getJwtSecret();
   const {
     name,
     email,
@@ -241,7 +250,7 @@ router.post('/register-seller', (req, res) => {
     });
   }
 
-  const store = getStore();
+  const store = await getStore({ users: { email: String(email).toLowerCase().trim() }, sellers: { _id: { $in: [] } } });
   const exists = store.users.find((u) => u.email.toLowerCase() === String(email).toLowerCase().trim());
   if (exists) {
     return res.status(409).json({ message: 'An account with this email already exists.' });
@@ -299,7 +308,7 @@ router.post('/register-seller', (req, res) => {
     name: name.trim(),
     email: email.toLowerCase().trim(),
     phone: phone.trim(),
-    passwordHash: bcrypt.hashSync(password, 8),
+    passwordHash: await bcrypt.hash(password, 10),
     role: 'seller',
     sellerId,
     defaultDistrict: district,
@@ -311,7 +320,7 @@ router.post('/register-seller', (req, res) => {
 
   store.sellers.push(newSeller);
   store.users.push(newUser);
-  persistStore();
+  await persistStore(store);
 
   const token = signToken(newUser);
   return res.status(201).json({
@@ -323,15 +332,15 @@ router.post('/register-seller', (req, res) => {
 });
 
 // GET /api/auth/me
-router.get('/me', authenticate, (req, res) => {
-  const store = getStore();
+router.get('/me', authenticate, async (req, res) => {
+  const store = await getStore({ sellers: { _id: req.user.sellerId || null } });
   return res.json({ user: sanitizeUser(req.user, store) });
 });
 
 // PUT /api/auth/profile
-router.put('/profile', authenticate, (req, res) => {
+router.put('/profile', authenticate, async (req, res) => {
   const { name, phone, defaultDistrict, email } = req.body;
-  const store = getStore();
+  const store = await getStore({ users: { $or: [idFilter(req.user._id), { email: typeof email === 'string' ? email.toLowerCase().trim() : '' }] }, sellers: { _id: req.user.sellerId || null } });
   const user = store.users.find((u) => u._id === req.user._id);
   if (!user) {
     return res.status(404).json({ message: 'User not found.' });
@@ -347,15 +356,15 @@ router.put('/profile', authenticate, (req, res) => {
     }
     user.email = trimmed;
   }
-  persistStore();
+  await persistStore(store);
   return res.json({ user: sanitizeUser(user, store) });
 });
 
 // PUT /api/auth/update-credentials
 // Allows updating username/email, password, name, phone with current password verification
-router.put('/update-credentials', authenticate, (req, res) => {
+router.put('/update-credentials', authenticate, async (req, res) => {
   const { currentPassword, newEmail, newPassword, newName, newPhone } = req.body;
-  const store = getStore();
+  const store = await getStore({ users: { $or: [idFilter(req.user._id), { email: typeof newEmail === 'string' ? newEmail.toLowerCase().trim() : '' }] }, sellers: { _id: req.user.sellerId || null } });
   const user = store.users.find((u) => u._id === req.user._id);
   if (!user) {
     return res.status(404).json({ message: 'User not found.' });
@@ -366,7 +375,7 @@ router.put('/update-credentials', authenticate, (req, res) => {
     if (!currentPassword) {
       return res.status(400).json({ message: 'Current password is required to update credentials.' });
     }
-    if (!bcrypt.compareSync(currentPassword, user.passwordHash)) {
+    if (!await bcrypt.compare(String(currentPassword), user.passwordHash)) {
       return res.status(401).json({ message: 'Current password is incorrect.' });
     }
   }
@@ -386,13 +395,17 @@ router.put('/update-credentials', authenticate, (req, res) => {
     if (newPassword.length < 6) {
       return res.status(400).json({ message: 'New password must be at least 6 characters.' });
     }
-    user.passwordHash = bcrypt.hashSync(newPassword, 8);
+    if (user.role === 'admin' && (newPassword.length < 14 || newPassword === 'Admin@123')) {
+      return res.status(400).json({ message: 'Administrator passwords must contain at least 14 characters.' });
+    }
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
   }
 
   if (newName && newName.trim()) user.name = newName.trim();
   if (newPhone !== undefined) user.phone = newPhone.trim();
 
-  persistStore();
+  await persistStore(store);
   const token = signToken(user);
   return res.json({
     token,
@@ -402,12 +415,12 @@ router.put('/update-credentials', authenticate, (req, res) => {
 });
 
 // POST /api/auth/addresses
-router.post('/addresses', authenticate, (req, res) => {
+router.post('/addresses', authenticate, async (req, res) => {
   const { label, recipientName, phone, addressLine1, addressLine2, city, district, postalCode, isDefault } = req.body;
   if (!recipientName || !phone || !addressLine1 || !city || !district) {
     return res.status(400).json({ message: 'Recipient name, phone, address, city, and Sri Lankan district are required.' });
   }
-  const store = getStore();
+  const store = await getStore({ users: idFilter(req.user._id) });
   const user = store.users.find((u) => u._id === req.user._id);
   user.addresses = user.addresses || [];
 
@@ -430,26 +443,26 @@ router.post('/addresses', authenticate, (req, res) => {
     isDefault: Boolean(isDefault || user.addresses.length === 0)
   });
 
-  persistStore();
+  await persistStore(store);
   return res.json({ addresses: user.addresses });
 });
 
 // DELETE /api/auth/addresses/:addressId
-router.delete('/addresses/:addressId', authenticate, (req, res) => {
-  const store = getStore();
+router.delete('/addresses/:addressId', authenticate, async (req, res) => {
+  const store = await getStore({ users: idFilter(req.user._id) });
   const user = store.users.find((u) => u._id === req.user._id);
   user.addresses = (user.addresses || []).filter((a) => a._id !== req.params.addressId);
-  persistStore();
+  await persistStore(store);
   return res.json({ addresses: user.addresses });
 });
 
 // POST /api/auth/wishlist/toggle
-router.post('/wishlist/toggle', authenticate, (req, res) => {
+router.post('/wishlist/toggle', authenticate, async (req, res) => {
   const { productId } = req.body;
   if (!productId) {
     return res.status(400).json({ message: 'productId is required.' });
   }
-  const store = getStore();
+  const store = await getStore({ users: idFilter(req.user._id) });
   const user = store.users.find((u) => u._id === req.user._id);
   user.wishlist = user.wishlist || [];
   const idx = user.wishlist.indexOf(productId);
@@ -458,7 +471,7 @@ router.post('/wishlist/toggle', authenticate, (req, res) => {
   } else {
     user.wishlist.push(productId);
   }
-  persistStore();
+  await persistStore(store);
   return res.json({ wishlist: user.wishlist });
 });
 

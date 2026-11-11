@@ -1,9 +1,11 @@
-import express from 'express';
-import { getStore, persistStore, generateId } from '../config/db.js';
+import { createRouter } from '../config/router.js';
+import { getStore, persistStore, generateId, idFilter, loadCollections, MODEL_MAP } from '../config/db.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { uploadMiddleware, handleProductImageUpload } from '../config/cloudinary.js';
+import { fulfillmentTransitions } from '../../../shared/orderStatus.js';
+import { releaseInventory } from '../services/orders.js';
 
-const router = express.Router();
+const router = createRouter();
 
 router.use(authenticate, requireRole('seller', 'admin'));
 
@@ -16,9 +18,32 @@ function resolveSellerForRequest(req, store) {
   );
 }
 
+async function sellerStore(req) {
+  const target = req.params.subOrderId ? await MODEL_MAP.subOrders.collection.findOne(idFilter(req.params.subOrderId)) : null;
+  const sellerId = req.user.role === 'admin' && typeof req.query.sellerId === 'string'
+    ? req.query.sellerId : req.user.sellerId || (req.user.role === 'admin' ? target?.sellerId : null);
+  const store = await getStore({ sellers: { $or: [{ _id: sellerId || null }, { userId: req.user._id }] } });
+  const seller = resolveSellerForRequest(req, store);
+  const noRecords = { _id: { $in: [] } };
+  if (req.path === '/dashboard') {
+    await loadCollections(store, { products: { sellerId: seller?._id || null },
+      subOrders: { sellerId: seller?._id || null }, settlements: { sellerId: seller?._id || null },
+      categories: true, platformConfig: true });
+  } else if (req.path.startsWith('/products')) {
+    await loadCollections(store, { products: req.params.productId ? idFilter(req.params.productId) : noRecords });
+  } else if (req.params.subOrderId) {
+    await loadCollections(store, { subOrders: target ? { parentOrderId: target.parentOrderId } : noRecords,
+      orders: target ? idFilter(target.parentOrderId) : noRecords });
+    if (target && req.body.fulfillmentStatus === 'cancelled') {
+      await loadCollections(store, { products: { $or: target.items.map((item) => idFilter(item.productId)) } });
+    }
+  }
+  return store;
+}
+
 // GET /api/seller/dashboard
-router.get('/dashboard', (req, res) => {
-  const store = getStore();
+router.get('/dashboard', async (req, res) => {
+  const store = await sellerStore(req);
   const seller = resolveSellerForRequest(req, store);
   if (!seller) {
     return res.status(404).json({ message: 'Seller profile not found.' });
@@ -92,8 +117,8 @@ router.post('/upload-image', uploadMiddleware.single('image'), async (req, res) 
 });
 
 // POST /api/seller/products
-router.post('/products', (req, res) => {
-  const store = getStore();
+router.post('/products', async (req, res) => {
+  const store = await sellerStore(req);
   const seller = resolveSellerForRequest(req, store);
   if (!seller) {
     return res.status(404).json({ message: 'Seller profile not found.' });
@@ -171,7 +196,7 @@ router.post('/products', (req, res) => {
   };
 
   store.products.unshift(newProduct);
-  persistStore();
+  await persistStore(store);
 
   return res.status(201).json({
     product: newProduct,
@@ -183,8 +208,8 @@ router.post('/products', (req, res) => {
 });
 
 // PUT /api/seller/products/:productId
-router.put('/products/:productId', (req, res) => {
-  const store = getStore();
+router.put('/products/:productId', async (req, res) => {
+  const store = await sellerStore(req);
   const seller = resolveSellerForRequest(req, store);
   const product = store.products.find((p) => p._id === req.params.productId);
 
@@ -238,13 +263,13 @@ router.put('/products/:productId', (req, res) => {
   if (isHomemade !== undefined) product.isHomemade = Boolean(isHomemade);
   if (codEligible !== undefined) product.codEligible = Boolean(codEligible);
 
-  persistStore();
+  await persistStore(store);
   return res.json({ product, message: 'Product updated successfully.' });
 });
 
 // DELETE /api/seller/products/:productId
-router.delete('/products/:productId', (req, res) => {
-  const store = getStore();
+router.delete('/products/:productId', async (req, res) => {
+  const store = await sellerStore(req);
   const seller = resolveSellerForRequest(req, store);
   const idx = store.products.findIndex((p) => p._id === req.params.productId);
 
@@ -256,14 +281,14 @@ router.delete('/products/:productId', (req, res) => {
   }
 
   store.products.splice(idx, 1);
-  persistStore();
+  await persistStore(store);
   return res.json({ message: 'Product deleted.' });
 });
 
 // PATCH /api/seller/products/:productId/stock
 // Quick inline inventory restock
-router.patch('/products/:productId/stock', (req, res) => {
-  const store = getStore();
+router.patch('/products/:productId/stock', async (req, res) => {
+  const store = await sellerStore(req);
   const seller = resolveSellerForRequest(req, store);
   const product = store.products.find((p) => p._id === req.params.productId);
 
@@ -283,7 +308,7 @@ router.patch('/products/:productId/stock', (req, res) => {
     return res.status(400).json({ message: 'Provide new stock number or delta.' });
   }
 
-  persistStore();
+  await persistStore(store);
   return res.json({
     productId: product._id,
     stock: product.stock,
@@ -293,8 +318,8 @@ router.patch('/products/:productId/stock', (req, res) => {
 
 // POST /api/seller/products/bulk-import
 // Bulk import product catalog from CSV
-router.post('/products/bulk-import', (req, res) => {
-  const store = getStore();
+router.post('/products/bulk-import', async (req, res) => {
+  const store = await sellerStore(req);
   const seller = resolveSellerForRequest(req, store);
   if (!seller) {
     return res.status(404).json({ message: 'Seller profile not found.' });
@@ -374,7 +399,7 @@ router.post('/products/bulk-import', (req, res) => {
   });
 
   if (createdProducts.length > 0) {
-    persistStore();
+    await persistStore(store);
   }
 
   return res.status(201).json({
@@ -390,8 +415,8 @@ router.post('/products/bulk-import', (req, res) => {
 
 // PUT /api/seller/suborders/:subOrderId/status
 // Seller updates fulfillment status, tracking number, and COD cash collection status
-router.put('/suborders/:subOrderId/status', (req, res) => {
-  const store = getStore();
+router.put('/suborders/:subOrderId/status', async (req, res) => {
+  const store = await sellerStore(req);
   const seller = resolveSellerForRequest(req, store);
   const subOrder = store.subOrders.find((s) => s._id === req.params.subOrderId);
 
@@ -403,6 +428,18 @@ router.put('/suborders/:subOrderId/status', (req, res) => {
   }
 
   const { fulfillmentStatus, trackingCode, courierPartner, codCollectionStatus, note = '' } = req.body;
+
+  if (fulfillmentStatus && !Object.hasOwn(fulfillmentTransitions, fulfillmentStatus)) {
+    return res.status(400).json({ message: 'Invalid fulfillment status.' });
+  }
+  if (fulfillmentStatus && fulfillmentStatus !== subOrder.fulfillmentStatus &&
+      !fulfillmentTransitions[subOrder.fulfillmentStatus]?.includes(fulfillmentStatus)) {
+    return res.status(409).json({ message: 'This order status transition is not allowed.' });
+  }
+  if (codCollectionStatus && !['pending_collection', 'collected_by_courier', 'remitted_to_platform', 'not_applicable', 'refunded'].includes(codCollectionStatus)) {
+    return res.status(400).json({ message: 'Invalid COD collection status.' });
+  }
+  if (fulfillmentStatus === 'cancelled' && subOrder.fulfillmentStatus !== 'cancelled') releaseInventory(store, subOrder);
 
   if (trackingCode !== undefined) subOrder.trackingCode = trackingCode.trim();
   if (courierPartner !== undefined) subOrder.courierPartner = courierPartner.trim();
@@ -461,7 +498,7 @@ router.put('/suborders/:subOrderId/status', (req, res) => {
     }
   }
 
-  persistStore();
+  await persistStore(store);
   return res.json({
     subOrder,
     message: `Order package ${subOrder.subOrderNumber} updated to "${subOrder.fulfillmentStatus}".`
@@ -470,8 +507,8 @@ router.put('/suborders/:subOrderId/status', (req, res) => {
 
 // PUT /api/seller/vacation-mode
 // Instant toggle for seller storefront vacation mode
-router.put('/vacation-mode', (req, res) => {
-  const store = getStore();
+router.put('/vacation-mode', async (req, res) => {
+  const store = await sellerStore(req);
   const seller = resolveSellerForRequest(req, store);
   if (!seller) {
     return res.status(404).json({ message: 'Seller profile not found.' });
@@ -481,7 +518,7 @@ router.put('/vacation-mode', (req, res) => {
   seller.isVacationMode = Boolean(isVacationMode);
   seller.vacationNotice = vacationNotice ? vacationNotice.trim() : '';
 
-  persistStore();
+  await persistStore(store);
   return res.json({
     seller,
     message: seller.isVacationMode
@@ -491,8 +528,8 @@ router.put('/vacation-mode', (req, res) => {
 });
 
 // PUT /api/seller/profile
-router.put('/profile', (req, res) => {
-  const store = getStore();
+router.put('/profile', async (req, res) => {
+  const store = await sellerStore(req);
   const seller = resolveSellerForRequest(req, store);
   if (!seller) {
     return res.status(404).json({ message: 'Seller profile not found.' });
@@ -541,7 +578,7 @@ router.put('/profile', (req, res) => {
     };
   }
 
-  persistStore();
+  await persistStore(store);
   return res.json({ seller, message: 'Seller storefront & shipping settings updated.' });
 });
 

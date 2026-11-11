@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server-core';
+import { MongoMemoryReplSet } from 'mongodb-memory-server-core';
 import { buildTestStore } from '../../../tests/support/fixtures.js';
 
 export async function startIsolatedApp(port = 0) {
@@ -19,7 +19,8 @@ export async function startIsolatedApp(port = 0) {
   let server;
   const overrides = {
     NODE_ENV: 'test', VERCEL: '1', TEMP: directory, TMP: directory,
-    JWT_SECRET: 'yaans-automated-tests-only-secret',
+    MAINTENANCE_READ_ONLY: '',
+    JWT_SECRET: 'yaans-automated-tests-only-secret-32chars',
     MONGODB_DB_NAME: 'yaans_automated_test', USE_EXTERNAL_MONGO: 'true',
     CLOUDINARY_URL: '', CLOUDINARY_CLOUD_NAME: '', CLOUDINARY_API_KEY: '', CLOUDINARY_API_SECRET: ''
   };
@@ -27,9 +28,9 @@ export async function startIsolatedApp(port = 0) {
   try {
     Object.assign(process.env, overrides);
     // Always create our own loopback-only MongoDB. Inherited MONGODB_URI is never used.
-    mongo = await MongoMemoryServer.create({
+    mongo = await MongoMemoryReplSet.create({
       binary: { version: '7.0.14' },
-      instance: { dbName: overrides.MONGODB_DB_NAME, ip: '127.0.0.1' }
+      replSet: { count: 1, dbName: overrides.MONGODB_DB_NAME, ip: '127.0.0.1', storageEngine: 'wiredTiger' }
     });
     process.env.MONGODB_URI = mongo.getUri();
     const { default: app } = await import('../../src/server.js');
@@ -41,7 +42,7 @@ export async function startIsolatedApp(port = 0) {
       const docs = collection === 'platformConfig' ? [{ ...fixtures.platformConfig, key: 'main_config' }] : fixtures[collection];
       if (docs.length) await model.collection.insertMany(docs);
     }
-    await db.loadStoreFromMongo();
+    for (const model of Object.values(db.MODEL_MAP)) await model.createIndexes();
     server = await new Promise((resolve, reject) => {
       const listener = app.listen(port, '127.0.0.1', () => resolve(listener));
       listener.once('error', reject);
@@ -51,6 +52,18 @@ export async function startIsolatedApp(port = 0) {
       app,
       db,
       mongo: mongoose.connection.db,
+      mongoUri: mongo.getUri(),
+      async reset() {
+        assert.match(process.env.MONGODB_URI, /^mongodb:\/\/127\.0\.0\.1:/);
+        assert.equal(mongoose.connection.name, overrides.MONGODB_DB_NAME);
+        const fixtures = buildTestStore();
+        for (const [key, model] of Object.entries(db.MODEL_MAP)) {
+          await model.collection.deleteMany({});
+          const values = key === 'platformConfig' ? [{ ...fixtures.platformConfig, key: 'main_config' }] : fixtures[key];
+          if (values.length) await model.collection.insertMany(values);
+        }
+        for (const name of ['counters', 'checkoutrequests']) await mongoose.connection.db.collection(name).deleteMany({});
+      },
       async close() {
         await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
         await mongoose.disconnect();

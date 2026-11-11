@@ -92,6 +92,7 @@ export async function apiRequest(endpoint, options = {}) {
     if (!response.ok) {
       const error = new Error(data.message || `Request failed (${response.status})`);
       error.status = response.status;
+      error.code = data.code;
       throw error;
     }
     if (publicKey && options.cache !== 'no-store' && generation === cacheGeneration) {

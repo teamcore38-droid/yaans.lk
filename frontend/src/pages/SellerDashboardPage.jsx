@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { fulfillmentTransitions } from '../../../shared/orderStatus.js';
 import {
   Store,
   Package,
@@ -926,7 +927,7 @@ export default function SellerDashboardPage() {
                         { status: 'shipped', label: 'Mark Shipped' },
                         { status: 'out_for_delivery', label: 'Out for Delivery' },
                         { status: 'delivered', label: 'Delivered & COD Collected' }
-                      ].map((btn) => (
+                      ].filter((btn) => fulfillmentTransitions[sub.fulfillmentStatus]?.includes(btn.status)).map((btn) => (
                         <button
                           key={btn.status}
                           type="button"

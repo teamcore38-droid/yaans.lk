@@ -1,15 +1,15 @@
-import express from 'express';
-import { getStore, persistStore, generateId } from '../config/db.js';
+import { createRouter } from '../config/router.js';
+import { getStore, persistStore, generateId, idFilter } from '../config/db.js';
 import { calculateSellerDeliveryFee } from '../config/sriLankaDistricts.js';
 import { optionalAuthenticate } from '../middleware/auth.js';
 
-const router = express.Router();
+const router = createRouter();
 
 // GET /api/marketplace/home
 // Returns categories (with 2x2 quad cards), active banners, homemade showcase, daily deals, featured products, and districts
-router.get('/home', (req, res) => {
+router.get('/home', async (req, res) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  const store = getStore();
+  const store = await getStore({ categories: true, sellers: { status: 'approved' }, products: { approvalStatus: 'approved' }, platformConfig: true });
   const approvedSellerIds = new Set(
     store.sellers.filter((s) => s.status === 'approved').map((s) => s._id)
   );
@@ -68,8 +68,8 @@ router.get('/home', (req, res) => {
 });
 
 // GET /api/marketplace/districts
-router.get('/districts', (_req, res) => {
-  const store = getStore();
+router.get('/districts', async (_req, res) => {
+  const store = await getStore({ platformConfig: true });
   return res.json({
     districts: store.platformConfig.districts,
     codEnabledGlobally: store.platformConfig.codEnabledGlobally,
@@ -80,16 +80,16 @@ router.get('/districts', (_req, res) => {
 });
 
 // GET /api/marketplace/categories
-router.get('/categories', (_req, res) => {
-  const store = getStore();
+router.get('/categories', async (_req, res) => {
+  const store = await getStore({ categories: true });
   const categories = [...store.categories].sort((a, b) => a.displayOrder - b.displayOrder);
   return res.json({ categories });
 });
 
 // GET /api/marketplace/products
 // Supports search, category, subcategory, sellerId, district, homemade, deals, minPrice, maxPrice, inStock, sort, page, limit
-router.get('/products', (req, res) => {
-  const store = getStore();
+router.get('/products', async (req, res) => {
+  const store = await getStore({ products: { approvalStatus: 'approved' }, sellers: { status: 'approved' } });
   const {
     q = '',
     category = '',
@@ -198,10 +198,10 @@ router.get('/products', (req, res) => {
 });
 
 // GET /api/marketplace/products/:idOrSlug
-router.get('/products/:idOrSlug', (req, res) => {
+router.get('/products/:idOrSlug', async (req, res) => {
   const { idOrSlug } = req.params;
   const { destinationDistrict = 'Colombo' } = req.query;
-  const store = getStore();
+  const store = await getStore({ products: { approvalStatus: 'approved' }, sellers: { status: 'approved' }, reviews: true, platformConfig: true });
 
   const product = store.products.find(
     (p) => p._id === idOrSlug || p.slug === idOrSlug
@@ -211,6 +211,9 @@ router.get('/products/:idOrSlug', (req, res) => {
   }
 
   const seller = store.sellers.find((s) => s._id === product.sellerId);
+  if (!seller || seller.status !== 'approved') {
+    return res.status(404).json({ message: 'Product not found.' });
+  }
   const reviews = store.reviews
     .filter((r) => r.productId === product._id)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -220,6 +223,7 @@ router.get('/products/:idOrSlug', (req, res) => {
       (p) =>
         p._id !== product._id &&
         p.approvalStatus === 'approved' &&
+        store.sellers.some((s) => s._id === p.sellerId && s.status === 'approved') &&
         (p.categorySlug === product.categorySlug || p.sellerId === product.sellerId)
     )
     .slice(0, 6);
@@ -263,14 +267,14 @@ router.get('/products/:idOrSlug', (req, res) => {
 });
 
 // POST /api/marketplace/products/:productId/reviews
-router.post('/products/:productId/reviews', optionalAuthenticate, (req, res) => {
+router.post('/products/:productId/reviews', optionalAuthenticate, async (req, res) => {
   const { productId } = req.params;
   const { customerName, district = 'Colombo', rating = 5, title = '', comment } = req.body;
   if (!comment) {
     return res.status(400).json({ message: 'Please write a review comment.' });
   }
 
-  const store = getStore();
+  const store = await getStore({ products: idFilter(productId), reviews: { productId } });
   const product = store.products.find((p) => p._id === productId);
   if (!product) {
     return res.status(404).json({ message: 'Product not found.' });
@@ -298,7 +302,7 @@ router.post('/products/:productId/reviews', optionalAuthenticate, (req, res) => 
   product.rating = Number(avg.toFixed(1));
   product.reviewCount = prodReviews.length;
 
-  persistStore();
+  await persistStore(store);
   return res.status(201).json({
     review: newReview,
     productRating: product.rating,
@@ -307,9 +311,9 @@ router.post('/products/:productId/reviews', optionalAuthenticate, (req, res) => 
 });
 
 // GET /api/marketplace/sellers/:slugOrId
-router.get('/sellers/:slugOrId', (req, res) => {
+router.get('/sellers/:slugOrId', async (req, res) => {
   const { slugOrId } = req.params;
-  const store = getStore();
+  const store = await getStore({ sellers: { status: 'approved', $or: [idFilter(slugOrId), { slug: slugOrId }] }, products: { approvalStatus: 'approved' } });
   const seller = store.sellers.find(
     (s) => s._id === slugOrId || s.slug === slugOrId
   );

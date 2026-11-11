@@ -13,6 +13,7 @@ vi.mock('../../src/context/MarketplaceContext.jsx', async (importOriginal) => ({
 
 let marketplace;
 beforeEach(() => {
+  sessionStorage.clear();
   marketplace = {
     user: null, cartItems: [{ productId: 'spice', variantLabel: '100 g', quantity: 2 }],
     cartQuote: { codAvailable: true, sellerGroups: [], grandTotalLkr: 2420 },
@@ -80,4 +81,39 @@ test('signed-in customers can start from their default saved address', () => {
   expect(screen.getByPlaceholderText('e.g., Kasun Perera')).toHaveValue('Saved Recipient');
   expect(screen.getByPlaceholderText('e.g., No. 42/B, Fife Road, Thimbirigasyaya')).toHaveValue('7 Saved Lane');
   expect(marketplace.setSelectedDistrict).toHaveBeenCalledWith('Kandy');
+});
+
+test('duplicate form submission sends one request and an ambiguous retry preserves its key across remounts', async () => {
+  let reject;
+  const request = vi.spyOn(api, 'apiRequest').mockImplementation(() => new Promise((_resolve, fail) => { reject = fail; }));
+  const first = checkout();
+  await fillAddress();
+  fireEvent.submit(first.container.querySelector('form'));
+  fireEvent.submit(first.container.querySelector('form'));
+  expect(request).toHaveBeenCalledTimes(1);
+  const key = request.mock.calls[0][1].headers['Idempotency-Key'];
+  reject(new Error('Response was lost'));
+  await waitFor(() => expect(marketplace.showToast).toHaveBeenCalledWith('Response was lost', 'error'));
+  first.unmount();
+  request.mockResolvedValueOnce({ order: { orderNumber: 'YLK-TEST-RECOVERED', grandTotalLkr: 2420,
+    shippingAddress: { city: 'Colombo', district: 'Colombo' } }, subOrders: [], guestAccessToken: 'a'.repeat(43) });
+  const second = checkout();
+  await fillAddress();
+  fireEvent.submit(second.container.querySelector('form'));
+  await screen.findByRole('heading', { name: /YLK-TEST-RECOVERED/ });
+  expect(request.mock.calls[1][1].headers['Idempotency-Key']).toBe(key);
+  expect(screen.getByText('a'.repeat(43))).toBeVisible();
+  expect(sessionStorage.getItem('yaans_guest_order_access_v1:YLK-TEST-RECOVERED')).toBe('a'.repeat(43));
+});
+
+test('changed details after an uncertain checkout recover the original order rather than creating a second one', async () => {
+  const conflict = Object.assign(new Error('Earlier order completed'), { status: 409, code: 'IDEMPOTENCY_CONFLICT' });
+  const request = vi.spyOn(api, 'apiRequest').mockRejectedValueOnce(conflict).mockResolvedValueOnce({
+    order: { orderNumber: 'YLK-TEST-ORIGINAL', grandTotalLkr: 2420, shippingAddress: { city: 'Colombo', district: 'Colombo' } }, subOrders: []
+  });
+  const { container } = checkout(); await fillAddress();
+  fireEvent.submit(container.querySelector('form'));
+  await screen.findByRole('heading', { name: /YLK-TEST-ORIGINAL/ });
+  expect(request.mock.calls[1][0]).toBe('/orders/checkout-result');
+  expect(request.mock.calls[1][1].headers['Idempotency-Key']).toBe(request.mock.calls[0][1].headers['Idempotency-Key']);
 });

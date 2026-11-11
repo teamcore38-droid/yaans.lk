@@ -1,317 +1,159 @@
-import fs from 'fs';
-import os from 'os';
-import dns from 'dns';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { randomUUID } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import mongoose from 'mongoose';
-import {
-  UserModel,
-  SellerModel,
-  CategoryModel,
-  ProductModel,
-  ReviewModel,
-  SubOrderModel,
-  OrderModel,
-  SettlementModel,
-  PlatformConfigModel
-} from '../models/schemas.js';
-import { getInitialSeedState } from '../seed/initialState.js';
+import { UserModel, SellerModel, CategoryModel, ProductModel, ReviewModel, SubOrderModel, OrderModel, SettlementModel, PlatformConfigModel } from '../models/schemas.js';
+import { httpError } from './errors.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Use /tmp on serverless platforms (Vercel) where the deployment folder is read-only
-const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
-const DATA_DIR = IS_SERVERLESS
-  ? path.join(os.tmpdir(), 'yaans_lk_data')
-  : path.resolve(__dirname, '../../data');
-const DB_FILE = path.join(DATA_DIR, 'yaans_db.json');
-
-let isMongoConnected = false;
-let connectionPromise = null;
-let memoryStore = null;
-let isDirty = false;
-let lastMongoSyncTime = 0;
-let refreshPromise = null;
-let storeRevision = 0;
-
-const MODEL_MAP = {
-  users: UserModel,
-  sellers: SellerModel,
-  categories: CategoryModel,
-  products: ProductModel,
-  reviews: ReviewModel,
-  subOrders: SubOrderModel,
-  orders: OrderModel,
-  settlements: SettlementModel,
-  platformConfig: PlatformConfigModel
+export const MODEL_MAP = {
+  users: UserModel, sellers: SellerModel, categories: CategoryModel, products: ProductModel,
+  reviews: ReviewModel, subOrders: SubOrderModel, orders: OrderModel,
+  settlements: SettlementModel, platformConfig: PlatformConfigModel
 };
+let connectionPromise;
+const snapshot = Symbol('database unit of work');
+const clone = (value) => mongoose.mongo.BSON.EJSON.parse(mongoose.mongo.BSON.EJSON.stringify(value, { relaxed: false }));
 
-function safeWriteLocalCache(data) {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
-  } catch (_err) {
-    // Ignore filesystem write errors in restricted serverless containers
-  }
-}
-
-function ensureLocalStoreLoaded(forceReset = false) {
-  if (!forceReset && memoryStore) {
-    return memoryStore;
-  }
-  if (!forceReset && fs.existsSync(DB_FILE)) {
-    try {
-      const raw = fs.readFileSync(DB_FILE, 'utf-8');
-      memoryStore = JSON.parse(raw);
-      return memoryStore;
-    } catch (_err) {
-      // Rebuild from seed state
-    }
-  }
-  memoryStore = getInitialSeedState();
-  safeWriteLocalCache(memoryStore);
-  return memoryStore;
-}
-
-/**
- * Loads all collections from MongoDB Atlas into memoryStore
- */
-export function loadStoreFromMongo() {
-  if (refreshPromise) return refreshPromise;
-  refreshPromise = readStoreFromMongo().finally(() => { refreshPromise = null; });
-  return refreshPromise;
-}
-
-async function readStoreFromMongo() {
-  if (!isMongoConnected) return ensureLocalStoreLoaded(false);
-  const revisionAtStart = storeRevision;
-  try {
-    const [
-      users,
-      sellers,
-      categories,
-      products,
-      reviews,
-      subOrders,
-      orders,
-      settlements,
-      platformConfigDoc
-    ] = await Promise.all([
-      UserModel.find({}).lean(),
-      SellerModel.find({}).lean(),
-      CategoryModel.find({}).lean(),
-      ProductModel.find({}).lean(),
-      ReviewModel.find({}).lean(),
-      SubOrderModel.find({}).lean(),
-      OrderModel.find({}).lean(),
-      SettlementModel.find({}).lean(),
-      PlatformConfigModel.findOne({ key: 'main_config' }).lean()
-    ]);
-
-    // A checkout or admin edit may have completed while these queries ran.
-    // Keep that newer in-memory state instead of replacing it with older reads.
-    if (storeRevision !== revisionAtStart || isDirty) return memoryStore;
-    const seedFallback = getInitialSeedState();
-    const resolvedUsers =
-      users.length > 0 ? users.map((d) => ({ ...d, _id: String(d._id) })) : seedFallback.users;
-    if (!resolvedUsers.some((u) => u.role === 'admin' || (u.email && u.email.toLowerCase() === 'admin@yaans.lk'))) {
-      const defaultAdmin = seedFallback.users.find((u) => u.role === 'admin');
-      if (defaultAdmin) resolvedUsers.unshift(defaultAdmin);
-    }
-
-    memoryStore = {
-      users: resolvedUsers,
-      sellers: sellers.length > 0 ? sellers.map((d) => ({ ...d, _id: String(d._id) })) : seedFallback.sellers,
-      categories:
-        categories.length > 0
-          ? categories.map((d) => ({ ...d, _id: String(d._id) }))
-          : seedFallback.categories,
-      products:
-        products.length > 0
-          ? products.map((d) => ({ ...d, _id: String(d._id) }))
-          : seedFallback.products,
-      reviews: reviews.map((d) => ({ ...d, _id: String(d._id) })),
-      subOrders: subOrders.map((d) => ({ ...d, _id: String(d._id) })),
-      orders: orders.map((d) => ({ ...d, _id: String(d._id) })),
-      settlements: settlements.map((d) => ({ ...d, _id: String(d._id) })),
-      platformConfig: platformConfigDoc
-        ? {
-            ...platformConfigDoc,
-            _id: String(platformConfigDoc._id),
-            banners:
-              Array.isArray(platformConfigDoc.banners) && platformConfigDoc.banners.length > 0
-                ? platformConfigDoc.banners
-                : seedFallback.platformConfig?.banners || []
-          }
-        : seedFallback.platformConfig
-    };
-    lastMongoSyncTime = Date.now();
-    safeWriteLocalCache(memoryStore);
-    return memoryStore;
-  } catch (err) {
-    console.warn('[Yaans.lk DB] Error loading from MongoDB, using cached store:', err.message);
-    return ensureLocalStoreLoaded(false);
-  }
-}
-
-/**
- * Flushes any in-memory mutations back to MongoDB Atlas collections
- */
-export async function syncStoreToMongo() {
-  if (!isMongoConnected || !memoryStore || !isDirty) return;
-  isDirty = false;
-  try {
-    const replaceCollection = async (Model, docs) => {
-      await Model.deleteMany({});
-      if (Array.isArray(docs) && docs.length > 0) {
-        const cleanDocs = docs.map(({ _id, __v, ...rest }) => ({
-          ...rest,
-          ...(mongoose.Types.ObjectId.isValid(_id) ? { _id } : {})
-        }));
-        await Model.insertMany(cleanDocs, { ordered: false });
-      }
-    };
-
-    // Use atomic bulkWrite (upsert + remove deleted) to prevent race conditions and zero-document read windows
-    const syncNativeCollection = async (Model, docs) => {
-      const col = Model.collection;
-      if (!Array.isArray(docs)) return;
-      if (docs.length === 0) {
-        await col.deleteMany({});
-        return;
-      }
-      const activeIds = docs.map((d) => d._id);
-      const bulkOps = docs.map((doc) => ({
-        replaceOne: {
-          filter: { _id: doc._id },
-          replacement: { ...doc },
-          upsert: true
-        }
-      }));
-      bulkOps.push({
-        deleteMany: {
-          filter: { _id: { $nin: activeIds } }
-        }
-      });
-      await col.bulkWrite(bulkOps, { ordered: false });
-    };
-
-    await Promise.all([
-      syncNativeCollection(UserModel, memoryStore.users),
-      syncNativeCollection(SellerModel, memoryStore.sellers),
-      syncNativeCollection(CategoryModel, memoryStore.categories),
-      syncNativeCollection(ProductModel, memoryStore.products),
-      syncNativeCollection(ReviewModel, memoryStore.reviews),
-      syncNativeCollection(SubOrderModel, memoryStore.subOrders),
-      syncNativeCollection(OrderModel, memoryStore.orders),
-      syncNativeCollection(SettlementModel, memoryStore.settlements)
-    ]);
-
-    if (memoryStore.platformConfig) {
-      const cfg = { ...memoryStore.platformConfig, key: 'main_config' };
-      await PlatformConfigModel.collection.updateOne(
-        { key: 'main_config' },
-        { $set: cfg },
-        { upsert: true }
-      );
-    }
-    lastMongoSyncTime = Date.now();
-  } catch (err) {
-    console.error('[Yaans.lk DB] Failed syncing to MongoDB Atlas:', err.message);
-  }
-}
-
-export function persistStore() {
-  if (!memoryStore) return;
-  storeRevision++;
-  isDirty = true;
-  safeWriteLocalCache(memoryStore);
-  if (isMongoConnected) {
-    // Trigger async sync (also awaited by server middleware on mutating requests)
-    syncStoreToMongo().catch(() => {});
-  }
-}
-
+// Reuse connections, never authoritative business records, across requests.
 export async function connectDatabase() {
-  if (connectionPromise) {
-    return connectionPromise;
+  if (mongoose.connection.readyState === 1) return { isMongoConnected: true, storePath: 'MongoDB Atlas' };
+  if (!connectionPromise) {
+    connectionPromise = (async () => {
+      const uri = process.env.MONGODB_URI;
+      if (!uri) throw httpError(503, 'The database is unavailable. Please try again later.');
+      await mongoose.connect(uri, {
+        dbName: process.env.MONGODB_DB_NAME || 'yaans_lk', serverSelectionTimeoutMS: 8000,
+        waitQueueTimeoutMS: 3000, maxPoolSize: 10, minPoolSize: 0, autoIndex: false
+      });
+      return { isMongoConnected: true, storePath: 'MongoDB Atlas' };
+    })().finally(() => { connectionPromise = undefined; });
   }
-
-  connectionPromise = (async () => {
-    const uri = process.env.MONGODB_URI;
-    const shouldTryMongo =
-      uri &&
-      (uri.startsWith('mongodb+srv://') ||
-        process.env.USE_EXTERNAL_MONGO === 'true' ||
-        !uri.includes('127.0.0.1'));
-
-    if (shouldTryMongo) {
-      try {
-        if (!IS_SERVERLESS && uri.startsWith('mongodb+srv://')) {
-          try {
-            dns.setServers(['8.8.8.8', '1.1.1.1']);
-          } catch (_e) {
-            // ignore
-          }
-        }
-        await mongoose.connect(uri, {
-          serverSelectionTimeoutMS: 8000,
-          dbName: process.env.MONGODB_DB_NAME || 'yaans_lk'
-        });
-        isMongoConnected = true;
-        console.log('[Yaans.lk DB] Connected to MongoDB Atlas via Mongoose!');
-
-        const configCount = await PlatformConfigModel.collection.countDocuments();
-        if (configCount === 0) {
-          console.log('[Yaans.lk DB] Initializing clean Yaans.lk marketplace schema into MongoDB Atlas...');
-          await seedMongoDatabase();
-        } else {
-          await loadStoreFromMongo();
-        }
-      } catch (err) {
-        console.warn(
-          '[Yaans.lk DB] MongoDB connection fallback to local document store:',
-          err.message
-        );
-        isMongoConnected = false;
-      }
-    }
-
-    ensureLocalStoreLoaded(false);
-    return {
-      isMongoConnected,
-      storePath: isMongoConnected ? 'MongoDB Atlas (yaans_lk)' : DB_FILE
-    };
-  })();
-
   return connectionPromise;
 }
 
-export async function refreshStoreIfNeeded() {
-  if (isMongoConnected && !isDirty && Date.now() - lastMongoSyncTime > 5000) {
-    await loadStoreFromMongo();
+export function idFilter(id) {
+  if (typeof id !== 'string' || !id) throw httpError(400, 'A valid record ID is required.');
+  return mongoose.Types.ObjectId.isValid(id) && /^[a-f\d]{24}$/i.test(id)
+    ? { $or: [{ _id: id }, { _id: new mongoose.Types.ObjectId(id) }] } : { _id: id };
+}
+
+export async function withTransaction(work) {
+  await connectDatabase();
+  const session = await mongoose.connection.startSession();
+  try {
+    return await session.withTransaction(() => work(session), {
+      readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' },
+      readPreference: 'primary', maxCommitTimeMS: 10000
+    });
+  } finally { await session.endSession(); }
+}
+
+// Request-local units of work contain only explicitly selected collections/IDs.
+export async function getStore(selection, { session } = {}) {
+  if (!selection || typeof selection !== 'object') throw new Error('Explicit database selection is required');
+  await connectDatabase();
+  const store = Object.fromEntries(Object.keys(MODEL_MAP).map((key) => [key, key === 'platformConfig' ? null : []]));
+  Object.defineProperty(store, snapshot, { value: { records: new Map(), session } });
+  return loadCollections(store, selection);
+}
+
+export async function loadCollections(store, selection) {
+  const state = store[snapshot];
+  if (!state) throw new Error('A database unit of work is required');
+  for (const [key, filter] of Object.entries(selection)) {
+    if (!MODEL_MAP[key] || !filter) throw new Error(`Invalid database selection: ${key}`);
+    if (state.records.has(key)) throw new Error(`Collection already loaded: ${key}`);
+    const query = key === 'platformConfig' ? { key: 'main_config' } : filter === true ? {} : filter;
+    const docs = await MODEL_MAP[key].collection.find(query, { session: state.session }).toArray();
+    const before = new Map();
+    const values = docs.map((doc) => {
+      const { _writeVersion, ...value } = doc;
+      value._id = String(doc._id);
+      before.set(value._id, { value: clone(value), rawId: doc._id, version: _writeVersion });
+      return value;
+    });
+    state.records.set(key, before);
+    store[key] = key === 'platformConfig' ? values[0] || null : values;
+    if (key === 'platformConfig' && !store[key]) throw httpError(503, 'Marketplace settings are not configured.');
+  }
+  return store;
+}
+
+function validateProduct(product) {
+  if (!Number.isSafeInteger(product.stock) || product.stock < 0 || !Number.isFinite(product.priceLkr) || product.priceLkr <= 0) {
+    throw httpError(400, 'Product stock must be a non-negative integer and price must be positive.');
+  }
+  for (const group of product.variants || []) {
+    for (const option of group.values || []) {
+      if (!Number.isSafeInteger(option.stock) || option.stock < 0 || !Number.isFinite(option.priceLkr) || option.priceLkr <= 0) {
+        throw httpError(400, 'Variant stock and prices are invalid.');
+      }
+    }
   }
 }
 
-export async function seedMongoDatabase() {
-  const seed = getInitialSeedState();
-  memoryStore = seed;
-  safeWriteLocalCache(seed);
-  if (isMongoConnected) {
-    isDirty = true;
-    await syncStoreToMongo();
+export async function persistStore(store) {
+  const state = store?.[snapshot];
+  if (!state) throw new Error('Writes require an explicit database unit of work');
+  const changes = [];
+  for (const key of Object.keys(MODEL_MAP)) {
+    if (!state.records.has(key) && (key === 'platformConfig' ? store[key] : store[key].length)) {
+      throw new Error(`Cannot write an unselected collection: ${key}`);
+    }
+  }
+  for (const [key, before] of state.records) {
+    const after = key === 'platformConfig' ? (store[key] ? [store[key]] : []) : store[key];
+    const seen = new Set();
+    for (const doc of after) {
+      if (typeof doc._id !== 'string' || seen.has(doc._id)) throw new Error('Invalid or duplicate record ID');
+      seen.add(doc._id);
+      const previous = before.get(doc._id);
+      if (previous && isDeepStrictEqual(previous.value, doc)) continue;
+      if (key === 'products') validateProduct(doc);
+      if (!previous) { changes.push({ key, type: 'insert', doc: { ...clone(doc), _writeVersion: 1 } }); continue; }
+      const set = Object.create(null), unset = Object.create(null);
+      for (const field of new Set([...Object.keys(previous.value), ...Object.keys(doc)])) {
+        if (field === '_id' || field === '_writeVersion' || isDeepStrictEqual(previous.value[field], doc[field])) continue;
+        if (doc[field] === undefined) unset[field] = '';
+        else set[field] = clone(doc[field]);
+      }
+      changes.push({ key, type: 'update', previous, set, unset });
+    }
+    for (const [id, previous] of before) if (!seen.has(id)) changes.push({ key, type: 'delete', previous });
+  }
+  const write = async (session) => {
+    // MongoDB transactions must execute operations sequentially.
+    for (const change of changes) {
+      const collection = MODEL_MAP[change.key].collection;
+      if (change.type === 'insert') { await collection.insertOne(change.doc, { session }); continue; }
+      const filter = { _id: change.previous.rawId,
+        _writeVersion: change.previous.version === undefined ? { $exists: false } : change.previous.version };
+      const result = change.type === 'delete'
+        ? await collection.deleteOne(filter, { session })
+        : await collection.updateOne(filter, {
+          ...(Object.keys(change.set).length ? { $set: change.set } : {}),
+          ...(Object.keys(change.unset).length ? { $unset: change.unset } : {}),
+          $inc: { _writeVersion: 1 }
+        }, { session });
+      if ((change.type === 'delete' ? result.deletedCount : result.matchedCount) !== 1) {
+        throw httpError(409, 'This record changed during your request. Refresh and try again.', 'WRITE_CONFLICT');
+      }
+    }
+  };
+  if (changes.length) {
+    if (state.session) await write(state.session);
+    else await withTransaction(write);
   }
 }
 
-export function getStore() {
-  return ensureLocalStoreLoaded(false);
+export async function findUserById(id) {
+  await connectDatabase();
+  const user = await UserModel.collection.findOne(idFilter(id));
+  return user ? { ...user, _id: String(user._id) } : null;
 }
 
-export function generateId(prefix = 'id') {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
+export async function pingDatabase() {
+  await connectDatabase();
+  await mongoose.connection.db.command({ ping: 1 }, { timeoutMS: 2000 });
 }
 
-export { MODEL_MAP };
+export function generateId(prefix = 'id') { return `${prefix}_${randomUUID()}`; }

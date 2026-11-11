@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { randomUUID } from 'node:crypto';
 import { startIsolatedApp } from './helpers/isolated-app.js';
 import { accounts, TEST_PASSWORD, shippingAddress } from '../../tests/support/fixtures.js';
 
@@ -10,7 +11,7 @@ test('marketplace API with disposable MongoDB', { timeout: 600000 }, async (t) =
     const response = await fetch(`${app.url}/api${route}`, {
       method,
       headers: { ...(body ? { 'Content-Type': 'application/json' } : {}),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers },
+        ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(route === '/orders/checkout' ? { 'Idempotency-Key': randomUUID() } : {}), ...headers },
       body: body ? JSON.stringify(body) : undefined
     });
     return { status: response.status, data: await response.json() };
@@ -36,7 +37,7 @@ test('marketplace API with disposable MongoDB', { timeout: 600000 }, async (t) =
     assert.equal(result.status, 200);
     assert.equal(result.data.mongoConnected, true);
     assert.match(process.env.MONGODB_URI, /^mongodb:\/\/127\.0\.0\.1:/);
-    assert.notEqual(app.db.getStore().users[0].email, 'admin@yaans.lk');
+    assert.notEqual((await app.mongo.collection('users').findOne({ _id: 'usr_test_admin' })).email, 'admin@yaans.lk');
   });
 
   await t.test('catalog excludes pending listings and supports combined filters, sorting and pagination', async () => {
@@ -124,12 +125,12 @@ test('marketplace API with disposable MongoDB', { timeout: 600000 }, async (t) =
   await t.test('empty carts and incomplete delivery addresses cannot create orders', async () => {
     assert.equal((await request('/orders/checkout', { method: 'POST', body: { items: [], shippingAddress } })).status, 400);
     assert.equal((await request('/orders/checkout', { method: 'POST', body: { items: cart, shippingAddress: {} } })).status, 400);
-    assert.equal(app.db.getStore().orders.length, 0);
+    assert.equal(await app.mongo.collection('orders').countDocuments(), 0);
   });
 
   await t.test('checkout creates one parent and one package per seller and recalculates all client amounts', async () => {
     const result = await request('/orders/checkout', { method: 'POST', token: customerToken, body: {
-      items: cart.map((item) => ({ ...item, unitPriceLkr: 1 })), shippingAddress, grandTotalLkr: 1, paymentMethod: 'COD'
+      items: cart.map((item) => ({ ...item, unitPriceLkr: 1 })), shippingAddress, grandTotalLkr: 1, paymentMethod: 'COD', codConfirmedByCustomer: true
     } });
     assert.equal(result.status, 201);
     ({ order, subOrders } = result.data);
@@ -138,11 +139,11 @@ test('marketplace API with disposable MongoDB', { timeout: 600000 }, async (t) =
     assert.equal(order.userId, 'usr_test_customer');
     assert.equal(subOrders.length, 2);
     assert.deepEqual(order.subOrderIds, subOrders.map((s) => s._id));
-    assert.equal(app.db.getStore().products.find((p) => p._id === 'prd_test_spice').stock, 98);
+    assert.equal((await app.mongo.collection('products').findOne({ _id: 'prd_test_spice' })).stock, 98);
     const mine = await request('/orders/my-orders', { token: customerToken });
     assert.equal(mine.data.orders[0].orderNumber, order.orderNumber);
     assert.equal((await request('/orders/my-orders', { token: sellerToken })).data.orders.length, 0);
-    const tracking = await request(`/orders/track?orderNumber=${order.orderNumber}&phone=${shippingAddress.phone}`);
+    const tracking = await request(`/orders/track?orderNumber=${order.orderNumber}`, { token: customerToken });
     assert.equal(tracking.data.subOrders.length, 2);
     assert.equal((await request(`/orders/track?orderNumber=${order.orderNumber}&phone=0779999999`)).status, 403);
   });
@@ -151,12 +152,14 @@ test('marketplace API with disposable MongoDB', { timeout: 600000 }, async (t) =
     const first = subOrders.find((s) => s.sellerId === 'sel_test_pantry');
     const second = subOrders.find((s) => s.sellerId === 'sel_test_home');
     assert.equal((await request(`/seller/suborders/${first._id}/status`, { method: 'PUT', token: otherSellerToken, body: { fulfillmentStatus: 'shipped' } })).status, 403);
+    for (const fulfillmentStatus of ['packed', 'shipped']) assert.equal((await request(`/seller/suborders/${first._id}/status`, { method: 'PUT', token: sellerToken, body: { fulfillmentStatus } })).status, 200);
     const delivered = await request(`/seller/suborders/${first._id}/status`, { method: 'PUT', token: sellerToken, body: { fulfillmentStatus: 'delivered', codCollectionStatus: 'remitted_to_platform' } });
     assert.equal(delivered.status, 200);
     assert.equal(delivered.data.subOrder.settlementStatus, 'eligible_for_payout');
-    assert.equal(app.db.getStore().orders[0].overallStatus, 'partially_shipped');
+    assert.equal((await app.mongo.collection('orders').findOne({ _id: order._id })).overallStatus, 'partially_shipped');
+    for (const fulfillmentStatus of ['packed', 'shipped']) assert.equal((await request(`/seller/suborders/${second._id}/status`, { method: 'PUT', token: otherSellerToken, body: { fulfillmentStatus } })).status, 200);
     await request(`/seller/suborders/${second._id}/status`, { method: 'PUT', token: otherSellerToken, body: { fulfillmentStatus: 'delivered', codCollectionStatus: 'remitted_to_platform' } });
-    assert.equal(app.db.getStore().orders[0].overallStatus, 'delivered');
+    assert.equal((await app.mongo.collection('orders').findOne({ _id: order._id })).overallStatus, 'delivered');
   });
 
   await t.test('admin payout reconciles the owning seller and cannot settle the same packages twice', async () => {
@@ -196,19 +199,12 @@ test('marketplace API with disposable MongoDB', { timeout: 600000 }, async (t) =
     const quote = await request('/orders/quote', { method: 'POST', body: { items: cart, destinationDistrict: 'Jaffna' } });
     assert.equal(quote.data.totalDeliveryFeeLkr, 300);
     await request('/admin/config/general', { method: 'PUT', token: adminToken, body: { codEnabledGlobally: false } });
-    assert.equal((await request('/orders/checkout', { method: 'POST', body: { items: cart, shippingAddress } })).status, 400);
+    assert.equal((await request('/orders/checkout', { method: 'POST', body: { items: cart, shippingAddress, paymentMethod: 'COD', codConfirmedByCustomer: true } })).status, 400);
   });
 
   await t.test('accepted order and settlement documents reach the actual MongoDB collections', async () => {
-    // Persistence currently runs in the background; verify the eventual stored records too.
-    let storedOrder;
-    let storedSettlement;
-    for (let attempt = 0; attempt < 30; attempt++) {
-      storedOrder = await app.mongo.collection('orders').findOne({ _id: order._id });
-      storedSettlement = await app.mongo.collection('settlements').findOne({ bankReference: 'TEST-PAYOUT-1' });
-      if (storedOrder && storedSettlement) break;
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
+    const storedOrder = await app.mongo.collection('orders').findOne({ _id: order._id });
+    const storedSettlement = await app.mongo.collection('settlements').findOne({ bankReference: 'TEST-PAYOUT-1' });
     assert.equal(storedOrder.grandTotalLkr, 7200);
     assert.equal(storedSettlement.netPayoutLkr, 3800);
   });

@@ -3,51 +3,9 @@ import bcrypt from 'bcryptjs';
 import { getStore, persistStore, generateId, idFilter } from '../config/db.js';
 import { authenticate, signToken, signAdminToken, getJwtSecret, usesDefaultAdminPassword, credentialsRevoked } from '../middleware/auth.js';
 import { recordAdminAuditLog } from '../config/auditLogger.js';
+import { loginIpLimit, loginAccountLimit, adminAccountLimit, sharedRateLimit } from '../middleware/sharedRateLimit.js';
 
 const router = createRouter();
-
-// Dedicated Admin Brute-Force Protection (Max 5 failed attempts per 15 minutes per IP/Email)
-const ADMIN_LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
-const ADMIN_MAX_FAILED_ATTEMPTS = 5;
-const adminFailedAttempts = new Map();
-
-function getClientIp(req) {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (forwarded) {
-    return String(forwarded).split(',')[0].trim();
-  }
-  return req.ip || req.socket?.remoteAddress || 'unknown';
-}
-
-function checkAdminRateLimit(key) {
-  const record = adminFailedAttempts.get(key);
-  if (!record) return { locked: false, remainingAttempts: ADMIN_MAX_FAILED_ATTEMPTS };
-  if (Date.now() - record.firstAttemptAt > ADMIN_LOCKOUT_WINDOW_MS) {
-    adminFailedAttempts.delete(key);
-    return { locked: false, remainingAttempts: ADMIN_MAX_FAILED_ATTEMPTS };
-  }
-  if (record.count >= ADMIN_MAX_FAILED_ATTEMPTS) {
-    const minutesLeft = Math.ceil((ADMIN_LOCKOUT_WINDOW_MS - (Date.now() - record.firstAttemptAt)) / 60000);
-    return { locked: true, minutesLeft: Math.max(1, minutesLeft), remainingAttempts: 0 };
-  }
-  return { locked: false, remainingAttempts: ADMIN_MAX_FAILED_ATTEMPTS - record.count };
-}
-
-function recordFailedAdminAttempt(key) {
-  const now = Date.now();
-  const record = adminFailedAttempts.get(key);
-  if (!record || now - record.firstAttemptAt > ADMIN_LOCKOUT_WINDOW_MS) {
-    adminFailedAttempts.set(key, { count: 1, firstAttemptAt: now });
-    return ADMIN_MAX_FAILED_ATTEMPTS - 1;
-  }
-  record.count += 1;
-  adminFailedAttempts.set(key, record);
-  return Math.max(0, ADMIN_MAX_FAILED_ATTEMPTS - record.count);
-}
-
-function clearAdminFailedAttempts(key) {
-  adminFailedAttempts.delete(key);
-}
 
 function sanitizeUser(user, store) {
   const seller = user.sellerId ? store.sellers.find((s) => s._id === user.sellerId) : null;
@@ -67,7 +25,7 @@ function sanitizeUser(user, store) {
 }
 
 // POST /api/auth/login (Customer & Seller Storefront Login ONLY)
-router.post('/login', async (req, res) => {
+router.post('/login', loginIpLimit, loginAccountLimit, async (req, res) => {
   getJwtSecret();
   const { email, password } = req.body;
   if (!email || !password) {
@@ -97,33 +55,20 @@ router.post('/login', async (req, res) => {
 });
 
 // POST /api/auth/admin/login (Dedicated Gated Marketplace Admin Authentication)
-router.post('/admin/login', async (req, res) => {
+router.post('/admin/login', loginIpLimit, adminAccountLimit, async (req, res) => {
   getJwtSecret();
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ message: 'Administrator email and password are required.' });
   }
 
-  const ip = getClientIp(req);
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
   const userAgent = String(req.headers['user-agent'] || 'unknown').slice(0, 180);
   const normalizedEmail = String(email).toLowerCase().trim();
-  const rateLimitKey = `${ip}:${normalizedEmail}`;
-
-  const ipStatus = checkAdminRateLimit(ip);
-  const accountStatus = checkAdminRateLimit(rateLimitKey);
-  if (ipStatus.locked || accountStatus.locked) {
-    const minutes = Math.max(ipStatus.minutesLeft || 1, accountStatus.minutesLeft || 1);
-    return res.status(429).json({
-      message: `Security Lockout: Too many failed administrator sign-in attempts. Please wait ${minutes} minute(s) before trying again.`
-    });
-  }
-
   const store = await getStore({ users: { email: normalizedEmail }, platformConfig: true });
   const user = store.users.find((u) => u.email.toLowerCase() === normalizedEmail);
 
   if (!user || !await bcrypt.compare(String(password), user.passwordHash)) {
-    recordFailedAdminAttempt(ip);
-    const remaining = recordFailedAdminAttempt(rateLimitKey);
     recordAdminAuditLog(store, {
       event: 'ADMIN_LOGIN_FAILED',
       email: normalizedEmail,
@@ -133,16 +78,11 @@ router.post('/admin/login', async (req, res) => {
     });
     await persistStore(store);
     return res.status(401).json({
-      message:
-        remaining > 0
-          ? `Invalid administrator credentials. (${remaining} attempt${remaining === 1 ? '' : 's'} remaining before temporary lockout)`
-          : 'Security Lockout: Maximum failed attempts reached. Account locked for 15 minutes.'
+      message: 'Invalid administrator credentials.'
     });
   }
 
   if (user.role !== 'admin') {
-    recordFailedAdminAttempt(ip);
-    recordFailedAdminAttempt(rateLimitKey);
     recordAdminAuditLog(store, {
       event: 'ADMIN_LOGIN_FORBIDDEN_ROLE',
       email: normalizedEmail,
@@ -165,8 +105,6 @@ router.post('/admin/login', async (req, res) => {
     return res.status(403).json({ message: 'This administrator account requires a secure password reset by the site owner.' });
   }
 
-  clearAdminFailedAttempts(ip);
-  clearAdminFailedAttempts(rateLimitKey);
   recordAdminAuditLog(store, {
     event: 'ADMIN_LOGIN_SUCCESS',
     email: user.email,
@@ -185,7 +123,7 @@ router.post('/admin/login', async (req, res) => {
 });
 
 // POST /api/auth/register-customer
-router.post('/register-customer', async (req, res) => {
+router.post('/register-customer', sharedRateLimit('registration', 10, 60 * 60000), async (req, res) => {
   getJwtSecret();
   const { name, email, phone, password, defaultDistrict = 'Colombo' } = req.body;
   if (!name || !email || !phone || !password) {
@@ -224,7 +162,7 @@ router.post('/register-customer', async (req, res) => {
 });
 
 // POST /api/auth/register-seller
-router.post('/register-seller', async (req, res) => {
+router.post('/register-seller', sharedRateLimit('registration', 10, 60 * 60000), async (req, res) => {
   getJwtSecret();
   const {
     name,

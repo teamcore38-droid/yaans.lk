@@ -166,7 +166,7 @@ test('seller fulfillment and admin payout are reflected in the settlement ledger
   await expect(page.getByRole('heading', { name: /Test Kandy Pantry.*Seller Portal/ })).toBeVisible();
   const card = page.getByText(`Sub-Order #${subOrder.subOrderNumber}`, { exact: true })
     .locator('xpath=ancestor::div[contains(@class, "shadow-sm")][1]');
-  for (const label of ['Mark Packed', 'Mark Shipped', 'Delivered & COD Collected']) {
+  for (const label of ['Mark Packed', 'Mark Shipped', 'Mark Delivered']) {
     const updated = page.waitForResponse((response) => response.url().includes(`/seller/suborders/${subOrder._id}/status`) && response.request().method() === 'PUT');
     await card.getByRole('button', { name: label, exact: true }).click();
     expect((await updated).status()).toBe(200);
@@ -174,8 +174,20 @@ test('seller fulfillment and admin payout are reflected in the settlement ledger
   await login(page, accounts.admin, true);
   await expect(page).toHaveURL(/\/admin$/);
   await page.getByRole('button', { name: 'Commissions & Seller Settlements' }).click();
+  const receiptForm = page.getByRole('article', { name: `Reconcile ${subOrder.subOrderNumber}` }).getByRole('form', { name: 'Confirm platform receipt' });
+  await receiptForm.getByLabel('Actual bank or courier reference').fill(`E2E-RECEIPT-${subOrder._id}`);
+  await receiptForm.getByLabel('Confirmed amount (LKR)').fill(String(subOrder.grossTotalLkr));
+  await receiptForm.getByRole('checkbox').check();
+  const received = page.waitForResponse((response) => response.url().endsWith(`/cash/receipt`) && response.request().method() === 'POST');
+  await receiptForm.getByRole('button', { name: 'Confirm platform receipt', exact: true }).click();
+  expect((await received).status()).toBe(201);
+  await page.getByText('Record bank payout', { exact: true }).first().click();
+  const payoutForm = page.getByRole('form', { name: 'Record completed bank transfer' }).first();
+  await payoutForm.getByLabel('Actual bank or courier reference').fill(`E2E-PAYOUT-${subOrder._id}`);
+  await payoutForm.getByLabel('Confirmed amount (LKR)').fill('950');
+  await payoutForm.getByRole('checkbox').check();
   const paid = page.waitForResponse((response) => response.url().endsWith('/admin/settlements/payout') && response.request().method() === 'POST');
-  await page.getByRole('button', { name: 'Settle Payout', exact: true }).first().click();
+  await payoutForm.getByRole('button', { name: 'Record completed bank transfer', exact: true }).click();
   const payout = await paid;
   expect(payout.status()).toBe(201);
   const { settlement } = await payout.json();

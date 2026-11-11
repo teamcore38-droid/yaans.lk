@@ -1,0 +1,37 @@
+name: Isolated staging business journey
+
+on:
+  schedule:
+    - cron: '32 20 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-business-journey
+  cancel-in-progress: false
+
+jobs:
+  staging:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require private staging credentials
+        env:
+          PRIVATE_REPOSITORY: ${{ github.event.repository.private }}
+        run: test "$PRIVATE_REPOSITORY" = true
+      - uses: actions/checkout@v6
+        with:
+          repository: teamcore38-droid/yaans.lk
+          ref: ${{ vars.APP_REVISION }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - name: Exercise customer, seller, delivery, receipt, payout, return and refund
+        env:
+          STAGING_BASE_URL: ${{ vars.STAGING_BASE_URL }}
+          STAGING_ACCOUNT_PASSWORD: ${{ secrets.STAGING_ACCOUNT_PASSWORD }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: node scripts/exercise-staging.mjs

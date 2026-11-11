@@ -4,6 +4,7 @@ import { authenticate, requireRole } from '../middleware/auth.js';
 import { uploadMiddleware, handleProductImageUpload } from '../config/cloudinary.js';
 import { fulfillmentTransitions } from '../../../shared/orderStatus.js';
 import { releaseInventory } from '../services/orders.js';
+import { uploadLimit } from '../middleware/sharedRateLimit.js';
 
 const router = createRouter();
 
@@ -107,7 +108,7 @@ router.get('/dashboard', async (req, res) => {
 });
 
 // POST /api/seller/upload-image
-router.post('/upload-image', uploadMiddleware.single('image'), async (req, res) => {
+router.post('/upload-image', uploadLimit, uploadMiddleware.single('image'), async (req, res) => {
   try {
     const uploaded = await handleProductImageUpload(req);
     return res.status(201).json(uploaded);
@@ -436,8 +437,8 @@ router.put('/suborders/:subOrderId/status', async (req, res) => {
       !fulfillmentTransitions[subOrder.fulfillmentStatus]?.includes(fulfillmentStatus)) {
     return res.status(409).json({ message: 'This order status transition is not allowed.' });
   }
-  if (codCollectionStatus && !['pending_collection', 'collected_by_courier', 'remitted_to_platform', 'not_applicable', 'refunded'].includes(codCollectionStatus)) {
-    return res.status(400).json({ message: 'Invalid COD collection status.' });
+  if (codCollectionStatus !== undefined) {
+    return res.status(403).json({ message: 'Cash receipt and refunds require administrator reconciliation.' });
   }
   if (fulfillmentStatus === 'cancelled' && subOrder.fulfillmentStatus !== 'cancelled') releaseInventory(store, subOrder);
 
@@ -448,18 +449,15 @@ router.put('/suborders/:subOrderId/status', async (req, res) => {
     subOrder.fulfillmentStatus = fulfillmentStatus;
 
     if (fulfillmentStatus === 'delivered') {
-      if (subOrder.paymentMethod === 'COD') {
-        subOrder.codCollectionStatus = codCollectionStatus || 'remitted_to_platform';
-        subOrder.codCollectedAt = new Date().toISOString();
-      }
-      if (subOrder.settlementStatus === 'unsettled') {
-        subOrder.settlementStatus = 'eligible_for_payout';
-      }
-    } else if (fulfillmentStatus === 'cancelled' || fulfillmentStatus === 'returned') {
+      // Delivery alone is no proof of courier remittance or platform receipt.
+      if (!subOrder.paymentReceipt && !subOrder.settlementId) subOrder.settlementStatus = 'unsettled';
+    } else if (fulfillmentStatus === 'cancelled') {
       subOrder.settlementStatus = 'voided';
-      if (fulfillmentStatus === 'returned' && subOrder.paymentMethod === 'COD') {
-        subOrder.codCollectionStatus = 'refunded';
-      }
+      subOrder.codCollectionStatus = 'not_applicable';
+    } else if (['return_requested', 'returned'].includes(fulfillmentStatus)) {
+      subOrder.payoutHoldReason = fulfillmentStatus;
+      if (!subOrder.settlementId) subOrder.settlementStatus = 'held_for_return';
+      // Returned goods do not prove a refund; stock requires inspection.
     }
 
     subOrder.statusHistory.push({
@@ -467,14 +465,10 @@ router.put('/suborders/:subOrderId/status', async (req, res) => {
       note:
         note ||
         (fulfillmentStatus === 'delivered'
-          ? `Package delivered & COD Rs. ${subOrder.grossTotalLkr.toLocaleString()} collected. Eligible for seller settlement.`
+          ? 'Package delivered. Awaiting administrator confirmation of cash received.'
           : `Status updated to ${fulfillmentStatus.replace(/_/g, ' ')}.`),
       timestamp: new Date().toISOString()
     });
-  }
-
-  if (codCollectionStatus) {
-    subOrder.codCollectionStatus = codCollectionStatus;
   }
 
   // Recompute Parent Order overallStatus based on all its split SubOrders

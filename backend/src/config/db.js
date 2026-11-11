@@ -3,6 +3,8 @@ import { isDeepStrictEqual } from 'node:util';
 import mongoose from 'mongoose';
 import { UserModel, SellerModel, CategoryModel, ProductModel, ReviewModel, SubOrderModel, OrderModel, SettlementModel, PlatformConfigModel } from '../models/schemas.js';
 import { httpError } from './errors.js';
+import { ensureOperationalIndexes } from './operations.js';
+import { databaseName } from './environment.js';
 
 export const MODEL_MAP = {
   users: UserModel, sellers: SellerModel, categories: CategoryModel, products: ProductModel,
@@ -15,15 +17,19 @@ const clone = (value) => mongoose.mongo.BSON.EJSON.parse(mongoose.mongo.BSON.EJS
 
 // Reuse connections, never authoritative business records, across requests.
 export async function connectDatabase() {
-  if (mongoose.connection.readyState === 1) return { isMongoConnected: true, storePath: 'MongoDB Atlas' };
+  if (mongoose.connection.readyState === 1) {
+    await ensureOperationalIndexes(mongoose.connection.db);
+    return { isMongoConnected: true, storePath: 'MongoDB Atlas' };
+  }
   if (!connectionPromise) {
     connectionPromise = (async () => {
       const uri = process.env.MONGODB_URI;
       if (!uri) throw httpError(503, 'The database is unavailable. Please try again later.');
       await mongoose.connect(uri, {
-        dbName: process.env.MONGODB_DB_NAME || 'yaans_lk', serverSelectionTimeoutMS: 8000,
+        dbName: databaseName(), serverSelectionTimeoutMS: 8000,
         waitQueueTimeoutMS: 3000, maxPoolSize: 10, minPoolSize: 0, autoIndex: false
       });
+      await ensureOperationalIndexes(mongoose.connection.db);
       return { isMongoConnected: true, storePath: 'MongoDB Atlas' };
     })().finally(() => { connectionPromise = undefined; });
   }

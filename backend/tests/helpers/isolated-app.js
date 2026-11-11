@@ -18,7 +18,7 @@ export async function startIsolatedApp(port = 0) {
   let mongo;
   let server;
   const overrides = {
-    NODE_ENV: 'test', VERCEL: '1', TEMP: directory, TMP: directory,
+    NODE_ENV: 'test', VERCEL: '1', VERCEL_ENV: 'test', APP_ENV: 'test', TEMP: directory, TMP: directory,
     MAINTENANCE_READ_ONLY: '',
     JWT_SECRET: 'yaans-automated-tests-only-secret-32chars',
     MONGODB_DB_NAME: 'yaans_automated_test', USE_EXTERNAL_MONGO: 'true',
@@ -62,7 +62,7 @@ export async function startIsolatedApp(port = 0) {
           const values = key === 'platformConfig' ? [{ ...fixtures.platformConfig, key: 'main_config' }] : fixtures[key];
           if (values.length) await model.collection.insertMany(values);
         }
-        for (const name of ['counters', 'checkoutrequests']) await mongoose.connection.db.collection(name).deleteMany({});
+        for (const name of ['counters', 'checkoutrequests', 'cashmovements', 'ratelimits', 'operationalmetrics']) await mongoose.connection.db.collection(name).deleteMany({});
       },
       async close() {
         await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

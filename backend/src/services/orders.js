@@ -37,8 +37,8 @@ export function customerOrder(order) {
 
 export function customerPackage(subOrder) {
   const { _writeVersion, commissionRatePercent, commissionAmountLkr, netSellerEarningsLkr,
-    settlementId, inventoryReleasedAt, inventoryReservedAt, ...view } = subOrder;
-  return view;
+    settlementId, inventoryReleasedAt, inventoryReservedAt, paymentReceipt, sellerRecovery, refund, returnInspection, ...view } = subOrder;
+  return { ...view, ...(refund ? { refund: { amountLkr: refund.amountLkr, confirmedAt: refund.confirmedAt } } : {}) };
 }
 
 function guestToken(key) {
@@ -214,6 +214,8 @@ export async function customerAction(subOrderId, body, user, token) {
       if (target.fulfillmentStatus === 'return_requested') return { subOrder: customerPackage(target), message: 'Return already requested.' };
       if (target.fulfillmentStatus !== 'delivered') throw httpError(409, 'Only delivered packages can be returned.');
       target.fulfillmentStatus = 'return_requested';
+      target.payoutHoldReason = 'return_requested';
+      if (!target.settlementId) target.settlementStatus = 'held_for_return';
     }
     target.statusHistory.push({ status: target.fulfillmentStatus, note: body.reason || 'Customer requested this action.', timestamp: new Date().toISOString() });
     if (store.subOrders.every((item) => item.fulfillmentStatus === 'cancelled')) order.overallStatus = 'cancelled';

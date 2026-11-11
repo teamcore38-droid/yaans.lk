@@ -1,0 +1,98 @@
+name: Private encrypted backups and recovery
+run-name: ${{ (github.event.schedule == '19 20 * * *' || inputs.restore == true) && 'Backup and restore verification' || 'Encrypted snapshot' }}
+
+on:
+  schedule:
+    - cron: '19 0,4,8,12,16 * * *'
+    - cron: '19 20 * * *'
+  workflow_dispatch:
+    inputs:
+      restore:
+        description: Test restoration of this backup
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: private-backup-and-restore
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require private storage
+        env:
+          PRIVATE_REPOSITORY: ${{ github.event.repository.private }}
+        run: test "$PRIVATE_REPOSITORY" = true
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v6
+        with:
+          repository: teamcore38-droid/yaans.lk
+          ref: ${{ vars.APP_REVISION }}
+          path: app
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Install locked runtime dependencies
+        working-directory: app
+        run: npm ci --omit=dev --no-audit --no-fund
+      - name: Require the full successful suite for this exact source
+        working-directory: app
+        env:
+          APP_REVISION: ${{ vars.APP_REVISION }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node --input-type=module -e 'import { waitForFullVerification } from "./scripts/require-production-verification.mjs"; await waitForFullVerification(process.env.APP_REVISION, {timeoutMs:1000});'
+      - name: Export an encrypted production snapshot
+        working-directory: app
+        env:
+          MONGODB_URI: ${{ secrets.BACKUP_MONGODB_URI }}
+          MONGODB_DB_NAME: yaans_lk
+          BACKUP_PUBLIC_KEY_FILE: ../keys/backup-public.pem
+        run: node backend/scripts/backup_db.js --out=../encrypted-backups
+      - name: Enforce the initial private-storage budget
+        run: node --input-type=module -e 'import fs from "node:fs/promises"; for(const name of await fs.readdir("encrypted-backups")){if(!name.endsWith(".backup.enc")||(await fs.stat(`encrypted-backups/${name}`)).size>8*1024*1024)throw Error("Backup exceeds the configured private-storage budget; review storage before increasing it.");}'
+      - name: Retain encrypted backups in this private repository only
+        id: retain
+        uses: actions/upload-artifact@v4
+        with:
+          name: encrypted-database-${{ github.run_id }}
+          path: encrypted-backups/*.backup.enc
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+      - name: Restore and verify into the isolated recovery database
+        id: restore
+        if: github.event.schedule == '19 20 * * *' || inputs.restore == true
+        working-directory: app
+        env:
+          RESTORE_MONGODB_URI: ${{ secrets.RESTORE_MONGODB_URI }}
+          BACKUP_PRIVATE_KEY: ${{ secrets.BACKUP_PRIVATE_KEY }}
+        run: |
+          export BACKUP_FILE="$(find ../encrypted-backups -maxdepth 1 -type f -name '*.backup.enc' -print -quit)"
+          export BACKUP_PRIVATE_KEY_FILE="$RUNNER_TEMP/yaans-restore-key.pem"
+          printf '%s' "$BACKUP_PRIVATE_KEY" > "$BACKUP_PRIVATE_KEY_FILE"
+          chmod 600 "$BACKUP_PRIVATE_KEY_FILE"
+          trap 'rm -f -- "$BACKUP_PRIVATE_KEY_FILE"' EXIT
+          node backend/scripts/restore-drill.js
+      - name: Record or resolve the private backup alert
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ steps.retain.outcome }}
+        run: node scripts/report-alert.mjs backup "$JOB_STATUS"
+      - name: Record or resolve the private recovery alert
+        if: always() && (github.event.schedule == '19 20 * * *' || inputs.restore == true)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ steps.restore.outcome }}
+        run: node scripts/report-alert.mjs recovery "$JOB_STATUS"

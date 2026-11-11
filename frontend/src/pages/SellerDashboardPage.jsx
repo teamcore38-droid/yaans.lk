@@ -926,7 +926,8 @@ export default function SellerDashboardPage() {
                         { status: 'packed', label: 'Mark Packed' },
                         { status: 'shipped', label: 'Mark Shipped' },
                         { status: 'out_for_delivery', label: 'Out for Delivery' },
-                        { status: 'delivered', label: 'Delivered & COD Collected' }
+                        { status: 'delivered', label: 'Mark Delivered' },
+                        { status: 'returned', label: 'Confirm Return Received' }
                       ].filter((btn) => fulfillmentTransitions[sub.fulfillmentStatus]?.includes(btn.status)).map((btn) => (
                         <button
                           key={btn.status}

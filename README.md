@@ -48,3 +48,5 @@ npm run dev:frontend
 - Use MongoDB Atlas or a local replica set and configure a unique random `JWT_SECRET` of at least 32 characters. Database/authentication failures have no JSON-store, default-secret or seed-admin fallback.
 
 Run `npm run verify` before releasing: it runs the existing Node tests, React interaction tests, API integration tests against disposable MongoDB, the production frontend build, and Chromium journeys at desktop and mobile sizes. Tests never use the configured application database. See [TESTING.md](TESTING.md) for setup, individual commands, coverage, and the required GitHub/Vercel release settings.
+
+See [OPERATIONS.md](OPERATIONS.md) for private encrypted backup schedules and recovery drills, isolated staging, COD receipt/refund/payout controls, monitoring alerts and shared rate limits. Operational workflow templates belong in the private operations repository; they are not public backup workflows.

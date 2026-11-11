@@ -234,6 +234,11 @@ const SubOrderSchema = new Schema(
       default: 'pending_collection'
     },
     codCollectedAt: { type: Date, default: null },
+    paymentReceipt: { type: Schema.Types.Mixed, default: null },
+    refund: { type: Schema.Types.Mixed, default: null },
+    sellerRecovery: { type: Schema.Types.Mixed, default: null },
+    payoutHoldReason: { type: String, default: '' },
+    returnInspection: { type: Schema.Types.Mixed, default: null },
     fulfillmentStatus: {
       type: String,
       enum: [
@@ -253,7 +258,7 @@ const SubOrderSchema = new Schema(
     courierPartner: { type: String, default: 'Prompt Xpress / Domex SL' },
     settlementStatus: {
       type: String,
-      enum: ['unsettled', 'eligible_for_payout', 'settled', 'voided'],
+      enum: ['unsettled', 'eligible_for_payout', 'held_for_return', 'settled', 'voided'],
       default: 'unsettled'
     },
     settlementId: { type: String, default: null },

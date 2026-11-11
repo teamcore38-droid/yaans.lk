@@ -153,17 +153,21 @@ test('marketplace API with disposable MongoDB', { timeout: 600000 }, async (t) =
     const second = subOrders.find((s) => s.sellerId === 'sel_test_home');
     assert.equal((await request(`/seller/suborders/${first._id}/status`, { method: 'PUT', token: otherSellerToken, body: { fulfillmentStatus: 'shipped' } })).status, 403);
     for (const fulfillmentStatus of ['packed', 'shipped']) assert.equal((await request(`/seller/suborders/${first._id}/status`, { method: 'PUT', token: sellerToken, body: { fulfillmentStatus } })).status, 200);
-    const delivered = await request(`/seller/suborders/${first._id}/status`, { method: 'PUT', token: sellerToken, body: { fulfillmentStatus: 'delivered', codCollectionStatus: 'remitted_to_platform' } });
+    const delivered = await request(`/seller/suborders/${first._id}/status`, { method: 'PUT', token: sellerToken, body: { fulfillmentStatus: 'delivered' } });
     assert.equal(delivered.status, 200);
-    assert.equal(delivered.data.subOrder.settlementStatus, 'eligible_for_payout');
+    assert.equal(delivered.data.subOrder.settlementStatus, 'unsettled');
+    assert.equal(delivered.data.subOrder.codCollectionStatus, 'pending_collection');
     assert.equal((await app.mongo.collection('orders').findOne({ _id: order._id })).overallStatus, 'partially_shipped');
     for (const fulfillmentStatus of ['packed', 'shipped']) assert.equal((await request(`/seller/suborders/${second._id}/status`, { method: 'PUT', token: otherSellerToken, body: { fulfillmentStatus } })).status, 200);
-    await request(`/seller/suborders/${second._id}/status`, { method: 'PUT', token: otherSellerToken, body: { fulfillmentStatus: 'delivered', codCollectionStatus: 'remitted_to_platform' } });
+    await request(`/seller/suborders/${second._id}/status`, { method: 'PUT', token: otherSellerToken, body: { fulfillmentStatus: 'delivered' } });
     assert.equal((await app.mongo.collection('orders').findOne({ _id: order._id })).overallStatus, 'delivered');
   });
 
   await t.test('admin payout reconciles the owning seller and cannot settle the same packages twice', async () => {
-    const result = await request('/admin/settlements/payout', { method: 'POST', token: adminToken, body: { sellerId: 'sel_test_pantry', bankReference: 'TEST-PAYOUT-1' } });
+    const sub = subOrders.find((entry) => entry.sellerId === 'sel_test_pantry');
+    const receipt = await request(`/admin/suborders/${sub._id}/cash/receipt`, { method: 'POST', token: adminToken, body: { bankReference: 'TEST-RECEIPT-1', amountLkr: sub.grossTotalLkr } });
+    assert.equal(receipt.status, 201);
+    const result = await request('/admin/settlements/payout', { method: 'POST', token: adminToken, body: { sellerId: 'sel_test_pantry', subOrderIds: [sub._id], amountLkr: 3800, bankReference: 'TEST-PAYOUT-1' } });
     assert.equal(result.status, 201);
     assert.equal(result.data.settledCount, 1);
     assert.equal(result.data.settlement.netPayoutLkr, 3800);

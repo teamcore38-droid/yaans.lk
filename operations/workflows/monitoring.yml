@@ -1,0 +1,43 @@
+name: Website and checkout monitoring
+
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+concurrency:
+  group: operations-monitoring
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require private operational alerts
+        env:
+          PRIVATE_REPOSITORY: ${{ github.event.repository.private }}
+        run: test "$PRIVATE_REPOSITORY" = true
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Check readiness, checkout/database errors and backup freshness
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MONITORING_TOKEN: ${{ secrets.MONITORING_TOKEN }}
+          PRODUCTION_ORIGIN: https://yaans.lk
+        run: node scripts/monitor.mjs
+      - name: Record or resolve the private operational alert
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: node scripts/report-alert.mjs monitoring "$JOB_STATUS"

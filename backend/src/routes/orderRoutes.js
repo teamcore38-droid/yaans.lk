@@ -4,6 +4,8 @@ import { authenticate, optionalAuthenticate } from '../middleware/auth.js';
 import { normalizeCartItems, buildMultiSellerCartBreakdown } from '../services/cart.js';
 import { loadCartStore, checkout, checkoutResult, customerAction, assertOrderAccess, customerOrder, customerPackage } from '../services/orders.js';
 import { httpError } from '../config/errors.js';
+import { sharedRateLimit } from '../middleware/sharedRateLimit.js';
+import { recordOperationalEvent } from '../config/operations.js';
 
 const router = createRouter();
 router.use((_req, res, next) => { res.set('Cache-Control', 'private, no-store'); next(); });
@@ -14,12 +16,18 @@ router.post('/quote', async (req, res) => {
   return res.json(buildMultiSellerCartBreakdown(items, req.body.destinationDistrict || 'Colombo', store));
 });
 
-router.post('/checkout', optionalAuthenticate, async (req, res) => {
-  const result = await checkout(req.body, req.user, req.headers['idempotency-key']);
-  return res.status(result.replayed ? 200 : 201).json(result);
+router.post('/checkout', sharedRateLimit('checkout', 30, 5 * 60000), optionalAuthenticate, async (req, res) => {
+  try {
+    const result = await checkout(req.body, req.user, req.headers['idempotency-key']);
+    if (!result.replayed) await recordOperationalEvent('checkout_success');
+    return res.status(result.replayed ? 200 : 201).json(result);
+  } catch (error) {
+    await recordOperationalEvent(error.status && error.status < 500 ? 'checkout_rejected' : 'checkout_failure');
+    throw error;
+  }
 });
 
-router.post('/checkout-result', optionalAuthenticate, async (req, res) => {
+router.post('/checkout-result', sharedRateLimit('checkout-result', 30, 5 * 60000), optionalAuthenticate, async (req, res) => {
   return res.json(await checkoutResult(req.user, req.headers['idempotency-key']));
 });
 
@@ -31,7 +39,7 @@ router.get('/my-orders', authenticate, async (req, res) => {
     .map((order) => ({ ...customerOrder(order), subOrders: packages.subOrders.filter((sub) => sub.parentOrderId === order._id).map(customerPackage) })) });
 });
 
-router.get('/track', optionalAuthenticate, async (req, res) => {
+router.get('/track', sharedRateLimit('tracking', 60, 5 * 60000), optionalAuthenticate, async (req, res) => {
   const number = req.query.orderNumber;
   if (typeof number !== 'string' || !number.trim() || number.length > 100) throw httpError(400, 'Please enter your order number.');
   const store = await getStore({ orders: { $or: [idFilter(number.trim()), { orderNumber: number.trim().toUpperCase() }] } });
@@ -42,7 +50,7 @@ router.get('/track', optionalAuthenticate, async (req, res) => {
   return res.json({ order: customerOrder(order), subOrders: packages.subOrders.map(customerPackage) });
 });
 
-router.post('/suborders/:subOrderId/customer-action', optionalAuthenticate, async (req, res) => {
+router.post('/suborders/:subOrderId/customer-action', sharedRateLimit('order-action', 30, 5 * 60000), optionalAuthenticate, async (req, res) => {
   const result = await customerAction(req.params.subOrderId, req.body, req.user, req.headers['x-order-access-token']);
   return res.json(result);
 });

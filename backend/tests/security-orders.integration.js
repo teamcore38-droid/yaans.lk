@@ -323,6 +323,138 @@ test('security, durable orders and recovery with real MongoDB transactions', { t
     assert.equal((await request('/admin/overview', { token: replacement })).status, 200);
   });
 
+  const deliver = async (placed, sellerToken) => {
+    const sub = placed.subOrders[0];
+    for (const fulfillmentStatus of ['packed', 'shipped', 'delivered']) {
+      const result = await request(`/seller/suborders/${sub._id}/status`, { token: sellerToken, method: 'PUT', body: { fulfillmentStatus } });
+      assert.equal(result.status, 200, JSON.stringify(result.data));
+    }
+    return sub;
+  };
+  const cash = (sub, kind, token, reference, amountLkr = sub.grossTotalLkr) => request(`/admin/suborders/${sub._id}/cash/${kind}`, {
+    token, body: { bankReference: reference, amountLkr }
+  });
+  const payout = (sub, token, reference, url = app.url) => request('/admin/settlements/payout', {
+    token, url, body: { sellerId: sub.sellerId, subOrderIds: [sub._id], amountLkr: sub.netSellerEarningsLkr || 950, bankReference: reference }
+  });
+
+  await t.test('seller delivery cannot confirm cash, make an unpaid order eligible or forge a refund', async () => {
+    const seller = await login(accounts.seller), admin = await login(accounts.admin, true);
+    const placed = await place(); const sub = await deliver(placed, seller);
+    const saved = await app.mongo.collection('suborders').findOne({ _id: sub._id });
+    assert.equal(saved.codCollectionStatus, 'pending_collection'); assert.equal(saved.settlementStatus, 'unsettled');
+    for (const codCollectionStatus of ['remitted_to_platform', 'refunded']) {
+      assert.equal((await request(`/seller/suborders/${sub._id}/status`, { method: 'PUT', token: seller, body: { codCollectionStatus } })).status, 403);
+    }
+    assert.equal((await cash(sub, 'receipt', seller, 'NOT-ALLOWED-RECEIPT')).status, 403);
+    assert.equal((await payout(sub, admin, 'UNRECEIVED-PAYOUT')).status, 409);
+    // Old automatically-remitted records without explicit evidence remain blocked.
+    await app.mongo.collection('suborders').updateOne({ _id: sub._id }, { $set: { codCollectionStatus: 'remitted_to_platform', settlementStatus: 'eligible_for_payout' } });
+    assert.equal((await payout(sub, admin, 'LEGACY-UNVERIFIED-PAYOUT')).status, 409);
+  });
+
+  await t.test('receipt amounts and references are verified, retries are idempotent and concurrent payouts claim a package once', async () => {
+    const seller = await login(accounts.seller), admin = await login(accounts.admin, true);
+    const sub = await deliver(await place(), seller);
+    for (const amount of [-1, 0, sub.grossTotalLkr - 1, 1.001]) assert.ok([400, 409].includes((await cash(sub, 'receipt', admin, 'RECEIPT-EXACT-AMOUNT', amount)).status));
+    assert.equal((await cash(sub, 'receipt', admin, '')).status, 400);
+    assert.equal((await cash(sub, 'receipt', admin, 'RECEIPT-EXACT-AMOUNT')).status, 201);
+    assert.equal((await cash(sub, 'receipt', admin, 'RECEIPT-EXACT-AMOUNT')).status, 200);
+    assert.equal((await cash(sub, 'receipt', admin, 'SECOND-RECEIPT')).status, 409);
+    const second = await deliver(await place(), seller);
+    assert.equal((await cash(second, 'receipt', admin, 'RECEIPT-EXACT-AMOUNT')).status, 409);
+    const results = await Promise.all([payout(sub, admin, 'CONCURRENT-PAYOUT'), payout(sub, admin, 'CONCURRENT-PAYOUT', ready.url)]);
+    assert.deepEqual(results.map((r) => r.status).sort(), [200, 201]);
+    assert.equal(await app.mongo.collection('settlements').countDocuments(), 1);
+    assert.equal((await payout(sub, admin, 'ANOTHER-PAYOUT')).status, 409);
+    assert.equal(await app.mongo.collection('cashmovements').countDocuments({ kind: 'payout' }), 1);
+  });
+
+  await t.test('a requested return holds payout and returned goods do not imply a refund or automatic restocking', async () => {
+    const seller = await login(accounts.seller), admin = await login(accounts.admin, true);
+    const placed = await place(); const sub = await deliver(placed, seller);
+    await cash(sub, 'receipt', admin, 'RETURN-RECEIPT');
+    const action = await request(`/orders/suborders/${sub._id}/customer-action`, { access: placed.guestAccessToken, body: { action: 'request_return' } });
+    assert.equal(action.status, 200); assert.equal(action.data.subOrder.settlementStatus, 'held_for_return');
+    assert.equal((await payout(sub, admin, 'RETURN-PAYOUT')).status, 409);
+    assert.equal((await cash(sub, 'refund', admin, 'PREMATURE-REFUND')).status, 409);
+    assert.equal((await request(`/seller/suborders/${sub._id}/status`, { method: 'PUT', token: seller, body: { fulfillmentStatus: 'returned' } })).status, 200);
+    let saved = await app.mongo.collection('suborders').findOne({ _id: sub._id });
+    assert.equal(saved.codCollectionStatus, 'remitted_to_platform'); assert.equal(saved.refund, undefined);
+    assert.equal((await app.mongo.collection('products').findOne({ _id: 'prd_test_spice' })).stock, 99);
+    assert.equal((await cash(sub, 'refund', admin, 'CUSTOMER-REFUND', sub.grossTotalLkr - 1)).status, 409);
+    assert.equal((await cash(sub, 'refund', admin, 'CUSTOMER-REFUND')).status, 201);
+    assert.equal((await cash(sub, 'refund', admin, 'CUSTOMER-REFUND')).status, 200);
+    saved = await app.mongo.collection('suborders').findOne({ _id: sub._id });
+    assert.equal(saved.codCollectionStatus, 'refunded'); assert.equal(saved.settlementStatus, 'voided');
+    const restock = `/admin/suborders/${sub._id}/restock-return`;
+    assert.equal((await request(restock, { token: admin, body: { reason: 'Received returned goods.' } })).status, 400);
+    for (let i = 0; i < 2; i++) assert.equal((await request(restock, { token: admin, body: { inspectedForResale: true, reason: 'Goods inspected and approved for resale.' } })).status, 200);
+    assert.equal((await app.mongo.collection('products').findOne({ _id: 'prd_test_spice' })).stock, 100);
+    assert.equal((await app.mongo.collection('products').findOne({ _id: 'prd_test_spice' })).variants[0].values[0].stock, 50);
+    const view = await request(`/orders/track?orderNumber=${placed.order.orderNumber}`, { access: placed.guestAccessToken });
+    assert.equal(view.data.subOrders[0].refund.reference, undefined);
+    assert.equal(view.data.subOrders[0].refund.amountLkr, sub.grossTotalLkr);
+  });
+
+  await t.test('refund after seller payout creates a recovery obligation and blocks further seller payouts until confirmed recovery', async () => {
+    const seller = await login(accounts.seller), admin = await login(accounts.admin, true);
+    const placed = await place(); const sub = await deliver(placed, seller);
+    await cash(sub, 'receipt', admin, 'PAID-RETURN-RECEIPT');
+    assert.equal((await payout(sub, admin, 'PAID-RETURN-PAYOUT')).status, 201);
+    await request(`/orders/suborders/${sub._id}/customer-action`, { access: placed.guestAccessToken, body: { action: 'request_return' } });
+    await request(`/seller/suborders/${sub._id}/status`, { method: 'PUT', token: seller, body: { fulfillmentStatus: 'returned' } });
+    assert.equal((await cash(sub, 'refund', admin, 'PAID-CUSTOMER-REFUND')).status, 201);
+    const next = await deliver(await place(), seller);
+    await cash(next, 'receipt', admin, 'NEXT-RECEIPT');
+    assert.equal((await payout(next, admin, 'NEXT-PAYOUT')).status, 409);
+    assert.equal((await cash(sub, 'recovery', admin, 'SELLER-RECOVERY', 949)).status, 409);
+    assert.equal((await cash(sub, 'recovery', admin, 'SELLER-RECOVERY', 950)).status, 201);
+    assert.equal((await payout(next, admin, 'NEXT-PAYOUT')).status, 201);
+  });
+
+  await t.test('shared limits enforce one budget across API processes and never store plaintext client identities', async () => {
+    const results = await Promise.all(Array.from({ length: 70 }, (_, index) => request('/orders/track?orderNumber=NOT-A-REAL-ORDER', { url: index % 2 ? ready.url : app.url })));
+    assert.equal(results.filter((result) => result.status === 404).length, 60);
+    assert.equal(results.filter((result) => result.status === 429).length, 10);
+    const counters = await app.mongo.collection('ratelimits').find({}).toArray();
+    assert.equal(counters.length, 1); assert.equal(counters[0].hits, 61); assert.ok(counters[0].expiresAt instanceof Date);
+    assert.ok(!JSON.stringify(counters).includes('127.0.0.1'));
+    const { consumeLimit } = await import('../src/middleware/sharedRateLimit.js');
+    const instant = Date.now();
+    assert.equal((await consumeLimit('boundary', 'test-client', 1, 1000, instant)).allowed, true);
+    assert.equal((await consumeLimit('boundary', 'test-client', 1, 1000, instant)).allowed, false);
+    assert.equal((await consumeLimit('boundary', 'test-client', 1, 1000, instant + 1000)).allowed, true);
+  });
+
+  await t.test('monitoring is authenticated and exposes only bounded aggregate counters', async () => {
+    const previous = process.env.MONITORING_TOKEN;
+    process.env.MONITORING_TOKEN = 'tests-only-monitoring-secret-32-characters';
+    try {
+      assert.equal((await request('/operations/status')).status, 401);
+      const { recordOperationalEvent } = await import('../src/config/operations.js');
+      for (let i = 0; i < 3; i++) await recordOperationalEvent('checkout_failure');
+      const response = await request('/operations/status', { token: process.env.MONITORING_TOKEN });
+      assert.equal(response.status, 200); assert.equal(response.data.status, 'degraded');
+      assert.deepEqual(response.data.alerts, ['checkout_failures']);
+      assert.equal(response.data.counts.checkout_failure, 3);
+      assert.ok(!JSON.stringify(response.data).includes(accounts.customer));
+      assert.ok((await app.mongo.collection('operationalmetrics').listIndexes().toArray()).some((index) => index.expireAfterSeconds === 0));
+    } finally { if (previous === undefined) delete process.env.MONITORING_TOKEN; else process.env.MONITORING_TOKEN = previous; }
+  });
+
+  await t.test('administrator lockouts are shared across instances and sensitive routes fail closed when protection storage fails', async () => {
+    for (let i = 0; i < 5; i++) assert.equal((await request('/auth/admin/login', { body: { email: accounts.admin, password: 'incorrect-password' }, url: i % 2 ? ready.url : app.url })).status, 401);
+    assert.equal((await request('/auth/admin/login', { body: { email: accounts.admin, password: TEST_PASSWORD }, url: ready.url })).status, 429);
+    const original = app.mongo.collection;
+    app.mongo.collection = function (name, ...options) {
+      if (name === 'ratelimits') return { async findOneAndUpdate() { throw new Error('Synthetic shared protection outage'); } };
+      return original.call(this, name, ...options);
+    };
+    try { assert.equal((await request('/orders/track?orderNumber=TEST')).status, 503); }
+    finally { app.mongo.collection = original; }
+  });
+
   await t.test('encrypted backups restore BSON IDs, dates and indexes into a separate empty database without erasing production-like data', async () => {
     const root = path.resolve(os.tmpdir()); const directory = await fs.mkdtemp(path.join(root, 'yaans-backup-test-'));
     const keys = generateKeyPairSync('rsa', { modulusLength: 3072,
@@ -332,6 +464,7 @@ test('security, durable orders and recovery with real MongoDB transactions', { t
     const script = fileURLToPath(new URL('../scripts/backup_db.js', import.meta.url));
     const environment = { ...process.env, MONGODB_URI: app.mongoUri, BACKUP_PUBLIC_KEY_FILE: publicFile };
     try {
+      const placed = await place();
       await app.mongo.collection('typechecks').insertOne({ _id: new app.db.MODEL_MAP.users.db.base.Types.ObjectId(), at: new Date('2026-01-01'), value: 5 });
       await app.mongo.collection('typechecks').createIndex({ value: 1 }, { unique: true });
       await runFile(process.execPath, [script, `--out=${directory}`], { env: environment });
@@ -342,9 +475,16 @@ test('security, durable orders and recovery with real MongoDB transactions', { t
       const target = `yaans_restore_${randomUUID().replaceAll('-', '')}`;
       await runFile(process.execPath, [script, `--restore=${filename}`, `--private-key=${privateFile}`, `--target-db=${target}`], { env: environment });
       const restored = app.mongo.client.db(target);
+      assert.equal(await restored.collection('orders').countDocuments({ _id: placed.order._id }), 1);
+      assert.equal((await restored.collection('products').findOne({ _id: 'prd_test_spice' })).stock, 99);
+      assert.equal(await restored.collection('users').countDocuments(), 4);
       const value = await restored.collection('typechecks').findOne({ value: 5 });
       assert.equal(value._id._bsontype, 'ObjectId'); assert.ok(value.at instanceof Date);
       assert.ok((await restored.collection('typechecks').listIndexes().toArray()).some((index) => index.unique));
+      const drillScript = fileURLToPath(new URL('../scripts/restore-drill.js', import.meta.url));
+      await runFile(process.execPath, [drillScript], { env: { ...environment, RESTORE_MONGODB_URI: app.mongoUri,
+        BACKUP_FILE: filename, BACKUP_PRIVATE_KEY_FILE: privateFile } });
+      assert.equal((await app.mongo.client.db('yaans_restore_automated').listCollections().toArray()).length, 0);
       await assert.rejects(runFile(process.execPath, [script, `--restore=${filename}`, `--private-key=${privateFile}`, '--target-db=yaans_automated_test'], { env: environment }));
       await assert.rejects(runFile(process.execPath, [script, `--restore=${filename}`, `--private-key=${privateFile}`, `--target-db=${target}`], { env: environment }));
       assert.equal(await app.mongo.collection('users').countDocuments(), 4);

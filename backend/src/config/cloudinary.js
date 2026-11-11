@@ -52,7 +52,8 @@ export const uploadMiddleware = multer({
  */
 export async function uploadToCloudinary(fileBuffer, options = {}) {
   const isConfigured = initCloudinary();
-  const folder = options.folder || process.env.CLOUDINARY_FOLDER || 'yaans_lk/products';
+  const requestedFolder = options.folder || process.env.CLOUDINARY_FOLDER || 'yaans_lk/products';
+  const folder = process.env.APP_ENV === 'staging' ? requestedFolder.replace(/^yaans_lk\//, 'yaans_staging/') : requestedFolder;
   const customPublicId = options.publicId || `ylk_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
   if (isConfigured) {

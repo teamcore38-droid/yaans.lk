@@ -13,13 +13,13 @@ export function latestVerification(runs, sha) {
 
 export async function waitForFullVerification(sha, {
   fetchImpl = fetch, pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-  now = Date.now, timeoutMs = 10 * 60 * 1000, intervalMs = 30000
+  now = Date.now, timeoutMs = 10 * 60 * 1000, intervalMs = 30000, token = process.env.GITHUB_TOKEN
 } = {}) {
   if (!/^[a-f\d]{40}$/i.test(sha || '')) throw new Error('Production requires an exact Git commit SHA.');
   const started = now();
   do {
     const response = await fetchImpl(`https://api.github.com/repos/${repository}/actions/workflows/${workflowId}/runs?head_sha=${sha}&per_page=30`, {
-      headers: { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'yaans-production-verification' },
+      headers: { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'yaans-production-verification', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       redirect: 'error', signal: AbortSignal.timeout(10000)
     });
     if (!response.ok) throw new Error(`Cannot verify the required GitHub suite (HTTP ${response.status}); production remains blocked.`);

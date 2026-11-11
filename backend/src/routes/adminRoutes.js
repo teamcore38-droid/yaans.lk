@@ -3,6 +3,8 @@ import { getStore, persistStore, generateId, idFilter } from '../config/db.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { uploadMiddleware, uploadToCloudinary } from '../config/cloudinary.js';
 import { recordAdminAuditLog } from '../config/auditLogger.js';
+import { recordCashMovement, recordSellerPayout, payoutEligible, restockReturnedPackage } from '../services/finance.js';
+import { uploadLimit } from '../middleware/sharedRateLimit.js';
 
 const router = createRouter();
 
@@ -30,7 +32,7 @@ router.get('/overview', async (_req, res) => {
   const totalItemsRevenueLkr = activeSubOrders.reduce((sum, s) => sum + s.itemsSubtotalLkr, 0);
   const totalCommissionEarnedLkr = activeSubOrders.reduce((sum, s) => sum + s.commissionAmountLkr, 0);
   const unsettledPayoutLiabilityLkr = store.subOrders
-    .filter((s) => s.settlementStatus === 'eligible_for_payout')
+    .filter(payoutEligible)
     .reduce((sum, s) => sum + s.netSellerEarningsLkr, 0);
   const totalSettledPayoutsLkr = store.settlements.reduce((sum, st) => sum + st.netPayoutLkr, 0);
 
@@ -546,7 +548,7 @@ router.delete('/categories/:categoryId', async (req, res) => {
 
 // POST /api/admin/upload-image
 // Uploads category cover or general admin media to Cloudinary CDN
-router.post('/upload-image', uploadMiddleware.single('image'), async (req, res) => {
+router.post('/upload-image', uploadLimit, uploadMiddleware.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No image file was provided.' });
@@ -718,82 +720,19 @@ router.put('/config/banners', async (req, res) => {
   });
 });
 
-// POST /api/admin/settlements/payout
-// Reconciles and settles all eligible_for_payout SubOrders for a given seller
+// Only administrators can confirm cash received, refunds and completed transfers.
+router.post('/suborders/:subOrderId/restock-return', async (req, res) => {
+  return res.json(await restockReturnedPackage(req.params.subOrderId, req.body, req.user));
+});
+
+router.post('/suborders/:subOrderId/cash/:kind', async (req, res) => {
+  const result = await recordCashMovement(req.params.kind, req.params.subOrderId, req.body, req.user);
+  return res.status(result.replayed ? 200 : 201).json(result);
+});
+
 router.post('/settlements/payout', async (req, res) => {
-  const { sellerId, bankReference = '', notes = '' } = req.body;
-  if (!sellerId) {
-    return res.status(400).json({ message: 'sellerId is required to execute settlement.' });
-  }
-
-  const store = await getStore({ sellers: idFilter(sellerId), subOrders: { sellerId }, settlements: { sellerId }, platformConfig: true });
-  const seller = store.sellers.find((s) => s._id === sellerId);
-  if (!seller) {
-    return res.status(404).json({ message: 'Seller not found.' });
-  }
-
-  const eligibleSubs = store.subOrders.filter(
-    (s) => s.sellerId === sellerId && s.settlementStatus === 'eligible_for_payout'
-  );
-
-  if (eligibleSubs.length === 0) {
-    return res.status(400).json({
-      message: 'No delivered & COD-collected orders are currently waiting for settlement for this seller.'
-    });
-  }
-
-  const grossOrderItemsLkr = eligibleSubs.reduce((sum, s) => sum + s.itemsSubtotalLkr, 0);
-  const platformCommissionLkr = eligibleSubs.reduce((sum, s) => sum + s.commissionAmountLkr, 0);
-  const netPayoutLkr = eligibleSubs.reduce((sum, s) => sum + s.netSellerEarningsLkr, 0);
-
-  const settlementId = generateId('stl');
-  const settlementReference = `STL-YLK-${new Date().getUTCFullYear()}-${settlementId.slice(4).replaceAll('-', '').toUpperCase()}`;
-
-  const newSettlement = {
-    _id: settlementId,
-    settlementReference,
-    sellerId: seller._id,
-    sellerName: seller.storeName,
-    subOrderIds: eligibleSubs.map((s) => s._id),
-    grossOrderItemsLkr,
-    platformCommissionLkr,
-    netPayoutLkr,
-    bankReference: bankReference || `CEFT-SL-${Math.floor(1000000 + Math.random() * 9000000)}`,
-    status: 'paid',
-    paidAt: new Date().toISOString(),
-    notes:
-      notes ||
-      `Settled ${eligibleSubs.length} delivered sub-order(s) to ${seller.bankDetails?.bankName || 'Seller Bank'}.`
-  };
-
-  eligibleSubs.forEach((s) => {
-    s.settlementStatus = 'settled';
-    s.settlementId = settlementId;
-    s.statusHistory.push({
-      status: 'settled',
-      note: `Seller payout settled via ${settlementReference} (Net Rs. ${s.netSellerEarningsLkr.toLocaleString()})`,
-      timestamp: new Date().toISOString()
-    });
-  });
-
-  store.settlements.unshift(newSettlement);
-
-  recordAdminAuditLog(store, {
-    action: 'seller_payout',
-    adminEmail: req.user.email,
-    adminId: req.user._id,
-    ip: req.ip || req.headers['x-forwarded-for'] || '127.0.0.1',
-    details: `Settled bank payout ${settlementReference} for Rs. ${netPayoutLkr.toLocaleString()} to seller "${seller.storeName}" (${eligibleSubs.length} sub-orders reconciled)`,
-    metadata: { sellerId, settlementReference, netPayoutLkr, subOrderCount: eligibleSubs.length }
-  });
-
-  await persistStore(store);
-
-  return res.status(201).json({
-    settlement: newSettlement,
-    settledCount: eligibleSubs.length,
-    message: `Settlement ${settlementReference} for Rs. ${netPayoutLkr.toLocaleString()} paid to ${seller.storeName}!`
-  });
+  const result = await recordSellerPayout(req.body, req.user);
+  return res.status(result.replayed ? 200 : 201).json(result);
 });
 
 export default router;

@@ -68,6 +68,7 @@ export default function App() {
         <ScrollToTop />
         <NavigationPrefetch />
         <div className="min-h-screen flex flex-col bg-[#F3F4F6] text-slate-900">
+          {import.meta.env.VITE_APP_ENV === 'staging' && <div role="status" className="bg-amber-200 text-slate-950 text-center px-4 py-2 font-bold">Test environment — synthetic orders and payments only</div>}
           <Navbar />
           <main className="flex-1">
             <ErrorBoundary>

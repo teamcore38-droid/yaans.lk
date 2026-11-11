@@ -1,5 +1,7 @@
 import React from 'react';
 import { apiRequest, formatLkr } from '../../utils/api.js';
+import CashReconciliation, { PaymentEvidenceForm } from './CashReconciliation.jsx';
+import { payoutEligible } from '../../../../shared/payments.js';
 
 export default function SettlementsTab({
   generalCfg,
@@ -24,16 +26,17 @@ export default function SettlementsTab({
     }
   };
 
-  const handleSettleSellerPayout = async (sellerId) => {
+  const handleSettleSellerPayout = async (sellerId, subOrderIds, body) => {
     try {
       const res = await apiRequest('/admin/settlements/payout', {
         method: 'POST',
-        body: JSON.stringify({ sellerId })
+        body: JSON.stringify({ sellerId, subOrderIds, ...body })
       });
       showToast(res.message);
-      fetchOverview();
+      await fetchOverview();
     } catch (err) {
       showToast(err.message, 'error');
+      throw err;
     }
   };
 
@@ -110,6 +113,7 @@ export default function SettlementsTab({
 
       {/* Right: Seller Payout Reconciliation Queue (7 cols) */}
       <div className="lg:col-span-7 space-y-5">
+        <CashReconciliation subOrders={subOrders} showToast={showToast} fetchOverview={fetchOverview} />
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
           <h2 className="text-sm font-extrabold text-slate-900">
             Seller COD Payment Reconciliation &amp; Payout Queue
@@ -124,7 +128,7 @@ export default function SettlementsTab({
               .map((s) => {
                 const eligibleSubs = subOrders.filter(
                   (sub) =>
-                    sub.sellerId === s._id && sub.settlementStatus === 'eligible_for_payout'
+                    sub.sellerId === s._id && payoutEligible(sub)
                 );
                 const eligibleTotal = eligibleSubs.reduce(
                   (sum, sub) => sum + sub.netSellerEarningsLkr,
@@ -150,14 +154,12 @@ export default function SettlementsTab({
                           {formatLkr(eligibleTotal)}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        disabled={eligibleSubs.length === 0}
-                        onClick={() => handleSettleSellerPayout(s._id)}
-                        className="px-3 py-2 rounded-lg bg-amber-400 hover:bg-amber-500 disabled:bg-slate-200 text-slate-950 font-bold"
-                      >
-                        Settle Payout
-                      </button>
+                      {eligibleSubs.length > 0 && <details>
+                        <summary className="cursor-pointer font-bold">Record bank payout</summary>
+                        <p>This records an existing bank transfer; it does not send money. Packages: {eligibleSubs.map((sub) => sub.subOrderNumber).join(', ')}</p>
+                        <PaymentEvidenceForm label="Record completed bank transfer" expectedAmount={eligibleTotal}
+                          onRecord={(body) => handleSettleSellerPayout(s._id, eligibleSubs.map((sub) => sub._id), body)} />
+                      </details>}
                     </div>
                   </div>
                 );

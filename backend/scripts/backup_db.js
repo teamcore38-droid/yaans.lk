@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import { createPublicKey } from 'node:crypto';
 import { encryptBackup, decryptBackup } from '../src/config/backupCrypto.js';
+import { captureBackup, restoreBackup, validateBackup } from '../src/config/backupRepository.js';
 
 dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
 const option = (name) => process.argv.slice(2).find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -17,7 +18,7 @@ async function main() {
     const keyFile = option('private-key') || process.env.BACKUP_PRIVATE_KEY_FILE;
     if (!keyFile) throw new Error('A private key file is required to restore an encrypted backup.');
     backup = mongoose.mongo.BSON.EJSON.parse(decryptBackup(await fs.readFile(restore, 'utf8'), await fs.readFile(keyFile, 'utf8')).toString());
-    if (!backup.data || !backup.indexes || backup.metadata?.format !== 2) throw new Error('Invalid backup manifest.');
+    validateBackup(backup);
   } else {
     const keyFile = option('public-key') || process.env.BACKUP_PUBLIC_KEY_FILE;
     if (!keyFile) throw new Error('Refusing an unencrypted export. Configure BACKUP_PUBLIC_KEY_FILE or --public-key=<file>.');
@@ -30,33 +31,12 @@ async function main() {
   await mongoose.connect(process.env.MONGODB_URI, { dbName: target, serverSelectionTimeoutMS: 10000, maxPoolSize: 2, autoIndex: false });
   const db = mongoose.connection.db;
   if (restore) {
-    if ((await db.listCollections().toArray()).length) throw new Error('The restore database must be empty.');
-    for (const [name, docs] of Object.entries(backup.data)) {
-      if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(name) || !Array.isArray(docs)) throw new Error('Invalid backup collection.');
-    }
-    for (const [name, docs] of Object.entries(backup.data)) {
-      await db.createCollection(name);
-      if (docs.length) await db.collection(name).insertMany(docs);
-      for (const index of backup.indexes[name] || []) {
-        if (index.name === '_id_') continue;
-        const options = Object.fromEntries(['name', 'unique', 'sparse', 'expireAfterSeconds', 'partialFilterExpression', 'collation']
-          .filter((key) => index[key] !== undefined).map((key) => [key, index[key]]));
-        await db.collection(name).createIndex(index.key, options);
-      }
-    }
-    console.log('Encrypted backup restored into the separate recovery database. Verify its business totals before any cutover.');
+    const result = await restoreBackup(db, backup);
+    console.log(JSON.stringify(result));
+    console.log('Encrypted backup restored and verified into the separate recovery database.');
   } else {
-    const data = Object.create(null), indexes = Object.create(null);
-    const existingNames = (await db.listCollections().toArray()).map((value) => value.name).filter((name) => !name.startsWith('system.'));
-    const names = [...new Set([...existingNames, 'users', 'sellers', 'categories', 'products', 'reviews', 'orders', 'suborders', 'settlements', 'platformconfigs', 'counters', 'checkoutrequests'])];
-    for (const name of names) indexes[name] = existingNames.includes(name) ? await db.collection(name).listIndexes().toArray() : [];
-    const session = await mongoose.connection.startSession();
-    try {
-      await session.withTransaction(async () => {
-        for (const name of names) data[name] = await db.collection(name).find({}, { session }).toArray();
-      }, { readConcern: { level: 'snapshot' }, readPreference: 'primary' });
-    } finally { await session.endSession(); }
-    const plaintext = mongoose.mongo.BSON.EJSON.stringify({ metadata: { format: 2, createdAt: new Date() }, data, indexes }, { relaxed: false });
+    backup = await captureBackup(db);
+    const plaintext = mongoose.mongo.BSON.EJSON.stringify(backup, { relaxed: false });
     const encrypted = encryptBackup(Buffer.from(plaintext), publicKey);
     const directory = path.resolve(option('out') || 'backups');
     await fs.mkdir(directory, { recursive: true });
@@ -66,5 +46,5 @@ async function main() {
   }
 }
 
-main().catch((error) => { console.error('[Yaans backup]', error.message); process.exitCode = 1; })
+main().catch((error) => { console.error('[Yaans backup]', /Mongo/.test(error.name) ? `Database backup operation failed (${error.code || error.name}).` : error.message); process.exitCode = 1; })
   .finally(() => mongoose.disconnect());

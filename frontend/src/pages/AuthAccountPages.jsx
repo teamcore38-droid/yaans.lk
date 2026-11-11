@@ -9,7 +9,9 @@ import {
   Trash2,
   Package,
   Heart,
-  CheckCircle2
+  CheckCircle2,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { apiRequest, formatLkr } from '../utils/api.js';
 import { useMarketplace, DEFAULT_SL_DISTRICTS } from '../context/MarketplaceContext.jsx';
@@ -20,13 +22,22 @@ export function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+
+    if (!cleanEmail || !cleanPassword) {
+      showToast('Please enter both email and password.', 'error');
+      return;
+    }
+
     try {
       setLoading(true);
-      const loggedUser = await login(email, password);
+      const loggedUser = await login(cleanEmail, cleanPassword);
       const searchParams = new URLSearchParams(window.location.search);
       const redirect = searchParams.get('redirect');
 
@@ -65,6 +76,7 @@ export function LoginPage() {
             <input
               type="email"
               required
+              autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="name@example.lk"
@@ -74,20 +86,31 @@ export function LoginPage() {
 
           <div>
             <label className="block font-bold text-slate-700 mb-1">Password</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full pl-3.5 pr-10 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 px-4 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold text-xs sm:text-sm shadow-sm transition"
+            className="w-full py-2.5 px-4 rounded-lg bg-amber-400 hover:bg-amber-500 disabled:opacity-60 text-slate-950 font-extrabold text-xs sm:text-sm shadow-sm transition"
           >
             {loading ? 'Signing In...' : 'Sign In'}
           </button>
@@ -115,13 +138,34 @@ export function RegisterCustomerPage() {
   const [phone, setPhone] = useState('');
   const [defaultDistrict, setDefaultDistrict] = useState('Colombo');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const cleanName = name.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPhone = phone.trim();
+    const cleanPassword = password.trim();
+
+    if (!cleanName || !cleanEmail || !cleanPhone || !cleanPassword) {
+      showToast('Please fill out all required fields.', 'error');
+      return;
+    }
+    if (cleanPassword.length < 6) {
+      showToast('Password must be at least 6 characters.', 'error');
+      return;
+    }
+
     try {
       setLoading(true);
-      await registerCustomer({ name, email, phone, defaultDistrict, password });
+      await registerCustomer({
+        name: cleanName,
+        email: cleanEmail,
+        phone: cleanPhone,
+        defaultDistrict,
+        password: cleanPassword
+      });
       navigate('/');
     } catch (err) {
       showToast(err.message, 'error');
@@ -134,16 +178,17 @@ export function RegisterCustomerPage() {
     <div className="max-w-md mx-auto px-4 py-8">
       <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
         <h1 className="text-lg font-extrabold text-slate-900">Create Your Yaans.lk Account</h1>
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
           <div>
             <label className="block font-bold text-slate-700 mb-1">Full Name *</label>
             <input
               type="text"
               required
+              autoComplete="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Dilshan Silva"
-              className="w-full px-3 py-2 rounded-lg border border-slate-300"
+              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
             />
           </div>
           <div>
@@ -151,10 +196,11 @@ export function RegisterCustomerPage() {
             <input
               type="tel"
               required
+              autoComplete="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="077 123 4567"
-              className="w-full px-3 py-2 rounded-lg border border-slate-300"
+              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
             />
           </div>
           <div>
@@ -162,10 +208,11 @@ export function RegisterCustomerPage() {
             <input
               type="email"
               required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="dilshan@example.com"
-              className="w-full px-3 py-2 rounded-lg border border-slate-300"
+              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
             />
           </div>
           <div>
@@ -173,7 +220,7 @@ export function RegisterCustomerPage() {
             <select
               value={defaultDistrict}
               onChange={(e) => setDefaultDistrict(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-semibold"
+              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 bg-white font-semibold focus:outline-none focus:ring-2 focus:ring-slate-900"
             >
               {DEFAULT_SL_DISTRICTS.map((d) => (
                 <option key={d} value={d}>{d}</option>
@@ -182,19 +229,32 @@ export function RegisterCustomerPage() {
           </div>
           <div>
             <label className="block font-bold text-slate-700 mb-1">Password *</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Minimum 6 characters"
-              className="w-full px-3 py-2 rounded-lg border border-slate-300"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                minLength={6}
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Minimum 6 characters"
+                className="w-full pl-3.5 pr-10 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">Must be at least 6 characters</p>
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold text-xs sm:text-sm"
+            className="w-full py-2.5 rounded-lg bg-amber-400 hover:bg-amber-500 disabled:opacity-60 text-slate-950 font-extrabold text-xs sm:text-sm shadow-sm transition"
           >
             {loading ? 'Creating Account...' : 'Create Customer Account'}
           </button>
@@ -237,13 +297,39 @@ export function SellerRegisterPage() {
     accountHolderName: '',
     accountNumber: ''
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const cleanForm = {
+      ...form,
+      name: form.name.trim(),
+      email: form.email.trim().toLowerCase(),
+      phone: form.phone.trim(),
+      password: form.password.trim(),
+      storeName: form.storeName.trim(),
+      city: form.city.trim(),
+      businessAddress: form.businessAddress.trim(),
+      nicOrBrNumber: form.nicOrBrNumber.trim(),
+      description: form.description.trim(),
+      branchName: form.branchName.trim(),
+      accountHolderName: form.accountHolderName.trim(),
+      accountNumber: form.accountNumber.trim()
+    };
+
+    if (!cleanForm.name || !cleanForm.email || !cleanForm.phone || !cleanForm.password || !cleanForm.storeName) {
+      showToast('Please fill out all required store details.', 'error');
+      return;
+    }
+    if (cleanForm.password.length < 6) {
+      showToast('Password must be at least 6 characters.', 'error');
+      return;
+    }
+
     try {
       setSubmitting(true);
-      await registerSeller(form);
+      await registerSeller(cleanForm);
       navigate('/seller/dashboard');
     } catch (err) {
       showToast(err.message, 'error');
@@ -274,10 +360,11 @@ export function SellerRegisterPage() {
               <input
                 type="text"
                 required
+                autoComplete="name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="e.g., Malini Rajapaksha"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
             </div>
 
@@ -286,10 +373,11 @@ export function SellerRegisterPage() {
               <input
                 type="tel"
                 required
+                autoComplete="tel"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 placeholder="e.g., 071 456 7890"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
             </div>
 
@@ -298,23 +386,37 @@ export function SellerRegisterPage() {
               <input
                 type="email"
                 required
+                autoComplete="email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 placeholder="store@example.lk"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
             </div>
 
             <div>
               <label className="block font-bold text-slate-700 mb-1">Account Password *</label>
-              <input
-                type="password"
-                required
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder="Create a strong password"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  placeholder="Create a strong password (min 6)"
+                  className="w-full pl-3 pr-10 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Must be at least 6 characters</p>
             </div>
           </div>
 
@@ -327,7 +429,7 @@ export function SellerRegisterPage() {
                 value={form.storeName}
                 onChange={(e) => setForm({ ...form, storeName: e.target.value })}
                 placeholder="e.g., Matara Cinnamon & Sweet Kitchen"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
             </div>
 
@@ -336,7 +438,7 @@ export function SellerRegisterPage() {
               <select
                 value={form.sellerType}
                 onChange={(e) => setForm({ ...form, sellerType: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-semibold"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-semibold focus:outline-none focus:ring-2 focus:ring-slate-900"
               >
                 <option value="Homemade & Cottage">Homemade & Cottage Producer (5% Commission)</option>
                 <option value="Artisan & Craft">Artisan, Pottery & Handloom (6% Commission)</option>
@@ -352,7 +454,7 @@ export function SellerRegisterPage() {
               <select
                 value={form.district}
                 onChange={(e) => setForm({ ...form, district: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-semibold"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-semibold focus:outline-none focus:ring-2 focus:ring-slate-900"
               >
                 {DEFAULT_SL_DISTRICTS.map((d) => (
                   <option key={d} value={d}>{d} District</option>
@@ -368,7 +470,7 @@ export function SellerRegisterPage() {
                 value={form.city}
                 onChange={(e) => setForm({ ...form, city: e.target.value })}
                 placeholder="e.g., Peradeniya / Nugegoda / Nallur"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
             </div>
 
@@ -382,7 +484,7 @@ export function SellerRegisterPage() {
                 value={form.nicOrBrNumber}
                 onChange={(e) => setForm({ ...form, nicOrBrNumber: e.target.value })}
                 placeholder="e.g., 199012345678 or PV-0012345"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
             </div>
 
@@ -391,23 +493,24 @@ export function SellerRegisterPage() {
               <input
                 type="text"
                 required
+                autoComplete="street-address"
                 value={form.businessAddress}
                 onChange={(e) => setForm({ ...form, businessAddress: e.target.value })}
                 placeholder="Full street address for courier pickup"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
             </div>
 
             <div className="sm:col-span-2">
               <label className="block font-bold text-slate-700 mb-1">
-                Store Description & Specialties
+                Store Description &amp; Specialties
               </label>
               <textarea
                 rows={2}
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="Tell customers about your homemade recipes, craftsmanship, or product range..."
-                className="w-full px-3 py-2 rounded-lg border border-slate-300"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
             </div>
           </div>
@@ -418,7 +521,7 @@ export function SellerRegisterPage() {
               <select
                 value={form.bankName}
                 onChange={(e) => setForm({ ...form, bankName: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-900"
               >
                 <option value="Bank of Ceylon (BOC)">Bank of Ceylon (BOC)</option>
                 <option value="Sampath Bank">Sampath Bank</option>
@@ -436,7 +539,7 @@ export function SellerRegisterPage() {
                 value={form.branchName}
                 onChange={(e) => setForm({ ...form, branchName: e.target.value })}
                 placeholder="e.g., Kandy City Branch"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
             </div>
 
@@ -447,7 +550,7 @@ export function SellerRegisterPage() {
                 value={form.accountNumber}
                 onChange={(e) => setForm({ ...form, accountNumber: e.target.value })}
                 placeholder="e.g., 102944819201"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
             </div>
           </div>
@@ -493,6 +596,9 @@ export function CustomerAccountPage() {
     newPassword: '',
     confirmPassword: ''
   });
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [savingCustProfile, setSavingCustProfile] = useState(false);
   const [savingCustPassword, setSavingCustPassword] = useState(false);
 
@@ -529,11 +635,20 @@ export function CustomerAccountPage() {
 
   const handleUpdateCustProfile = async (e) => {
     e.preventDefault();
+    const cleanProfile = {
+      name: custProfile.name.trim(),
+      phone: custProfile.phone.trim(),
+      defaultDistrict: custProfile.defaultDistrict
+    };
+    if (!cleanProfile.name) {
+      showToast('Name is required.', 'error');
+      return;
+    }
     try {
       setSavingCustProfile(true);
       await apiRequest('/auth/profile', {
         method: 'PUT',
-        body: JSON.stringify(custProfile)
+        body: JSON.stringify(cleanProfile)
       });
       await refreshUser();
       showToast('Profile settings updated!');
@@ -546,11 +661,19 @@ export function CustomerAccountPage() {
 
   const handleUpdateCustPassword = async (e) => {
     e.preventDefault();
-    if (custPasswordForm.newPassword !== custPasswordForm.confirmPassword) {
+    const currentPassword = custPasswordForm.currentPassword.trim();
+    const newPassword = custPasswordForm.newPassword.trim();
+    const confirmPassword = custPasswordForm.confirmPassword.trim();
+
+    if (!currentPassword) {
+      showToast('Current password is required.', 'error');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
       showToast('New passwords do not match.', 'error');
       return;
     }
-    if (custPasswordForm.newPassword.length < 6) {
+    if (newPassword.length < 6) {
       showToast('Password must be at least 6 characters.', 'error');
       return;
     }
@@ -559,8 +682,8 @@ export function CustomerAccountPage() {
       await apiRequest('/auth/update-credentials', {
         method: 'PUT',
         body: JSON.stringify({
-          currentPassword: custPasswordForm.currentPassword,
-          newPassword: custPasswordForm.newPassword
+          currentPassword,
+          newPassword
         })
       });
       setCustPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -574,10 +697,21 @@ export function CustomerAccountPage() {
 
   const handleAddAddress = async (e) => {
     e.preventDefault();
+    const cleanAddress = {
+      ...addrForm,
+      recipientName: addrForm.recipientName.trim(),
+      phone: addrForm.phone.trim(),
+      addressLine1: addrForm.addressLine1.trim(),
+      city: addrForm.city.trim()
+    };
+    if (!cleanAddress.recipientName || !cleanAddress.phone || !cleanAddress.addressLine1 || !cleanAddress.city) {
+      showToast('Please fill out all address fields.', 'error');
+      return;
+    }
     try {
       await apiRequest('/auth/addresses', {
         method: 'POST',
-        body: JSON.stringify(addrForm)
+        body: JSON.stringify(cleanAddress)
       });
       await refreshUser();
       setAddrForm({ ...addrForm, addressLine1: '', city: '', postalCode: '' });
@@ -695,12 +829,12 @@ export function CustomerAccountPage() {
                 placeholder="Town / City"
                 value={addrForm.city}
                 onChange={(e) => setAddrForm({ ...addrForm, city: e.target.value })}
-                className="px-2.5 py-1.5 rounded border border-slate-300"
+                className="px-2.5 py-1.5 rounded border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
               <select
                 value={addrForm.district}
                 onChange={(e) => setAddrForm({ ...addrForm, district: e.target.value })}
-                className="px-2.5 py-1.5 rounded border border-slate-300 bg-white font-semibold"
+                className="px-2.5 py-1.5 rounded border border-slate-300 bg-white font-semibold focus:outline-none focus:ring-2 focus:ring-slate-900"
               >
                 {DEFAULT_SL_DISTRICTS.map((d) => (
                   <option key={d} value={d}>{d}</option>
@@ -709,7 +843,7 @@ export function CustomerAccountPage() {
             </div>
             <button
               type="submit"
-              className="w-full py-2 rounded-lg bg-slate-900 text-white font-bold text-xs"
+              className="w-full py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition"
             >
               Save Address
             </button>
@@ -718,45 +852,83 @@ export function CustomerAccountPage() {
           {/* Account Security & Password */}
           <div className="pt-4 border-t border-slate-200 space-y-3">
             <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
-              Account Security & Password
+              Account Security &amp; Password
             </h3>
-            <form onSubmit={handleUpdateCustPassword} className="space-y-2 text-xs">
-              <input
-                type="password"
-                required
-                placeholder="Current password"
-                value={custPasswordForm.currentPassword}
-                onChange={(e) =>
-                  setCustPasswordForm({ ...custPasswordForm, currentPassword: e.target.value })
-                }
-                className="w-full px-2.5 py-1.5 rounded border border-slate-300"
-              />
-              <div className="grid grid-cols-2 gap-2">
+            <form onSubmit={handleUpdateCustPassword} className="space-y-2.5 text-xs">
+              <div className="relative">
                 <input
-                  type="password"
+                  type={showCurrentPassword ? 'text' : 'password'}
                   required
-                  placeholder="New password (min 6)"
-                  value={custPasswordForm.newPassword}
+                  autoComplete="current-password"
+                  placeholder="Current password"
+                  value={custPasswordForm.currentPassword}
                   onChange={(e) =>
-                    setCustPasswordForm({ ...custPasswordForm, newPassword: e.target.value })
+                    setCustPasswordForm({ ...custPasswordForm, currentPassword: e.target.value })
                   }
-                  className="px-2.5 py-1.5 rounded border border-slate-300"
+                  className="w-full pl-2.5 pr-8 py-1.5 rounded border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />
-                <input
-                  type="password"
-                  required
-                  placeholder="Confirm password"
-                  value={custPasswordForm.confirmPassword}
-                  onChange={(e) =>
-                    setCustPasswordForm({ ...custPasswordForm, confirmPassword: e.target.value })
-                  }
-                  className="px-2.5 py-1.5 rounded border border-slate-300"
-                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword((prev) => !prev)}
+                  aria-label={showCurrentPassword ? 'Hide current password' : 'Show current password'}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                >
+                  {showCurrentPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
               </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    required
+                    minLength={6}
+                    autoComplete="new-password"
+                    placeholder="New password (min 6)"
+                    value={custPasswordForm.newPassword}
+                    onChange={(e) =>
+                      setCustPasswordForm({ ...custPasswordForm, newPassword: e.target.value })
+                    }
+                    className="w-full pl-2.5 pr-8 py-1.5 rounded border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword((prev) => !prev)}
+                    aria-label={showNewPassword ? 'Hide new password' : 'Show new password'}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  >
+                    {showNewPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    required
+                    minLength={6}
+                    autoComplete="new-password"
+                    placeholder="Confirm password"
+                    value={custPasswordForm.confirmPassword}
+                    onChange={(e) =>
+                      setCustPasswordForm({ ...custPasswordForm, confirmPassword: e.target.value })
+                    }
+                    className="w-full pl-2.5 pr-8 py-1.5 rounded border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
               <button
                 type="submit"
                 disabled={savingCustPassword}
-                className="w-full py-2 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs disabled:opacity-50"
+                className="w-full py-2 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs disabled:opacity-50 transition shadow-sm"
               >
                 {savingCustPassword ? 'Updating...' : 'Change Password'}
               </button>

@@ -22,9 +22,19 @@ export default function AdminLoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+
+    if (!cleanEmail || !cleanPassword) {
+      const msg = 'Please enter both administrator email and password.';
+      setErrorMsg(msg);
+      showToast(msg, 'error');
+      return;
+    }
+
     try {
       setLoading(true);
-      await adminLogin(email, password);
+      await adminLogin(cleanEmail, cleanPassword);
       navigate('/admin', { replace: true });
     } catch (err) {
       const msg = err.message || 'Invalid administrator credentials.';

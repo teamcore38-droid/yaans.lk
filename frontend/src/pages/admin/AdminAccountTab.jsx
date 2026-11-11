@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { apiRequest } from '../../utils/api.js';
 
 export default function AdminAccountTab({ user, refreshUser, showToast }) {
@@ -14,6 +14,10 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
     newPassword: '',
     confirmPassword: ''
   });
+  const [showEmailCurrentPassword, setShowEmailCurrentPassword] = useState(false);
+  const [showAdminCurrentPassword, setShowAdminCurrentPassword] = useState(false);
+  const [showAdminNewPassword, setShowAdminNewPassword] = useState(false);
+  const [showAdminConfirmPassword, setShowAdminConfirmPassword] = useState(false);
   const [savingAdminProfile, setSavingAdminProfile] = useState(false);
   const [savingAdminPassword, setSavingAdminPassword] = useState(false);
 
@@ -30,21 +34,31 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
 
   const handleUpdateAdminProfile = async (e) => {
     e.preventDefault();
+    const cleanName = adminProfileForm.name.trim();
+    const cleanEmail = adminProfileForm.email.trim().toLowerCase();
+    const cleanPhone = adminProfileForm.phone.trim();
+    const cleanPassword = adminProfileForm.currentPasswordForEmail.trim();
+
+    if (!cleanName || !cleanEmail) {
+      showToast('Admin display name and email are required.', 'error');
+      return;
+    }
+
     try {
       setSavingAdminProfile(true);
       const isEmailChanging =
-        adminProfileForm.email.toLowerCase().trim() !== (user.email || '').toLowerCase().trim();
-      if (isEmailChanging && !adminProfileForm.currentPasswordForEmail) {
+        cleanEmail !== (user.email || '').toLowerCase().trim();
+      if (isEmailChanging && !cleanPassword) {
         showToast('Please enter your current password to confirm email/username change.', 'error');
         return;
       }
       const res = await apiRequest('/auth/update-credentials', {
         method: 'PUT',
         body: JSON.stringify({
-          newName: adminProfileForm.name,
-          newEmail: adminProfileForm.email,
-          newPhone: adminProfileForm.phone,
-          currentPassword: adminProfileForm.currentPasswordForEmail || undefined
+          newName: cleanName,
+          newEmail: cleanEmail,
+          newPhone: cleanPhone,
+          currentPassword: cleanPassword || undefined
         })
       });
       localStorage.setItem('yaans_token', res.token);
@@ -61,11 +75,19 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
 
   const handleUpdateAdminPassword = async (e) => {
     e.preventDefault();
-    if (adminPasswordForm.newPassword !== adminPasswordForm.confirmPassword) {
+    const currentPassword = adminPasswordForm.currentPassword.trim();
+    const newPassword = adminPasswordForm.newPassword.trim();
+    const confirmPassword = adminPasswordForm.confirmPassword.trim();
+
+    if (!currentPassword) {
+      showToast('Current password is required.', 'error');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
       showToast('New passwords do not match.', 'error');
       return;
     }
-    if (adminPasswordForm.newPassword.length < 6) {
+    if (newPassword.length < 6) {
       showToast('New password must be at least 6 characters.', 'error');
       return;
     }
@@ -74,8 +96,8 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
       const res = await apiRequest('/auth/update-credentials', {
         method: 'PUT',
         body: JSON.stringify({
-          currentPassword: adminPasswordForm.currentPassword,
-          newPassword: adminPasswordForm.newPassword
+          currentPassword,
+          newPassword
         })
       });
       localStorage.setItem('yaans_token', res.token);
@@ -151,6 +173,7 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
               <input
                 type="text"
                 required
+                autoComplete="name"
                 value={adminProfileForm.name}
                 onChange={(e) => setAdminProfileForm({ ...adminProfileForm, name: e.target.value })}
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
@@ -164,6 +187,7 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
               <input
                 type="email"
                 required
+                autoComplete="email"
                 value={adminProfileForm.email}
                 onChange={(e) => setAdminProfileForm({ ...adminProfileForm, email: e.target.value })}
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono"
@@ -174,6 +198,7 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
               <label className="block font-bold text-slate-700 mb-1">Contact Phone</label>
               <input
                 type="tel"
+                autoComplete="tel"
                 value={adminProfileForm.phone}
                 onChange={(e) => setAdminProfileForm({ ...adminProfileForm, phone: e.target.value })}
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
@@ -185,19 +210,30 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
                 <label className="block font-bold text-amber-900 text-xs">
                   Enter Current Password to Confirm Email Change
                 </label>
-                <input
-                  type="password"
-                  required
-                  value={adminProfileForm.currentPasswordForEmail}
-                  onChange={(e) =>
-                    setAdminProfileForm({
-                      ...adminProfileForm,
-                      currentPasswordForEmail: e.target.value
-                    })
-                  }
-                  placeholder="Current password"
-                  className="w-full px-3 py-2 rounded-lg border border-amber-300 bg-white"
-                />
+                <div className="relative">
+                  <input
+                    type={showEmailCurrentPassword ? 'text' : 'password'}
+                    required
+                    autoComplete="current-password"
+                    value={adminProfileForm.currentPasswordForEmail}
+                    onChange={(e) =>
+                      setAdminProfileForm({
+                        ...adminProfileForm,
+                        currentPasswordForEmail: e.target.value
+                      })
+                    }
+                    placeholder="Current password"
+                    className="w-full pl-3 pr-10 py-2 rounded-lg border border-amber-300 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEmailCurrentPassword((prev) => !prev)}
+                    aria-label={showEmailCurrentPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  >
+                    {showEmailCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
             )}
 
@@ -225,49 +261,82 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
           <form onSubmit={handleUpdateAdminPassword} className="space-y-3.5 text-xs">
             <div>
               <label className="block font-bold text-slate-700 mb-1">Current Password *</label>
-              <input
-                type="password"
-                required
-                value={adminPasswordForm.currentPassword}
-                onChange={(e) =>
-                  setAdminPasswordForm({ ...adminPasswordForm, currentPassword: e.target.value })
-                }
-                placeholder="••••••••"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
-              />
+              <div className="relative">
+                <input
+                  type={showAdminCurrentPassword ? 'text' : 'password'}
+                  required
+                  autoComplete="current-password"
+                  value={adminPasswordForm.currentPassword}
+                  onChange={(e) =>
+                    setAdminPasswordForm({ ...adminPasswordForm, currentPassword: e.target.value })
+                  }
+                  placeholder="••••••••"
+                  className="w-full pl-3 pr-10 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAdminCurrentPassword((prev) => !prev)}
+                  aria-label={showAdminCurrentPassword ? 'Hide current password' : 'Show current password'}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                >
+                  {showAdminCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div>
               <label className="block font-bold text-slate-700 mb-1">New Password *</label>
-              <input
-                type="password"
-                required
-                minLength={6}
-                value={adminPasswordForm.newPassword}
-                onChange={(e) =>
-                  setAdminPasswordForm({ ...adminPasswordForm, newPassword: e.target.value })
-                }
-                placeholder="Minimum 6 characters"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
-              />
+              <div className="relative">
+                <input
+                  type={showAdminNewPassword ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  value={adminPasswordForm.newPassword}
+                  onChange={(e) =>
+                    setAdminPasswordForm({ ...adminPasswordForm, newPassword: e.target.value })
+                  }
+                  placeholder="Minimum 6 characters"
+                  className="w-full pl-3 pr-10 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAdminNewPassword((prev) => !prev)}
+                  aria-label={showAdminNewPassword ? 'Hide new password' : 'Show new password'}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                >
+                  {showAdminNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div>
               <label className="block font-bold text-slate-700 mb-1">Confirm New Password *</label>
-              <input
-                type="password"
-                required
-                minLength={6}
-                value={adminPasswordForm.confirmPassword}
-                onChange={(e) =>
-                  setAdminPasswordForm({
-                    ...adminPasswordForm,
-                    confirmPassword: e.target.value
-                  })
-                }
-                placeholder="Repeat new password"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
-              />
+              <div className="relative">
+                <input
+                  type={showAdminConfirmPassword ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  value={adminPasswordForm.confirmPassword}
+                  onChange={(e) =>
+                    setAdminPasswordForm({
+                      ...adminPasswordForm,
+                      confirmPassword: e.target.value
+                    })
+                  }
+                  placeholder="Repeat new password"
+                  className="w-full pl-3 pr-10 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAdminConfirmPassword((prev) => !prev)}
+                  aria-label={showAdminConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                >
+                  {showAdminConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <button

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5173 --host",
-    "build": "vite build",
+    "verify:hooks": "node scripts/verify-hooks.js",
+    "build": "node scripts/verify-hooks.js && vite build",
     "preview": "vite preview --port 4173"
   },
   "dependencies": {

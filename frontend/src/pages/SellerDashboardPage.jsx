@@ -171,6 +171,35 @@ export default function SellerDashboardPage() {
   const [vacationNoticeInput, setVacationNoticeInput] = useState('');
   const [updatingVacation, setUpdatingVacation] = useState(false);
 
+  const products = data?.products || [];
+
+  // Filter products by stock and search query (Guaranteed Top-Level Hooks)
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      if (stockFilter === 'low' && (Number(p.stock) <= 0 || Number(p.stock) > 5)) return false;
+      if (stockFilter === 'out' && Number(p.stock) > 0) return false;
+      if (stockFilter === 'in_stock' && Number(p.stock) <= 0) return false;
+
+      if (searchProdQuery.trim()) {
+        const q = searchProdQuery.toLowerCase().trim();
+        const matchTitle = (p.title || '').toLowerCase().includes(q);
+        const matchSku = (p.sku || '').toLowerCase().includes(q);
+        const matchCat = (p.categorySlug || '').toLowerCase().includes(q);
+        if (!matchTitle && !matchSku && !matchCat) return false;
+      }
+      return true;
+    });
+  }, [products, stockFilter, searchProdQuery]);
+
+  const lowStockProducts = useMemo(
+    () => products.filter((p) => Number(p.stock) > 0 && Number(p.stock) <= 5),
+    [products]
+  );
+  const outOfStockProducts = useMemo(
+    () => products.filter((p) => Number(p.stock) <= 0),
+    [products]
+  );
+
   const fetchDashboard = useCallback(async () => {
     try {
       setLoading(true);
@@ -285,7 +314,6 @@ export default function SellerDashboardPage() {
 
   const seller = data?.seller;
   const metrics = data?.metrics || {};
-  const products = data?.products || [];
   const subOrders = data?.subOrders || [];
   const settlements = data?.settlements || [];
 
@@ -599,33 +627,6 @@ export default function SellerDashboardPage() {
       setImportingCsv(false);
     }
   };
-
-  // Filter products by stock and search query
-  const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
-      if (stockFilter === 'low' && (Number(p.stock) <= 0 || Number(p.stock) > 5)) return false;
-      if (stockFilter === 'out' && Number(p.stock) > 0) return false;
-      if (stockFilter === 'in_stock' && Number(p.stock) <= 0) return false;
-
-      if (searchProdQuery.trim()) {
-        const q = searchProdQuery.toLowerCase().trim();
-        const matchTitle = (p.title || '').toLowerCase().includes(q);
-        const matchSku = (p.sku || '').toLowerCase().includes(q);
-        const matchCat = (p.categorySlug || '').toLowerCase().includes(q);
-        if (!matchTitle && !matchSku && !matchCat) return false;
-      }
-      return true;
-    });
-  }, [products, stockFilter, searchProdQuery]);
-
-  const lowStockProducts = useMemo(
-    () => products.filter((p) => Number(p.stock) > 0 && Number(p.stock) <= 5),
-    [products]
-  );
-  const outOfStockProducts = useMemo(
-    () => products.filter((p) => Number(p.stock) <= 0),
-    [products]
-  );
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 py-5 space-y-6">

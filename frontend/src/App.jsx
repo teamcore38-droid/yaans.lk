@@ -5,6 +5,7 @@ import Navbar from './components/Navbar.jsx';
 import Footer from './components/Footer.jsx';
 import CookieNotice from './components/CookieNotice.jsx';
 import NavigationPrefetch from './components/NavigationPrefetch.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { pageLoaders } from './utils/navigation.js';
 
 const HomePage = lazy(pageLoaders.home);
@@ -69,37 +70,53 @@ export default function App() {
         <div className="min-h-screen flex flex-col bg-[#F3F4F6] text-slate-900">
           <Navbar />
           <main className="flex-1">
-            <Suspense
-              fallback={
-                <div className="max-w-7xl mx-auto px-4 py-8">
-                  <div className="h-48 bg-white rounded-xl border border-slate-200 animate-pulse" />
-                </div>
-              }
-            >
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/products" element={<ProductsPage />} />
-                <Route path="/product/:idOrSlug" element={<ProductDetailPage />} />
-                <Route path="/cart" element={<CartPage />} />
-                <Route path="/checkout" element={<CheckoutPage />} />
-                <Route path="/track-order" element={<TrackOrderPage />} />
-                <Route path="/store/:slugOrId" element={<SellerStorefrontPage />} />
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterCustomerPage />} />
-                <Route path="/seller/register" element={<SellerRegisterPage />} />
-                <Route path="/seller/dashboard" element={<SellerDashboardPage />} />
-                <Route path="/admin/login" element={<AdminLoginPage />} />
-                <Route path="/admin" element={<AdminDashboardPage />} />
-                <Route path="/account" element={<CustomerAccountPage />} />
-                <Route path="/wishlist" element={<WishlistPage />} />
-                <Route path="/privacy" element={<PrivacyPolicyPage />} />
-                <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-                <Route path="/terms" element={<TermsConditionsPage />} />
-                <Route path="/terms-and-conditions" element={<TermsConditionsPage />} />
-                <Route path="/cookies" element={<CookiePolicyPage />} />
-                <Route path="/cookies-policy" element={<CookiePolicyPage />} />
-              </Routes>
-            </Suspense>
+            <ErrorBoundary>
+              <Suspense
+                fallback={
+                  <div className="max-w-7xl mx-auto px-4 py-8">
+                    <div className="h-48 bg-white rounded-xl border border-slate-200 animate-pulse" />
+                  </div>
+                }
+              >
+                <Routes>
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/products" element={<ProductsPage />} />
+                  <Route path="/product/:idOrSlug" element={<ProductDetailPage />} />
+                  <Route path="/cart" element={<CartPage />} />
+                  <Route path="/checkout" element={<CheckoutPage />} />
+                  <Route path="/track-order" element={<TrackOrderPage />} />
+                  <Route path="/store/:slugOrId" element={<SellerStorefrontPage />} />
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/register" element={<RegisterCustomerPage />} />
+                  <Route path="/seller/register" element={<SellerRegisterPage />} />
+                  <Route
+                    path="/seller/dashboard"
+                    element={
+                      <ErrorBoundary title="Unable to load Seller Portal">
+                        <SellerDashboardPage />
+                      </ErrorBoundary>
+                    }
+                  />
+                  <Route path="/admin/login" element={<AdminLoginPage />} />
+                  <Route
+                    path="/admin"
+                    element={
+                      <ErrorBoundary title="Unable to load Admin Console">
+                        <AdminDashboardPage />
+                      </ErrorBoundary>
+                    }
+                  />
+                  <Route path="/account" element={<CustomerAccountPage />} />
+                  <Route path="/wishlist" element={<WishlistPage />} />
+                  <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                  <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                  <Route path="/terms" element={<TermsConditionsPage />} />
+                  <Route path="/terms-and-conditions" element={<TermsConditionsPage />} />
+                  <Route path="/cookies" element={<CookiePolicyPage />} />
+                  <Route path="/cookies-policy" element={<CookiePolicyPage />} />
+                </Routes>
+              </Suspense>
+            </ErrorBoundary>
           </main>
           <Footer />
           <CookieNotice />

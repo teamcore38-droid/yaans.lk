@@ -1,9 +1,67 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import { getStore, persistStore, generateId } from '../config/db.js';
-import { authenticate, signToken } from '../middleware/auth.js';
+import { authenticate, signToken, signAdminToken } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Dedicated Admin Brute-Force Protection (Max 5 failed attempts per 15 minutes per IP/Email)
+const ADMIN_LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
+const ADMIN_MAX_FAILED_ATTEMPTS = 5;
+const adminFailedAttempts = new Map();
+
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    return String(forwarded).split(',')[0].trim();
+  }
+  return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
+function checkAdminRateLimit(key) {
+  const record = adminFailedAttempts.get(key);
+  if (!record) return { locked: false, remainingAttempts: ADMIN_MAX_FAILED_ATTEMPTS };
+  if (Date.now() - record.firstAttemptAt > ADMIN_LOCKOUT_WINDOW_MS) {
+    adminFailedAttempts.delete(key);
+    return { locked: false, remainingAttempts: ADMIN_MAX_FAILED_ATTEMPTS };
+  }
+  if (record.count >= ADMIN_MAX_FAILED_ATTEMPTS) {
+    const minutesLeft = Math.ceil((ADMIN_LOCKOUT_WINDOW_MS - (Date.now() - record.firstAttemptAt)) / 60000);
+    return { locked: true, minutesLeft: Math.max(1, minutesLeft), remainingAttempts: 0 };
+  }
+  return { locked: false, remainingAttempts: ADMIN_MAX_FAILED_ATTEMPTS - record.count };
+}
+
+function recordFailedAdminAttempt(key) {
+  const now = Date.now();
+  const record = adminFailedAttempts.get(key);
+  if (!record || now - record.firstAttemptAt > ADMIN_LOCKOUT_WINDOW_MS) {
+    adminFailedAttempts.set(key, { count: 1, firstAttemptAt: now });
+    return ADMIN_MAX_FAILED_ATTEMPTS - 1;
+  }
+  record.count += 1;
+  adminFailedAttempts.set(key, record);
+  return Math.max(0, ADMIN_MAX_FAILED_ATTEMPTS - record.count);
+}
+
+function clearAdminFailedAttempts(key) {
+  adminFailedAttempts.delete(key);
+}
+
+function recordAdminAuditLog(store, entry) {
+  if (!store.platformConfig) return;
+  if (!Array.isArray(store.platformConfig.adminAuditLogs)) {
+    store.platformConfig.adminAuditLogs = [];
+  }
+  store.platformConfig.adminAuditLogs.unshift({
+    id: generateId('aud'),
+    timestamp: new Date().toISOString(),
+    ...entry
+  });
+  if (store.platformConfig.adminAuditLogs.length > 100) {
+    store.platformConfig.adminAuditLogs = store.platformConfig.adminAuditLogs.slice(0, 100);
+  }
+}
 
 function sanitizeUser(user, store) {
   const seller = user.sellerId ? store.sellers.find((s) => s._id === user.sellerId) : null;
@@ -22,16 +80,22 @@ function sanitizeUser(user, store) {
   };
 }
 
-// POST /api/auth/login
+// POST /api/auth/login (Customer & Seller Storefront Login ONLY)
 router.post('/login', (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ message: 'Email and password are required.' });
   }
   const store = getStore();
-  const user = store.users.find((u) => u.email.toLowerCase() === String(email).toLowerCase().trim());
+  const normalizedEmail = String(email).toLowerCase().trim();
+  const user = store.users.find((u) => u.email.toLowerCase() === normalizedEmail);
   if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
     return res.status(401).json({ message: 'Invalid email or password.' });
+  }
+  if (user.role === 'admin') {
+    return res.status(403).json({
+      message: 'Administrator accounts must sign in through the dedicated Admin Console (/admin/login).'
+    });
   }
   if (!user.isActive) {
     return res.status(403).json({ message: 'This account has been deactivated.' });
@@ -40,6 +104,89 @@ router.post('/login', (req, res) => {
   const token = signToken(user);
   return res.json({
     token,
+    user: sanitizeUser(user, store)
+  });
+});
+
+// POST /api/auth/admin/login (Dedicated Gated Marketplace Admin Authentication)
+router.post('/admin/login', (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Administrator email and password are required.' });
+  }
+
+  const ip = getClientIp(req);
+  const userAgent = String(req.headers['user-agent'] || 'unknown').slice(0, 180);
+  const normalizedEmail = String(email).toLowerCase().trim();
+  const rateLimitKey = `${ip}:${normalizedEmail}`;
+
+  const ipStatus = checkAdminRateLimit(ip);
+  const accountStatus = checkAdminRateLimit(rateLimitKey);
+  if (ipStatus.locked || accountStatus.locked) {
+    const minutes = Math.max(ipStatus.minutesLeft || 1, accountStatus.minutesLeft || 1);
+    return res.status(429).json({
+      message: `Security Lockout: Too many failed administrator sign-in attempts. Please wait ${minutes} minute(s) before trying again.`
+    });
+  }
+
+  const store = getStore();
+  const user = store.users.find((u) => u.email.toLowerCase() === normalizedEmail);
+
+  if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
+    recordFailedAdminAttempt(ip);
+    const remaining = recordFailedAdminAttempt(rateLimitKey);
+    recordAdminAuditLog(store, {
+      event: 'ADMIN_LOGIN_FAILED',
+      email: normalizedEmail,
+      ip,
+      userAgent,
+      reason: 'Invalid credentials'
+    });
+    persistStore();
+    return res.status(401).json({
+      message:
+        remaining > 0
+          ? `Invalid administrator credentials. (${remaining} attempt${remaining === 1 ? '' : 's'} remaining before temporary lockout)`
+          : 'Security Lockout: Maximum failed attempts reached. Account locked for 15 minutes.'
+    });
+  }
+
+  if (user.role !== 'admin') {
+    recordFailedAdminAttempt(ip);
+    recordFailedAdminAttempt(rateLimitKey);
+    recordAdminAuditLog(store, {
+      event: 'ADMIN_LOGIN_FORBIDDEN_ROLE',
+      email: normalizedEmail,
+      roleAttempted: user.role,
+      ip,
+      userAgent,
+      reason: 'Non-admin account attempted Admin Console login'
+    });
+    persistStore();
+    return res.status(403).json({
+      message: 'Access denied. This portal is strictly restricted to Yaans.lk Marketplace Administrators.'
+    });
+  }
+
+  if (!user.isActive) {
+    return res.status(403).json({ message: 'This administrator account has been deactivated.' });
+  }
+
+  clearAdminFailedAttempts(ip);
+  clearAdminFailedAttempts(rateLimitKey);
+  recordAdminAuditLog(store, {
+    event: 'ADMIN_LOGIN_SUCCESS',
+    email: user.email,
+    adminId: user._id,
+    ip,
+    userAgent
+  });
+  persistStore();
+
+  const token = signAdminToken(user);
+  return res.json({
+    token,
+    sessionExpiresIn: '6h',
     user: sanitizeUser(user, store)
   });
 });

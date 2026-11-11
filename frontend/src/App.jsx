@@ -16,6 +16,7 @@ const TrackOrderPage = lazy(pageLoaders.tracking);
 const SellerStorefrontPage = lazy(pageLoaders.store);
 const SellerDashboardPage = lazy(pageLoaders.seller);
 const AdminDashboardPage = lazy(pageLoaders.admin);
+const AdminLoginPage = lazy(pageLoaders.adminLogin);
 const PrivacyPolicyPage = lazy(pageLoaders.privacy);
 const TermsConditionsPage = lazy(pageLoaders.terms);
 const CookiePolicyPage = lazy(pageLoaders.cookies);
@@ -87,6 +88,7 @@ export default function App() {
                 <Route path="/register" element={<RegisterCustomerPage />} />
                 <Route path="/seller/register" element={<SellerRegisterPage />} />
                 <Route path="/seller/dashboard" element={<SellerDashboardPage />} />
+                <Route path="/admin/login" element={<AdminLoginPage />} />
                 <Route path="/admin" element={<AdminDashboardPage />} />
                 <Route path="/account" element={<CustomerAccountPage />} />
                 <Route path="/wishlist" element={<WishlistPage />} />

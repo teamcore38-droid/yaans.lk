@@ -10,6 +10,7 @@ export const pageLoaders = {
   store: () => import('../pages/SellerStorefrontPage.jsx'),
   seller: () => import('../pages/SellerDashboardPage.jsx'),
   admin: () => import('../pages/AdminDashboardPage.jsx'),
+  adminLogin: () => import('../pages/AdminLoginPage.jsx'),
   account: () => import('../pages/AuthAccountPages.jsx'),
   privacy: () => import('../pages/PrivacyPolicyPage.jsx'),
   terms: () => import('../pages/TermsConditionsPage.jsx'),

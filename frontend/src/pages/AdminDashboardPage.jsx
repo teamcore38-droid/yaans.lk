@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import {
   ShieldCheck,
   Store,
@@ -273,29 +273,7 @@ export default function AdminDashboardPage() {
   }, [user, fetchOverview]);
 
   if (!user) {
-    return (
-      <div className="max-w-xl mx-auto px-4 py-16">
-        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-4 shadow-sm">
-          <div className="w-14 h-14 rounded-full bg-sky-50 border border-sky-200 flex items-center justify-center mx-auto text-sky-800">
-            <ShieldCheck className="w-7 h-7" />
-          </div>
-          <h1 className="text-xl font-extrabold text-slate-900">
-            Yaans.lk Admin Console Access
-          </h1>
-          <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
-            This dashboard is restricted to Yaans.lk Marketplace Administrators. Please sign in with your administrator credentials.
-          </p>
-          <div className="pt-2">
-            <Link
-              to="/login?redirect=/admin"
-              className="inline-flex items-center justify-center px-6 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm transition"
-            >
-              Sign In to Admin Console
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
+    return <Navigate to="/admin/login" replace />;
   }
 
   if (user.role !== 'admin') {
@@ -323,11 +301,11 @@ export default function AdminDashboardPage() {
               type="button"
               onClick={() => {
                 logout();
-                navigate('/login?redirect=/admin');
+                navigate('/admin/login');
               }}
               className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs"
             >
-              Sign In as Admin
+              Sign In to Admin Console
             </button>
           </div>
         </div>

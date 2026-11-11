@@ -30,10 +30,8 @@ export function LoginPage() {
       const searchParams = new URLSearchParams(window.location.search);
       const redirect = searchParams.get('redirect');
 
-      if (redirect && redirect.startsWith('/')) {
+      if (redirect && redirect.startsWith('/') && !redirect.startsWith('/admin')) {
         navigate(redirect);
-      } else if (loggedUser.role === 'admin') {
-        navigate('/admin');
       } else if (loggedUser.role === 'seller') {
         navigate('/seller/dashboard');
       } else {
@@ -57,7 +55,7 @@ export function LoginPage() {
           />
           <h1 className="text-lg font-extrabold text-slate-900">Sign In to Yaans.lk</h1>
           <p className="text-xs text-slate-500">
-            Enter your credentials to access your isolated account
+            Customer &amp; Seller Storefront Sign In
           </p>
         </div>
 

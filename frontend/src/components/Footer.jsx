@@ -96,7 +96,7 @@ export default function Footer() {
             <li><Link to="/track-order" className="hover:text-slate-900 font-semibold">Track Order (e.g., YLK-2026-1001)</Link></li>
             <li><Link to="/cart" className="hover:text-slate-900">Multi-Seller Shopping Cart</Link></li>
             <li><Link to="/account" className="hover:text-slate-900">Customer Account & Saved Addresses</Link></li>
-            <li><Link to="/admin" className="hover:text-slate-900">Marketplace Admin Portal</Link></li>
+            <li><Link to="/wishlist" className="hover:text-slate-900">Saved Wishlist Items</Link></li>
           </ul>
         </div>
 

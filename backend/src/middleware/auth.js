@@ -17,6 +17,19 @@ export function signToken(user) {
   );
 }
 
+export function signAdminToken(user) {
+  return jwt.sign(
+    {
+      id: user._id,
+      email: user.email,
+      role: 'admin',
+      isAdminSession: true
+    },
+    JWT_SECRET,
+    { expiresIn: '6h' }
+  );
+}
+
 export function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

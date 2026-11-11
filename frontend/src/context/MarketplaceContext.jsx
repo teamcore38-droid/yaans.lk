@@ -154,6 +154,18 @@ export function MarketplaceProvider({ children }) {
     return res.user;
   };
 
+  const adminLogin = async (email, password) => {
+    const res = await apiRequest('/auth/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
+    localStorage.setItem('yaans_token', res.token);
+    localStorage.setItem('yaans_user', JSON.stringify(res.user));
+    setUser(res.user);
+    showToast(`Signed in to Admin Console as ${res.user.name}`);
+    return res.user;
+  };
+
   const registerCustomer = async (payload) => {
     const res = await apiRequest('/auth/register-customer', {
       method: 'POST',
@@ -304,6 +316,7 @@ export function MarketplaceProvider({ children }) {
       value={{
         user,
         login,
+        adminLogin,
         registerCustomer,
         registerSeller,
         logout,

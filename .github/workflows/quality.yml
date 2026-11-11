@@ -15,7 +15,7 @@ concurrency:
 jobs:
   verify:
     name: Marketplace verification
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
@@ -37,9 +37,11 @@ jobs:
         with:
           path: ~/.cache/mongodb-binaries
           key: mongodb-test-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - name: Install Chromium for tests
-        run: npx playwright install --with-deps chromium
+      - name: Check preinstalled Chrome
+        run: google-chrome --version
       - name: Verify Node, React, MongoDB, build and browser journeys
+        env:
+          YAANS_TEST_BROWSER_CHANNEL: chrome
         run: npm run verify
       - name: Retain test reports and failure traces
         if: always()

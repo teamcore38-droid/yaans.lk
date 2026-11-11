@@ -13,7 +13,7 @@ npm --prefix frontend ci --include=dev
 npx playwright install chromium
 ```
 
-On Linux CI, install Chromium system dependencies with `npx playwright install --with-deps chromium`. The first integration/browser run downloads a pinned MongoDB 7.0.14 test binary into the user's cache; subsequent runs reuse it. The `mongodb-memory-server-core` dependency has no binary download hook during package installation. No MongoDB Atlas account, Cloudinary credentials, Docker installation, plugin, or MCP is needed.
+GitHub CI uses the Chrome already installed on its pinned Ubuntu 24.04 runner, selected with `YAANS_TEST_BROWSER_CHANNEL=chrome`. This avoids downloading browser packages and fonts through Ubuntu's package mirrors on every run. Local tests use Playwright's installed Chromium by default. On other Linux machines, install Chromium system dependencies with `npx playwright install --with-deps chromium`. The first integration/browser run downloads a pinned MongoDB 7.0.14 test binary into the user's cache; subsequent runs reuse it. The `mongodb-memory-server-core` dependency has no binary download hook during package installation. No MongoDB Atlas account, Cloudinary credentials, Docker installation, plugin, or MCP is needed.
 
 ## Commands and scope
 
@@ -53,7 +53,7 @@ This is initial regression coverage, not a claim that all production failure mod
 
 ## CI and required external release settings
 
-`.github/workflows/quality.yml` runs on every push, pull request, and manual dispatch. Its stable check name is **Marketplace verification**. It installs locked dependencies, installs Chromium, runs `npm run verify`, and retains browser reports, JUnit output and failure traces for 14 days. No production secrets are supplied to this workflow.
+`.github/workflows/quality.yml` runs on every push, pull request, and manual dispatch. Its stable check name is **Marketplace verification**. It installs locked dependencies, checks the preinstalled Chrome version, runs `npm run verify`, and retains browser reports, JUnit output and failure traces for 14 days. No production secrets are supplied to this workflow.
 
 Vercel now runs `npm run verify:deploy`, so Node/React failures fail the deployment build. Browser/MongoDB checks run in GitHub Actions rather than downloading browsers/database executables into each Vercel build. **A green Vercel build alone does not imply the full suite passed.**
 

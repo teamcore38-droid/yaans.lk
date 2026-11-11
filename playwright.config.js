@@ -17,6 +17,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }], ['junit', { outputFile: 'test-results/e2e.xml' }]],
   use: {
     baseURL: 'http://127.0.0.1:4173',
+    channel: process.env.YAANS_TEST_BROWSER_CHANNEL || undefined,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     serviceWorkers: 'block'

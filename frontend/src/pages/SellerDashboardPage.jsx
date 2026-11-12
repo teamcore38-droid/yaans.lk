@@ -1,3 +1,4 @@
+import OrderNotifications from '../components/OrderNotifications.jsx';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { fulfillmentTransitions } from '../../../shared/orderStatus.js';
@@ -662,6 +663,7 @@ export default function SellerDashboardPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 py-5 space-y-6">
+      <OrderNotifications key={user._id || user.id} onViewOrders={() => { setActiveTab('orders'); fetchDashboard(); }} />
       {/* Seller Top Header */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">

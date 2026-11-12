@@ -1,3 +1,4 @@
+import OrderNotifications from '../components/OrderNotifications.jsx';
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import {
@@ -195,6 +196,7 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 py-5 space-y-6">
+      <OrderNotifications key={user._id || user.id} onViewOrders={() => { setActiveTab('orders'); fetchOverview(); }} />
       {/* Admin Top Header */}
       <div className="bg-slate-900 text-white rounded-xl p-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div>

@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import { createHash, timingSafeEqual } from 'node:crypto';
 
 import { connectDatabase, pingDatabase } from './config/db.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import marketplaceRoutes from './routes/marketplaceRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
@@ -113,6 +114,7 @@ app.get('/api/operations/status', async (req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/seller', sellerRoutes);
 app.use('/api/admin', adminRoutes);
 

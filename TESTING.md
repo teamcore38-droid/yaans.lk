@@ -76,3 +76,11 @@ Vercel needs system Git metadata, the production database configuration and a se
 For an additional platform-level gate, select **Marketplace verification** in Vercel project **Build and Deployment → Deployment Checks**. This remains useful for manual/prebuilt deployments, which can bypass package build scripts. Do not Force Promote or manually publish a prebuilt artifact that has not passed the full suite. See [SECURITY-RELEASE.md](SECURITY-RELEASE.md) for the cutover procedure.
 
 References: [Vitest](https://vitest.dev/guide/), [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/), [Playwright CI](https://playwright.dev/docs/ci), [Vercel Deployment Checks](https://vercel.com/docs/deployment-checks), [MongoDB test server](https://typegoose.github.io/mongodb-memory-server/docs/guides/quick-start-guide/).
+
+## Order notifications
+
+New checkouts atomically save unread notifications for each active administrator and involved seller. Checkout replays do not create notifications. Sellers receive only their own package items and total; administrators receive the complete order summary, with independent read states. Existing orders are not backfilled. `/api/notifications` and the read action use existing session, role, CSRF and shared-rate-limit protections. Private responses are not cached.
+
+Dashboard notifications use a separate indexed query limited to 20 unread summaries, with an unread count. They poll every 30 seconds while visible, back off after failures, and stop on unmount. Opening the list does not mark notifications read; the explicit view action does and reloads orders. Optional sound defaults off per dashboard session and requires a user click. No customer contact information is copied into notification records. Notifications remain saved when the dashboard is closed; sound and alerts run only while it is open.
+
+Tests cover multi-seller privacy, access denial, replay deduplication, independent/idempotent reads, rollback on notification persistence failure, the indexed bounded query, visible polling/cleanup, errors, badges and desktop/mobile dashboard journeys. These checks do not establish hosted capacity or replace the required CI release gate.

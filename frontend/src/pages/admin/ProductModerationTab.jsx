@@ -710,13 +710,23 @@ export default function ProductModerationTab({
                 </div>
               </div>
 
-              {/* Category, Subcategory, Approval Status */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Category, Subcategory, Approval Status, Stock */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Marketplace Category *</label>
+                  <label htmlFor="admin-product-category" className="block font-bold text-slate-700 mb-1">Marketplace Category *</label>
                   <select
+                    id="admin-product-category"
                     value={adminProdForm.categorySlug}
-                    onChange={(e) => setAdminProdForm({ ...adminProdForm, categorySlug: e.target.value })}
+                    onChange={(e) => {
+                      const newCatSlug = e.target.value;
+                      const nextCat = categories?.find((c) => c.slug === newCatSlug);
+                      const subValid = nextCat?.subCategories?.some((s) => s.slug === adminProdForm.subCategorySlug);
+                      setAdminProdForm({
+                        ...adminProdForm,
+                        categorySlug: newCatSlug,
+                        subCategorySlug: subValid ? adminProdForm.subCategorySlug : ''
+                      });
+                    }}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-semibold"
                   >
                     {categories?.map((cat) => (
@@ -737,8 +747,26 @@ export default function ProductModerationTab({
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Listing Approval Status</label>
+                  <label htmlFor="admin-product-subcategory" className="block font-bold text-slate-700 mb-1">Subcategory / Tile</label>
                   <select
+                    id="admin-product-subcategory"
+                    value={adminProdForm.subCategorySlug}
+                    onChange={(e) => setAdminProdForm({ ...adminProdForm, subCategorySlug: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-semibold"
+                  >
+                    <option value="">None (General Category)</option>
+                    {(categories?.find((c) => c.slug === adminProdForm.categorySlug)?.subCategories || []).map((sub) => (
+                      <option key={sub.slug} value={sub.slug}>
+                        {sub.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="admin-product-approval-status" className="block font-bold text-slate-700 mb-1">Listing Approval Status</label>
+                  <select
+                    id="admin-product-approval-status"
                     value={adminProdForm.approvalStatus}
                     onChange={(e) => setAdminProdForm({ ...adminProdForm, approvalStatus: e.target.value })}
                     className={`w-full px-3 py-2 rounded-lg border font-bold ${
@@ -756,8 +784,9 @@ export default function ProductModerationTab({
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Available Stock Qty *</label>
+                  <label htmlFor="admin-product-stock" className="block font-bold text-slate-700 mb-1">Available Stock Qty *</label>
                   <input
+                    id="admin-product-stock"
                     type="number"
                     min="0"
                     required

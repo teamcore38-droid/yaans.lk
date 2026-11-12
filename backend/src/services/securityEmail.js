@@ -56,6 +56,7 @@ export async function queueEmailChangeNotice({ userId, to, newEmail, completed }
 }
 
 export async function flushSecurityEmailNotices(maximum = 3) {
+  if (process.env.MAINTENANCE_READ_ONLY === 'true') return { sent: 0 };
   await connectDatabase();
   const outbox = mongoose.connection.db.collection('securityemailoutbox');
   let sent = 0;

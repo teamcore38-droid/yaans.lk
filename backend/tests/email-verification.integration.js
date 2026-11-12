@@ -120,6 +120,9 @@ test('email ownership and identity changes with disposable MongoDB', {timeout:60
     await app.mongo.collection('securityemailoutbox').updateMany({},{$set:{nextAttemptAt:new Date(0),createdAt:new Date(Date.now()-20*60000)}});
     const {operationalStatus}=await import('../src/config/operations.js');assert.ok((await operationalStatus()).alerts.includes('security_email_delivery'));
     app.setEmailTransport(async message=>{app.mailbox.push(message);return {id:'test-retry'};});
+    process.env.MAINTENANCE_READ_ONLY='true';
+    try { assert.equal((await flushSecurityEmailNotices()).sent,0);assert.equal((await app.mongo.collection('securityemailoutbox').findOne({_id:notice._id})).attempts,1); }
+    finally { process.env.MAINTENANCE_READ_ONLY=''; }
     assert.equal((await flushSecurityEmailNotices()).sent,1);assert.ok(!(await operationalStatus()).alerts.includes('security_email_delivery'));
     const sent=await app.mongo.collection('securityemailoutbox').findOne({_id:notice._id});assert.ok(sent.sentAt);assert.equal(sent.to,undefined);assert.equal(sent.text,undefined);
   });

@@ -31,6 +31,8 @@ Old-address notices are queued in the same transaction as each change. The reque
 
 ## Verification
 
+Notification delivery and its queue writes pause during `MAINTENANCE_READ_ONLY=true`, including on protected previews configured for read-only access.
+
 `npm run verify` runs dependency advisories, Node checks, React behavior, disposable MongoDB API tests, production build and desktop/mobile Playwright journeys. CI also runs secret scanning and OWASP source rules. Email-specific cases cover proof before registration, seller atomicity, password confirmation, expired/reused/superseded tokens, competing claims, session revocation, legacy account access, MFA preservation, provider failures, staging recipient restrictions, quotas, durable retries and backup exclusion.
 
 Isolated tests erase inherited Resend credentials and replace delivery with a local mailbox. The mailbox inspector exists only in the test bootstrap and requires its per-run control secret; it is never mounted by the production server.

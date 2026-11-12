@@ -3,6 +3,11 @@ import mongoose from 'mongoose';
 const initializations = new WeakMap();
 export function ensureOperationalIndexes(db) {
   if (!initializations.has(db)) initializations.set(db, (async () => {
+    await db.collection('staffsessions').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, name: 'staff_session_expiry' });
+    await db.collection('staffsessions').createIndex({ userId: 1 }, { name: 'staff_session_user' });
+    await db.collection('users').createIndex({ role: 1, _id: 1 }, { name: 'staff_roster' });
+    await db.collection('users').createIndex({ role: 1, isActive: 1, _id: 1 }, { name: 'staff_accounts' });
+    await db.collection('orders').createIndex({ createdAt: -1, _id: -1 }, { name: 'staff_orders_recent' });
     await db.collection('ordernotifications').createIndex({ recipient: 1, readAt: 1, createdAt: -1, _id: -1 }, { name: 'order_notification_inbox' });
     await db.collection('ratelimits').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, name: 'rate_limit_expiry' });
     await db.collection('operationalmetrics').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, name: 'operational_metric_expiry' });

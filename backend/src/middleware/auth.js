@@ -1,3 +1,4 @@
+import { verifyStaffSession, STAFF_SESSION_SECONDS } from '../services/staffSessions.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { createHash } from 'node:crypto';
@@ -23,10 +24,12 @@ export function credentialsRevoked(user) {
   return typeof user?.passwordHash === 'string' && revokedCredentialDigests.has(createHash('sha256').update(user.passwordHash).digest('hex'));
 }
 
-export function signToken(user, csrf = newCsrfToken()) {
+export function signToken(user, csrf = newCsrfToken(), staffSessionId) {
   if (user.role === 'admin') return signAdminToken(user, csrf);
-  return jwt.sign({ id: user._id, version: 3, tokenVersion: user.tokenVersion || 0, csrf }, getJwtSecret(), {
-    algorithm: 'HS256', expiresIn: '24h', issuer: 'yaans.lk', audience: 'yaans.lk'
+  if (user.role === 'staff' && !staffSessionId) throw httpError(401, 'Staff session required.');
+  return jwt.sign({ id: user._id, version: 3, tokenVersion: user.tokenVersion || 0, csrf,
+    ...(user.role === 'staff' ? { isStaffSession: true, staffSessionId } : {}) }, getJwtSecret(), {
+    algorithm: 'HS256', expiresIn: user.role === 'staff' ? STAFF_SESSION_SECONDS : '24h', issuer: 'yaans.lk', audience: 'yaans.lk'
   });
 }
 
@@ -57,6 +60,7 @@ async function resolveAuthentication(req) {
       (user.role === 'admin' && (!decoded.isAdminSession || (user.adminMfa?.enabled && decoded.mfa !== true) || await usesDefaultAdminPassword(user)))) {
     throw httpError(401, 'User account not found, inactive, or session expired.');
   }
+  if (user.role === 'staff') await verifyStaffSession(decoded, user, req);
   req.user = user;
 }
 

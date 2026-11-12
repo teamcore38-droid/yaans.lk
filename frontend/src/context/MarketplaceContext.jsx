@@ -169,6 +169,16 @@ export function MarketplaceProvider({ children }) {
     return res;
   };
 
+  const clearSession = useCallback(() => {
+    localStorage.removeItem('yaans_user'); localStorage.removeItem('yaans_token');
+    invalidateCatalogCache(); setUser(null);
+  }, []);
+  const staffLogin = async (email, password) => {
+    const res = await apiRequest('/auth/staff/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+    localStorage.setItem('yaans_user', JSON.stringify(res.user)); setUser(res.user);
+    return res.user;
+  };
+
   const registerCustomer = async (payload) => {
     const res = await apiRequest('/auth/register-customer', {
       method: 'POST',
@@ -320,6 +330,8 @@ export function MarketplaceProvider({ children }) {
         user,
         login,
         adminLogin,
+        staffLogin,
+        clearSession,
         registerCustomer,
         registerSeller,
         logout,

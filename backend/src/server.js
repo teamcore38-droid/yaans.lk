@@ -1,3 +1,5 @@
+import staffRoutes from './routes/staffRoutes.js';
+import staffAdminRoutes from './routes/staffAdminRoutes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import express from 'express';
@@ -116,7 +118,9 @@ app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/seller', sellerRoutes);
+app.use('/api/admin/staff', staffAdminRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/staff', staffRoutes);
 
 // Global error handler
 app.use(async (err, _req, res, _next) => {

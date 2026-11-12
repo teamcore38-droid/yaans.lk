@@ -1,6 +1,8 @@
+import mongoose from 'mongoose';
+import { createStaffSession, touchStaffSession } from '../services/staffSessions.js';
 import { createRouter } from '../config/router.js';
 import bcrypt from 'bcryptjs';
-import { getStore, persistStore, generateId, idFilter } from '../config/db.js';
+import { getStore, persistStore, generateId, idFilter, withTransaction } from '../config/db.js';
 import { authenticate, signToken, getJwtSecret, usesDefaultAdminPassword, credentialsRevoked } from '../middleware/auth.js';
 import { recordAdminAuditLog } from '../config/auditLogger.js';
 import { loginIpLimit, loginAccountLimit, adminAccountLimit, sharedRateLimit } from '../middleware/sharedRateLimit.js';
@@ -22,6 +24,7 @@ function sanitizeUser(user, store) {
     email: user.email,
     phone: user.phone,
     role: user.role,
+    ...(user.role === 'staff' ? { staffMustChangePassword: Boolean(user.staffMustChangePassword) } : {}),
     ...(user.role === 'admin' ? { mfaEnabled:Boolean(user.adminMfa?.enabled) } : {}),
     sellerId: user.sellerId,
     sellerStatus: seller ? seller.status : null,
@@ -32,9 +35,9 @@ function sanitizeUser(user, store) {
   };
 }
 
-function issueSession(req,res,user,store,extra={},status=200) {
-  const csrf=newCsrfToken();const token=signToken(user,csrf);
-  setSessionCookies(res,token,csrf,user.role==='admin');
+async function issueSession(req,res,user,store,extra={},status=200) {
+  const csrf=newCsrfToken();const staffSessionId=user.role==='staff'?await createStaffSession(user):undefined;const token=signToken(user,csrf,staffSessionId);
+  setSessionCookies(res,token,csrf,user.role==='admin',user.role==='staff');
   return res.status(status).json({...(req.headers['x-yaans-client']==='browser'?{}:{token}),user:sanitizeUser(user,store),...extra});
 }
 
@@ -52,6 +55,7 @@ router.post('/login', loginIpLimit, loginAccountLimit, async (req, res) => {
     await recordSecurityEvent('login_failed',{identity:normalizedEmail,ip:req.ip,outcome:'denied'});
     return res.status(401).json({ message: 'Invalid email or password.' });
   }
+  if (user.role === 'staff') throw httpError(403, 'Staff accounts must use Staff Login (/staff/login).');
   if (user.role === 'admin') {
     return res.status(403).json({
       message: 'Administrator accounts must sign in through the dedicated Admin Console (/admin/login).'
@@ -64,6 +68,44 @@ router.post('/login', loginIpLimit, loginAccountLimit, async (req, res) => {
 
   await recordSecurityEvent('login_success',{userId:user._id,role:user.role,ip:req.ip});
   return issueSession(req,res,user,store);
+});
+
+router.post('/staff/login', loginIpLimit, sharedRateLimit('staff-login', 10, 15*60000, req => String(req.body.email || '').toLowerCase().trim()), async (req, res) => {
+  getJwtSecret();
+  const { email, password } = req.body;
+  if (!email || !password) throw httpError(400, 'Email and password are required.');
+  const store = await getStore({ users: { email: email.toLowerCase().trim() } });
+  const user = store.users[0];
+  if (!user || user.role !== 'staff' || user.isActive === false || credentialsRevoked(user) || !await bcrypt.compare(password, user.passwordHash)) {
+    await recordSecurityEvent('staff_login_failed', { identity: email, ip: req.ip, outcome: 'denied' });
+    throw httpError(401, 'Invalid staff credentials or inactive account.');
+  }
+  await recordSecurityEvent('staff_login_success', { userId: user._id, role: 'staff', ip: req.ip });
+  return issueSession(req, res, user, store, { sessionExpiresIn: '8h', inactivityMinutes: 30 });
+});
+router.post('/staff/activity', authenticate, sharedRateLimit('staff-activity', 20, 60000, req => req.user._id), async (req, res) => {
+  if (req.user.role !== 'staff') throw httpError(403, 'Staff access required.');
+  await touchStaffSession(req);
+  return res.json({ message: 'Activity recorded.' });
+});
+router.post('/staff/password', authenticate, sharedRateLimit('staff-password', 5, 15*60000, req => req.user._id), async (req, res) => {
+  if (req.user.role !== 'staff') throw httpError(403, 'Staff access required.');
+  if (!req.body.currentPassword || !await bcrypt.compare(req.body.currentPassword, req.user.passwordHash)) throw httpError(401, 'Current password is incorrect.');
+  validateNewPassword(req.body.newPassword);
+  if (await bcrypt.compare(req.body.newPassword, req.user.passwordHash)) throw httpError(400, 'Choose a different password.');
+  const passwordHash = await bcrypt.hash(req.body.newPassword, 12);
+  const user = await withTransaction(async session => {
+    const store = await getStore({ users: idFilter(req.user._id) }, { session });
+    const target = store.users[0];
+    if (target.passwordHash !== req.user.passwordHash || target.isActive === false) throw httpError(409, 'Account changed. Please sign in again.');
+    target.passwordHash = passwordHash; target.staffMustChangePassword = false;
+    target.tokenVersion = (target.tokenVersion || 0) + 1;
+    await persistStore(store);
+    await mongoose.connection.db.collection('staffsessions').deleteMany({ userId: target._id }, { session });
+    return target;
+  });
+  await recordSecurityEvent('staff_password_changed', { userId: user._id, role: 'staff', ip: req.ip });
+  return issueSession(req, res, user, { sellers: [] });
 });
 
 // POST /api/auth/admin/login (Dedicated Gated Marketplace Admin Authentication)

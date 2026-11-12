@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { apiRequest, formatLkr } from '../utils/api.js';
 
-export default function OrderNotifications({ onViewOrders }) {
+export default function OrderNotifications({ onViewOrders, onSessionExpired }) {
   const [inbox, setInbox] = useState({ notifications: [], unreadCount: 0 });
   const [open, setOpen] = useState(false);
   const [sound, setSound] = useState(false);
@@ -38,7 +38,8 @@ export default function OrderNotifications({ onViewOrders }) {
         seen.current = new Set(result.notifications.map(item => item._id));
         initialized.current = true;
         setInbox(result); setError(''); failures = 0;
-      } catch {
+      } catch (error) {
+        if (!stopped && onSessionExpired && [401, 403].includes(error.status)) { onSessionExpired(); return; }
         if (!stopped) setError('Notifications are unavailable. Retrying automatically.');
         failures++;
       } finally {
@@ -49,7 +50,7 @@ export default function OrderNotifications({ onViewOrders }) {
     const visible = () => { if (!document.hidden) poll(); };
     poll(); document.addEventListener('visibilitychange', visible);
     return () => { stopped = true; clearTimeout(timer); document.removeEventListener('visibilitychange', visible); };
-  }, []);
+  }, [onSessionExpired]);
   useEffect(() => () => { audio.current?.close().catch(() => {}); }, []);
 
   function toggleSound() {

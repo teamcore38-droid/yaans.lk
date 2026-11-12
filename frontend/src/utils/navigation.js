@@ -9,6 +9,8 @@ export const pageLoaders = {
   tracking: () => import('../pages/TrackOrderPage.jsx'),
   store: () => import('../pages/SellerStorefrontPage.jsx'),
   seller: () => import('../pages/SellerDashboardPage.jsx'),
+  staff: () => import('../pages/StaffDashboardPage.jsx'),
+  staffLogin: () => import('../pages/StaffLoginPage.jsx'),
   admin: () => import('../pages/AdminDashboardPage.jsx'),
   adminLogin: () => import('../pages/AdminLoginPage.jsx'),
   account: () => import('../pages/AuthAccountPages.jsx'),
@@ -47,7 +49,7 @@ export function prefetchPage(href) {
   } else {
     page = {
       '/cart': 'cart', '/checkout': 'checkout', '/track-order': 'tracking',
-      '/seller/dashboard': 'seller', '/admin': 'admin', '/login': 'account',
+      '/staff': 'staff', '/staff/login': 'staffLogin', '/seller/dashboard': 'seller', '/admin': 'admin', '/login': 'account',
       '/register': 'account', '/seller/register': 'account', '/account': 'account', '/wishlist': 'account',
       '/privacy': 'privacy', '/privacy-policy': 'privacy',
       '/terms': 'terms', '/terms-and-conditions': 'terms',

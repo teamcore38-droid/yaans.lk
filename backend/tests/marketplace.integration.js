@@ -78,10 +78,13 @@ test('marketplace API with disposable MongoDB', { timeout: 600000 }, async (t) =
   await t.test('customer registration normalizes emails and rejects duplicate/missing fields', async () => {
     const payload = { name: 'New Customer', email: 'NEW@TEST.INVALID', phone: '0771234567', password: TEST_PASSWORD };
     const result = await request('/auth/register-customer', { method: 'POST', body: payload });
-    assert.equal(result.status, 201);
-    assert.equal(result.data.user.email, 'new@test.invalid');
-    assert.equal(result.data.user.role, 'customer');
-    assert.equal(result.data.user.passwordHash, undefined);
+    assert.equal(result.status, 202);
+    assert.equal(result.data.user, undefined);
+    assert.equal(await app.mongo.collection('users').countDocuments({email:'new@test.invalid'}),0);
+    const verificationToken=app.mailbox.at(-1).text.match(/#token=([\w-]+)/)[1];
+    assert.equal((await request('/auth/verify-email',{method:'POST',body:{verificationToken,password:TEST_PASSWORD}})).status,200);
+    const confirmed=await app.mongo.collection('users').findOne({email:'new@test.invalid'});
+    assert.equal(confirmed.role,'customer');assert.ok(confirmed.emailVerifiedAt);
     assert.equal((await request('/auth/register-customer', { method: 'POST', body: { ...payload, email: 'new@test.invalid' } })).status, 409);
     assert.equal((await request('/auth/register-customer', { method: 'POST', body: {} })).status, 400);
   });

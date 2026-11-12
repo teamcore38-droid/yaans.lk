@@ -21,7 +21,7 @@ test('OWASP remediation with actual HTTP routes and isolated MongoDB',{timeout:1
     const payload={name:'Synthetic user',email:'new@test.invalid',phone:'0771234567',password:TEST_PASSWORD};
     for(const change of [{password:'a'},{password:'a'.repeat(73)},{name:{bad:true}},{email:{$ne:null}},{phone:['0771234567']}])assert.equal((await request('/auth/register-customer',{method:'POST',body:{...payload,...change}})).status,400);
     assert.equal(await app.mongo.collection('users').countDocuments({email:payload.email}),0);
-    assert.equal((await request('/auth/register-customer',{method:'POST',body:payload})).status,201);
+    assert.equal((await request('/auth/register-customer',{method:'POST',body:payload})).status,202);
     const token=await login();
     assert.equal((await request('/auth/update-credentials',{method:'PUT',token,body:{currentPassword:TEST_PASSWORD,newPassword:'short'}})).status,400);
     assert.equal((await request('/health')).status,200);
@@ -31,9 +31,14 @@ test('OWASP remediation with actual HTTP routes and isolated MongoDB',{timeout:1
     assert.equal((await request('/auth/profile',{method:'PUT',token,body:{email:'unverified@test.invalid'}})).status,400);
     assert.equal((await request('/auth/update-credentials',{method:'PUT',token,body:{newEmail:'changed@test.invalid'}})).status,400);
     const changed=await request('/auth/update-credentials',{method:'PUT',token,body:{newEmail:'changed@test.invalid',currentPassword:TEST_PASSWORD}});
-    assert.equal(changed.status,200);assert.equal(changed.data.user.email,'changed@test.invalid');
+    assert.equal(changed.status,200);assert.equal(changed.data.user.email,accounts.admin);
+    assert.equal(changed.data.user.pendingEmail,'changed@test.invalid');
+    assert.equal((await request('/auth/me',{token})).status,200);
+    const verificationToken=app.mailbox.find(message=>message.to==='changed@test.invalid').text.match(/#token=([\w-]+)/)[1];
+    const completed=await request('/auth/verify-email',{method:'POST',body:{verificationToken,password:TEST_PASSWORD}});
+    assert.equal(completed.status,200);assert.equal(completed.data.token,undefined);
     assert.equal((await request('/auth/me',{token})).status,401);
-    assert.equal((await request('/auth/me',{token:changed.data.token})).status,200);
+    assert.equal((await request('/auth/admin/login',{method:'POST',body:{email:'changed@test.invalid',password:TEST_PASSWORD}})).status,200);
   });
   await scenario('browser sessions are HttpOnly, reject CSRF, and logout revokes copied tokens',async()=>{
     const result=await request('/auth/login',{method:'POST',body:{email:accounts.customer,password:TEST_PASSWORD},headers:{'X-Yaans-Client':'browser'}});

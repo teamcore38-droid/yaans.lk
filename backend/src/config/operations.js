@@ -8,6 +8,9 @@ export function ensureOperationalIndexes(db) {
     await db.collection('securityevents').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, name: 'security_event_expiry' });
     await db.collection('securityevents').createIndex({ createdAt: -1 }, { name: 'security_event_recent' });
     await db.collection('authchallenges').createIndex({ expiresAt: 1 }, { expireAfterSeconds:0, name:'auth_challenge_expiry' });
+    await db.collection('emailchallenges').createIndex({ expiresAt: 1 }, { expireAfterSeconds:0, name:'email_challenge_expiry' });
+    await db.collection('securityemailoutbox').createIndex({ expiresAt: 1 }, { expireAfterSeconds:0, name:'security_email_expiry' });
+    await db.collection('securityemailoutbox').createIndex({ sentAt:1, nextAttemptAt:1, createdAt:1 }, { name:'security_email_retry' });
   })().catch((error) => { initializations.delete(db); throw error; }));
   return initializations.get(db);
 }
@@ -37,6 +40,8 @@ export async function operationalStatus() {
   ], { maxTimeMS: 3000 }).toArray();
   const securityCounts = Object.fromEntries(security.map(({ _id, count }) => [_id, count]));
   const alerts = [];
+  const pendingEmails = await mongoose.connection.db.collection('securityemailoutbox').countDocuments({ sentAt:{$exists:false}, createdAt:{$lt:new Date(Date.now()-15*60000)} }, { maxTimeMS:2000 });
+  if (pendingEmails) alerts.push('security_email_delivery');
   if ((counts.checkout_failure || 0) >= 3) alerts.push('checkout_failures');
   if ((counts.database_error || 0) >= 3) alerts.push('database_errors');
   if ((counts.server_error || 0) >= 5) alerts.push('server_errors');

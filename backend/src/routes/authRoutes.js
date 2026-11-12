@@ -3,12 +3,13 @@ import bcrypt from 'bcryptjs';
 import { getStore, persistStore, generateId, idFilter } from '../config/db.js';
 import { authenticate, signToken, getJwtSecret, usesDefaultAdminPassword, credentialsRevoked } from '../middleware/auth.js';
 import { recordAdminAuditLog } from '../config/auditLogger.js';
-import { loginIpLimit, loginAccountLimit, adminAccountLimit, sharedRateLimit } from '../middleware/sharedRateLimit.js';
+import { loginIpLimit, loginAccountLimit, adminAccountLimit, sharedRateLimit, consumeLimit } from '../middleware/sharedRateLimit.js';
 import { validateAuthBody, validateNewPassword } from '../config/inputValidation.js';
 import { setSessionCookies, clearSessionCookies, newCsrfToken } from '../config/sessionCookies.js';
 import { recordSecurityEvent } from '../config/securityEvents.js';
 import { beginMfaEnrollment, completeMfaEnrollment, createMfaChallenge, verifyMfaLogin } from '../services/adminMfa.js';
 import { httpError } from '../config/errors.js';
+import { beginRegistration, beginEmailChange, requestCurrentEmailVerification, confirmEmail } from '../services/emailVerification.js';
 
 const router = createRouter();
 router.use((_req,res,next)=>{res.set('Cache-Control','private, no-store');next();});
@@ -20,6 +21,8 @@ function sanitizeUser(user, store) {
     _id: user._id,
     name: user.name,
     email: user.email,
+    emailVerified: Boolean(user.emailVerifiedAt && user.verifiedEmail === user.email),
+    pendingEmail: user.pendingEmail || null,
     phone: user.phone,
     role: user.role,
     ...(user.role === 'admin' ? { mfaEnabled:Boolean(user.adminMfa?.enabled) } : {}),
@@ -157,7 +160,8 @@ router.post('/admin/mfa/confirm',authenticate,sharedRateLimit('mfa-confirmation'
 });
 
 // POST /api/auth/register-customer
-router.post('/register-customer', sharedRateLimit('registration', 10, 60 * 60000), async (req, res) => {
+const emailRecipientLimit = sharedRateLimit('email-recipient', 3, 60 * 60000, req => String(req.body?.newEmail || req.body?.email || req.user?.email || '').trim().toLowerCase());
+router.post('/register-customer', sharedRateLimit('registration', 10, 60 * 60000), emailRecipientLimit, async (req, res) => {
   getJwtSecret();
   const { name, email, phone, password, defaultDistrict = 'Colombo' } = req.body;
   if (!name || !email || !phone || !password) {
@@ -186,14 +190,11 @@ router.post('/register-customer', sharedRateLimit('registration', 10, 60 * 60000
     createdAt: new Date().toISOString()
   };
 
-  store.users.push(newUser);
-  await persistStore(store);
-
-  return issueSession(req,res,newUser,store,{},201);
+  return res.status(202).json(await beginRegistration(newUser));
 });
 
 // POST /api/auth/register-seller
-router.post('/register-seller', sharedRateLimit('registration', 10, 60 * 60000), async (req, res) => {
+router.post('/register-seller', sharedRateLimit('registration', 10, 60 * 60000), emailRecipientLimit, async (req, res) => {
   getJwtSecret();
   const {
     name,
@@ -288,14 +289,20 @@ router.post('/register-seller', sharedRateLimit('registration', 10, 60 * 60000),
     createdAt: new Date().toISOString()
   };
 
-  store.sellers.push(newSeller);
-  store.users.push(newUser);
-  await persistStore(store);
+  return res.status(202).json(await beginRegistration(newUser,newSeller));
+});
 
-  return issueSession(req,res,newUser,store,{
-    seller: newSeller,
-    message: 'Seller application submitted! Your store is now pending Yaans.lk Admin review.'
-  },201);
+router.post('/verify-email', sharedRateLimit('email-confirm-ip',20,15*60000),
+  sharedRateLimit('email-confirm-token',5,15*60000,req=>req.body?.verificationToken||''), async(req,res)=>{
+    const result=await confirmEmail(req.body.verificationToken,req.body.password);
+    await recordSecurityEvent(result.emailChanged?'email_changed':'email_verified',{ip:req.ip});
+    // An email link never creates an authenticated session or bypasses administrator MFA.
+    return res.json(result);
+  });
+
+router.post('/email-verification',authenticate,sharedRateLimit('email-request-account',3,60*60000,req=>req.user._id),emailRecipientLimit,async(req,res)=>{
+  if(!req.body.currentPassword||!await bcrypt.compare(req.body.currentPassword,req.user.passwordHash))throw httpError(401,'Current password is required.');
+  return res.json(await requestCurrentEmailVerification(req.user));
 });
 
 // GET /api/auth/me
@@ -330,7 +337,7 @@ router.put('/profile', authenticate, async (req, res) => {
 
 // PUT /api/auth/update-credentials
 // Allows updating username/email, password, name, phone with current password verification
-router.put('/update-credentials', authenticate, async (req, res) => {
+router.put('/update-credentials', authenticate, sharedRateLimit('credential-updates',10,60*60000,req=>req.user._id), async (req, res) => {
   const { currentPassword, newEmail, newPassword, newName, newPhone } = req.body;
   const store = await getStore({ users: { $or: [idFilter(req.user._id), { email: typeof newEmail === 'string' ? newEmail.toLowerCase().trim() : '' }] }, sellers: { _id: req.user.sellerId || null } });
   const user = store.users.find((u) => u._id === req.user._id);
@@ -356,14 +363,20 @@ router.put('/update-credentials', authenticate, async (req, res) => {
     if (existing) {
       return res.status(409).json({ message: 'Email / username is already in use by another account.' });
     }
-    user.email = trimmedEmail;
+    if(newPassword)throw httpError(400,'Change your password and email address in separate requests.');
+    // Recipient throttling is shared with registration and verification requests.
+    const limit=await consumeLimit('email-recipient',trimmedEmail,3,60*60000);
+    if(!limit.allowed){res.set('Retry-After',String(limit.retryAfter));throw httpError(429,'Too many email requests. Please wait and try again.');}
+    const pending=await beginEmailChange(user,trimmedEmail,{name:newName?.trim(),phone:newPhone?.trim()});
+    await recordSecurityEvent('email_change_requested',{userId:user._id,role:user.role,ip:req.ip});
+    return res.json({user:sanitizeUser(pending,store),requiresEmailVerification:true,message:'Check your new inbox for a confirmation link. Your current login email stays active until you confirm it.'});
   }
 
   if (newPassword) {
     validateNewPassword(newPassword);
     user.passwordHash = await bcrypt.hash(newPassword, user.role==='admin'?12:10);
   }
-  if(newPassword||(newEmail&&newEmail.trim().toLowerCase()!==req.user.email.toLowerCase()))user.tokenVersion=(user.tokenVersion||0)+1;
+  if(newPassword){user.tokenVersion=(user.tokenVersion||0)+1;user.pendingEmail=undefined;user.pendingEmailChallengeId=undefined;}
 
   if (newName && newName.trim()) user.name = newName.trim();
   if (newPhone !== undefined) user.phone = newPhone.trim();

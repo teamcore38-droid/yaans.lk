@@ -174,13 +174,8 @@ export function MarketplaceProvider({ children }) {
       method: 'POST',
       body: JSON.stringify(payload)
     });
-    localStorage.setItem('yaans_user', JSON.stringify(res.user));
-    setUser(res.user);
-    if (res.user.defaultDistrict) {
-      setSelectedDistrict(res.user.defaultDistrict);
-    }
-    showToast('Customer account created successfully!');
-    return res.user;
+    showToast(res.message);
+    return res;
   };
 
   const registerSeller = async (payload) => {
@@ -188,9 +183,7 @@ export function MarketplaceProvider({ children }) {
       method: 'POST',
       body: JSON.stringify(payload)
     });
-    localStorage.setItem('yaans_user', JSON.stringify(res.user));
-    setUser(res.user);
-    showToast('Seller application submitted for Admin review!');
+    showToast(res.message);
     return res;
   };
 
@@ -204,10 +197,15 @@ export function MarketplaceProvider({ children }) {
   };
 
   const refreshUser = async () => {
-    const res = await apiRequest('/auth/me');
-    setUser(res.user);
-    localStorage.setItem('yaans_user', JSON.stringify(res.user));
-    return res.user;
+    try {
+      const res = await apiRequest('/auth/me');
+      setUser(res.user);
+      localStorage.setItem('yaans_user', JSON.stringify(res.user));
+      return res.user;
+    } catch(error) {
+      if(error.status===401){localStorage.removeItem('yaans_user');setUser(null);}
+      throw error;
+    }
   };
 
   const addToCart = (product, variantLabel = null, quantity = 1) => {

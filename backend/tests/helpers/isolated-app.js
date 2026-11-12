@@ -23,7 +23,8 @@ export async function startIsolatedApp(port = 0, { monitorCommands = false } = {
     JWT_SECRET: 'yaans-automated-tests-only-secret-32chars',
     MFA_ENCRYPTION_KEY: Buffer.alloc(32,7).toString('base64'),
     MONGODB_DB_NAME: 'yaans_automated_test', USE_EXTERNAL_MONGO: 'true',
-    CLOUDINARY_URL: '', CLOUDINARY_CLOUD_NAME: '', CLOUDINARY_API_KEY: '', CLOUDINARY_API_SECRET: ''
+    CLOUDINARY_URL: '', CLOUDINARY_CLOUD_NAME: '', CLOUDINARY_API_KEY: '', CLOUDINARY_API_SECRET: '',
+    RESEND_API_KEY:'', RESEND_EMAIL_DOMAIN:'', EMAIL_ALLOWED_RECIPIENTS:''
   };
   const previous = Object.fromEntries([...Object.keys(overrides), 'MONGODB_URI'].map((key) => [key, process.env[key]]));
   try {
@@ -36,6 +37,9 @@ export async function startIsolatedApp(port = 0, { monitorCommands = false } = {
     process.env.MONGODB_URI = mongo.getUri();
     const { default: app } = await import('../../src/server.js');
     const db = await import('../../src/config/db.js');
+    const mailbox=[];
+    const {setSecurityEmailTestTransport}=await import('../../src/services/securityEmail.js');
+    setSecurityEmailTestTransport(async message=>{mailbox.push(message);return {id:`isolated-email-${mailbox.length}`};});
     const originalConnect = mongoose.connect;
     try {
       if (monitorCommands) mongoose.connect = (uri, options) => originalConnect.call(mongoose, uri, { ...options, monitorCommands: true });
@@ -58,6 +62,8 @@ export async function startIsolatedApp(port = 0, { monitorCommands = false } = {
       db,
       mongo: mongoose.connection.db,
       mongoUri: mongo.getUri(),
+      mailbox,
+      setEmailTransport:setSecurityEmailTestTransport,
       async reset() {
         assert.match(process.env.MONGODB_URI, /^mongodb:\/\/127\.0\.0\.1:/);
         assert.equal(mongoose.connection.name, overrides.MONGODB_DB_NAME);
@@ -67,7 +73,8 @@ export async function startIsolatedApp(port = 0, { monitorCommands = false } = {
           const values = key === 'platformConfig' ? [{ ...fixtures.platformConfig, key: 'main_config' }] : fixtures[key];
           if (values.length) await model.collection.insertMany(values);
         }
-        for (const name of ['counters', 'checkoutrequests', 'cashmovements', 'ratelimits', 'operationalmetrics', 'authchallenges', 'securityevents', 'reviewclaims']) await mongoose.connection.db.collection(name).deleteMany({});
+        for (const name of ['counters', 'checkoutrequests', 'cashmovements', 'ratelimits', 'operationalmetrics', 'authchallenges', 'emailchallenges','securityemailoutbox','securityevents', 'reviewclaims']) await mongoose.connection.db.collection(name).deleteMany({});
+        mailbox.length=0;
       },
       async close() {
         await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

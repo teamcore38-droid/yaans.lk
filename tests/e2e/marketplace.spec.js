@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs/promises';
 import { accounts, TEST_PASSWORD, shippingAddress } from '../support/fixtures.js';
 
 let browserErrors;
@@ -16,6 +17,33 @@ test.beforeEach(async ({ context, page }) => {
   });
 });
 test.afterEach(() => expect(browserErrors).toEqual([]));
+
+test('new customer confirms an emailed link before signing in',async({page,request})=>{
+  const email=`verified-${randomUUID()}@test.invalid`;
+  await page.goto('/register');
+  await page.getByPlaceholder('e.g., Dilshan Silva').fill('Verified Customer');
+  await page.getByPlaceholder('077 123 4567').fill('0771234567');
+  await page.getByPlaceholder('dilshan@example.com').fill(email);
+  await page.getByPlaceholder('Minimum 15 characters').fill(TEST_PASSWORD);
+  const response=page.waitForResponse(r=>r.url().endsWith('/api/auth/register-customer')&&r.request().method()==='POST');
+  await page.getByRole('button',{name:'Create Customer Account',exact:true}).click();
+  const started=await response;expect(started.status()).toBe(202);expect((await started.json()).token).toBeUndefined();
+  await expect(page.getByRole('status')).toContainText('Check your inbox');
+  const {controlSecret}=JSON.parse(await fs.readFile(new URL('../../test-results/api-state.json',import.meta.url),'utf8'));
+  const inbox=await request.get('http://127.0.0.1:5179/__test/mailbox',{headers:{'x-yaans-test-control':controlSecret}});
+  const message=(await inbox.json()).messages.findLast(item=>item.to===email);
+  const token=message.text.match(/#token=([\w-]+)/)[1];
+  await page.goto('/verify-email#token='+token);
+  await expect(page.getByLabel('Your Yaans.lk password')).toBeVisible();
+  await expect(page).toHaveURL(/\/verify-email$/);
+  expect(await page.evaluate(()=>localStorage.getItem('yaans_user'))).toBeNull();
+  await page.getByLabel('Your Yaans.lk password').fill(TEST_PASSWORD);
+  await page.getByRole('button',{name:'Confirm email address'}).click();
+  await expect(page.getByRole('status')).toContainText('Email verified and account created');
+  await page.getByRole('link',{name:'Continue to sign in'}).click();await login(page,email);
+  await expect(page).toHaveURL(/\/account$/);
+  await expect(page.getByText(`${email} — Verified`,{exact:true})).toBeVisible();
+});
 
 async function login(page, email, admin = false) {
   await page.goto(admin ? '/admin/login' : '/login');

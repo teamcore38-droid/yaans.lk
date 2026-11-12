@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { apiRequest } from '../../utils/api.js';
 import AdminMfaSettings from './AdminMfaSettings.jsx';
+import EmailSecuritySettings from '../../components/EmailSecuritySettings.jsx';
 
 export default function AdminAccountTab({ user, refreshUser, showToast }) {
   const [adminProfileForm, setAdminProfileForm] = useState({
@@ -65,7 +66,7 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
       localStorage.setItem('yaans_user', JSON.stringify(res.user));
       await refreshUser();
       setAdminProfileForm((prev) => ({ ...prev, currentPasswordForEmail: '' }));
-      showToast('Admin profile and username updated successfully!');
+      showToast(res.message);
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -113,6 +114,7 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
 
   return (
     <div className="space-y-6">
+      <EmailSecuritySettings user={user} refreshUser={refreshUser} allowChange={false} />
       {/* Admin Identity Card */}
       <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-200">
@@ -295,7 +297,7 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
                   onChange={(e) =>
                     setAdminPasswordForm({ ...adminPasswordForm, newPassword: e.target.value })
                   }
-                  placeholder="Minimum 6 characters"
+                  placeholder="Minimum 15 characters"
                   className="w-full pl-3 pr-10 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />
                 <button

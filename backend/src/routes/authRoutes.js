@@ -24,7 +24,7 @@ function sanitizeUser(user, store) {
     email: user.email,
     phone: user.phone,
     role: user.role,
-    ...(user.role === 'staff' ? { staffMustChangePassword: Boolean(user.staffMustChangePassword) } : {}),
+    ...(user.role === 'staff' ? { staffMustChangePassword: Boolean(user.staffMustChangePassword), canEditProducts: user.canEditProducts === true } : {}),
     ...(user.role === 'admin' ? { mfaEnabled:Boolean(user.adminMfa?.enabled) } : {}),
     sellerId: user.sellerId,
     sellerStatus: seller ? seller.status : null,

@@ -1,0 +1,41 @@
+import React from 'react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
+import { test, expect, vi } from 'vitest';
+import StaffProducts from '../../src/pages/staff/StaffProducts.jsx';
+import StaffManagementTab from '../../src/pages/admin/StaffManagementTab.jsx';
+import { apiRequest } from '../../src/utils/api.js';
+vi.mock('../../src/utils/api.js',async original=>({...await original(),apiRequest:vi.fn()}));
+const product={_id:'p1',title:'Product One',sellerName:'Seller One',sku:'SKU1',description:'Description',categorySlug:'food',subCategorySlug:'',highlights:['First','Second'],priceLkr:100,compareAtPriceLkr:null,stock:5,images:['/brand/image.png'],variants:[],revision:'a'.repeat(64)};
+test('staff editor loads on demand, preserves revision and invalidates its form after successful save',async()=>{
+  apiRequest.mockImplementation(async(endpoint,options)=> options?.method==='PUT'?{message:'Product updated.'}:endpoint==='/staff/products/p1'?{product,categories:[{slug:'food',name:'Food'}]}:{products:[product],nextCursor:null});
+  render(<StaffProducts expire={vi.fn()}/>);const user=userEvent.setup();
+  await user.click(await screen.findByRole('button',{name:'Edit Product One'}));
+  const form=await screen.findByRole('form',{name:'Edit seller product'});
+  expect(within(form).getByLabelText('Highlights (one per line)')).toHaveValue('First\nSecond');
+  await user.clear(within(form).getByLabelText('Product title'));await user.type(within(form).getByLabelText('Product title'),'Updated product');
+  await user.click(within(form).getByRole('button',{name:'Save product changes'}));
+  expect(await screen.findByRole('status')).toHaveTextContent('Product updated');
+  const [,options]=apiRequest.mock.calls.find(([,options])=>options?.method==='PUT');
+  expect(JSON.parse(options.body)).toMatchObject({title:'Updated product',revision:product.revision,stock:5});
+  expect(JSON.parse(options.body).sellerName).toBeUndefined();
+  expect(screen.queryByRole('form')).not.toBeInTheDocument();
+});
+test('server conflicts remain visible and do not discard unsaved product changes',async()=>{
+  apiRequest.mockImplementation(async(endpoint,options)=>{if(options?.method==='PUT')throw Object.assign(new Error('Product or inventory changed. Reload before saving.'),{status:409});return endpoint.endsWith('/p1')?{product,categories:[]}:{products:[product]};});
+  render(<StaffProducts expire={vi.fn()}/>);const user=userEvent.setup();
+  await user.click(await screen.findByRole('button',{name:'Edit Product One'}));
+  await user.click(within(await screen.findByRole('form')).getByRole('button',{name:'Save product changes'}));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Reload before saving');expect(screen.getByRole('form')).toBeInTheDocument();
+});
+test('administrator product permission changes require explicit password confirmation',async()=>{
+  apiRequest.mockResolvedValue({staff:[{_id:'s1',name:'Staff One',email:'staff@test.invalid',isActive:true,canEditProducts:false}]});
+  render(<MemoryRouter><StaffManagementTab/></MemoryRouter>);const user=userEvent.setup();
+  await user.click(await screen.findByRole('button',{name:'Allow product editing'}));
+  expect(apiRequest.mock.calls.some(([,options])=>options?.method==='PATCH')).toBe(false);
+  await user.type(screen.getByLabelText('Confirm with your administrator password'),'Admin-password!12345');
+  await user.click(screen.getByRole('button',{name:'Confirm staff change'}));
+  await waitFor(()=>expect(apiRequest).toHaveBeenCalledWith('/admin/staff/s1/product-permission',expect.objectContaining({method:'PATCH'})));
+  const [,options]=apiRequest.mock.calls.find(([,options])=>options?.method==='PATCH');expect(JSON.parse(options.body).canEditProducts).toBe(true);
+});

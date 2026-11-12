@@ -29,6 +29,7 @@ const UserSchema = new Schema(
     adminMfa: { type:Schema.Types.Mixed, default:null, select:false },
     adminMfaPending: { type:Schema.Types.Mixed, default:null, select:false },
     role: { type: String, enum: ['customer', 'seller', 'admin', 'staff'], default: 'customer' },
+    canEditProducts: { type: Boolean, default: false },
     staffMustChangePassword: { type: Boolean, default: false },
     sellerId: { type: String, default: null },
     defaultDistrict: { type: String, default: 'Colombo' },

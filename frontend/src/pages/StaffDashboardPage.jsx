@@ -1,8 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useMarketplace } from '../context/MarketplaceContext.jsx';
 import { apiRequest, formatLkr } from '../utils/api.js';
 import OrderNotifications from '../components/OrderNotifications.jsx';
+
+const StaffProducts = lazy(() => import('./staff/StaffProducts.jsx'));
 
 function PasswordSetup({ refreshUser, temporary = true, onDone }) {
   const [currentPassword, setCurrent] = useState(''), [newPassword, setNew] = useState(''), [confirmation, setConfirmation] = useState('');
@@ -25,7 +27,8 @@ function PasswordSetup({ refreshUser, temporary = true, onDone }) {
     <button disabled={busy} className="bg-slate-900 text-white rounded px-4 py-2">Save staff password</button>
   </form>;
 }
-function OrderMonitor({ expire }) {
+function OrderMonitor({ expire, canEditProducts }) {
+  const [productsOpen, setProductsOpen] = useState(false);
   const [data, setData] = useState({ orders: [], nextCursor: null }), [selected, setSelected] = useState(null);
   const [error, setError] = useState(''), [loading, setLoading] = useState(false);
   const requestVersion = useRef(0), detailVersion = useRef(0), alive = useRef(true);
@@ -64,7 +67,9 @@ function OrderMonitor({ expire }) {
     catch (error) { if (alive.current && version === detailVersion.current) fail(error); }
   }
   return <>
-    <OrderNotifications onViewOrders={() => load()} onSessionExpired={expire} />
+    <OrderNotifications onViewOrders={() => { setProductsOpen(false); load(); }} onSessionExpired={expire} />
+    {canEditProducts && <div className="flex gap-4"><button onClick={() => setProductsOpen(false)}>Orders</button><button onClick={() => setProductsOpen(true)}>Products</button></div>}
+    {productsOpen && canEditProducts ? <Suspense fallback={<p>Loading products...</p>}><StaffProducts expire={expire} /></Suspense> : <div className="space-y-4">
     <div className="flex flex-wrap gap-3"><button onClick={() => load()} disabled={loading} className="border rounded px-3 py-2 bg-white">Refresh latest orders</button>
       {data.nextCursor && <button onClick={() => load(data.nextCursor)} disabled={loading} className="border rounded px-3 py-2 bg-white">Older orders</button>}</div>
     {error && <p role="alert" className="text-red-700">{error}</p>}
@@ -82,6 +87,7 @@ function OrderMonitor({ expire }) {
       {selected.shippingAddress.deliveryNotes && <p>{selected.shippingAddress.deliveryNotes}</p>}
       {selected.packages.map(sub => <article key={sub._id} className="border-t pt-3"><h3 className="font-bold">{sub.subOrderNumber} · {sub.sellerName}</h3><p>{sub.fulfillmentStatus} · {sub.courierPartner} {sub.trackingCode}</p><ul>{sub.items.map((item, index) => <li key={index}>{item.title} × {item.quantity} ({item.variantLabel})</li>)}</ul></article>)}
     </section>}
+    </div>}
   </>;
 }
 export default function StaffDashboardPage() {
@@ -94,6 +100,6 @@ export default function StaffDashboardPage() {
   return <div className="max-w-6xl mx-auto px-4 py-6 space-y-5"><h1 className="text-2xl font-bold">Staff Dashboard</h1>
     <p className="text-sm text-slate-600">Order monitoring · {user.name} · 8-hour maximum session · Locks after 30 minutes without activity. Notifications update while this dashboard is open.</p>
     {!user.staffMustChangePassword && <button className="underline" onClick={() => setChangingPassword(value => !value)}>{changingPassword ? 'Back to orders' : 'Change password'}</button>}
-    {user.staffMustChangePassword || changingPassword ? <PasswordSetup refreshUser={refreshUser} temporary={Boolean(user.staffMustChangePassword)} onDone={() => setChangingPassword(false)} /> : <OrderMonitor key={user._id} expire={expire} />}
+    {user.staffMustChangePassword || changingPassword ? <PasswordSetup refreshUser={refreshUser} temporary={Boolean(user.staffMustChangePassword)} onDone={() => setChangingPassword(false)} /> : <OrderMonitor key={user._id} expire={expire} canEditProducts={user.canEditProducts} />}
   </div>;
 }

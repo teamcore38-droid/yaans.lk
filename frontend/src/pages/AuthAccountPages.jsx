@@ -28,7 +28,7 @@ export function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const cleanEmail = email.trim().toLowerCase();
-    const cleanPassword = password.trim();
+    const cleanPassword = password;
 
     if (!cleanEmail || !cleanPassword) {
       showToast('Please enter both email and password.', 'error');
@@ -146,14 +146,14 @@ export function RegisterCustomerPage() {
     const cleanName = name.trim();
     const cleanEmail = email.trim().toLowerCase();
     const cleanPhone = phone.trim();
-    const cleanPassword = password.trim();
+    const cleanPassword = password;
 
     if (!cleanName || !cleanEmail || !cleanPhone || !cleanPassword) {
       showToast('Please fill out all required fields.', 'error');
       return;
     }
-    if (cleanPassword.length < 6) {
-      showToast('Password must be at least 6 characters.', 'error');
+    if (cleanPassword.length < 15) {
+      showToast('Password must be at least 15 characters.', 'error');
       return;
     }
 
@@ -233,7 +233,7 @@ export function RegisterCustomerPage() {
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
-                minLength={6}
+                minLength={15}
                 autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -249,7 +249,7 @@ export function RegisterCustomerPage() {
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">Must be at least 6 characters</p>
+            <p className="text-[11px] text-slate-400 mt-1">Must be at least 15 characters</p>
           </div>
           <button
             type="submit"
@@ -307,7 +307,7 @@ export function SellerRegisterPage() {
       name: form.name.trim(),
       email: form.email.trim().toLowerCase(),
       phone: form.phone.trim(),
-      password: form.password.trim(),
+      password: form.password,
       storeName: form.storeName.trim(),
       city: form.city.trim(),
       businessAddress: form.businessAddress.trim(),
@@ -322,8 +322,8 @@ export function SellerRegisterPage() {
       showToast('Please fill out all required store details.', 'error');
       return;
     }
-    if (cleanForm.password.length < 6) {
-      showToast('Password must be at least 6 characters.', 'error');
+    if (cleanForm.password.length < 15) {
+      showToast('Password must be at least 15 characters.', 'error');
       return;
     }
 
@@ -400,11 +400,11 @@ export function SellerRegisterPage() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
-                  minLength={6}
+                  minLength={15}
                   autoComplete="new-password"
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  placeholder="Create a strong password (min 6)"
+                  placeholder="Create a strong password (min 15)"
                   className="w-full pl-3 pr-10 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />
                 <button
@@ -416,7 +416,7 @@ export function SellerRegisterPage() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Must be at least 6 characters</p>
+              <p className="text-[11px] text-slate-400 mt-1">Must be at least 15 characters</p>
             </div>
           </div>
 
@@ -661,9 +661,9 @@ export function CustomerAccountPage() {
 
   const handleUpdateCustPassword = async (e) => {
     e.preventDefault();
-    const currentPassword = custPasswordForm.currentPassword.trim();
-    const newPassword = custPasswordForm.newPassword.trim();
-    const confirmPassword = custPasswordForm.confirmPassword.trim();
+    const currentPassword = custPasswordForm.currentPassword;
+    const newPassword = custPasswordForm.newPassword;
+    const confirmPassword = custPasswordForm.confirmPassword;
 
     if (!currentPassword) {
       showToast('Current password is required.', 'error');
@@ -673,8 +673,8 @@ export function CustomerAccountPage() {
       showToast('New passwords do not match.', 'error');
       return;
     }
-    if (newPassword.length < 6) {
-      showToast('Password must be at least 6 characters.', 'error');
+    if (newPassword.length < 15) {
+      showToast('Password must be at least 15 characters.', 'error');
       return;
     }
     try {
@@ -882,9 +882,9 @@ export function CustomerAccountPage() {
                   <input
                     type={showNewPassword ? 'text' : 'password'}
                     required
-                    minLength={6}
+                    minLength={15}
                     autoComplete="new-password"
-                    placeholder="New password (min 6)"
+                    placeholder="New password (min 15)"
                     value={custPasswordForm.newPassword}
                     onChange={(e) =>
                       setCustPasswordForm({ ...custPasswordForm, newPassword: e.target.value })
@@ -905,7 +905,7 @@ export function CustomerAccountPage() {
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
                     required
-                    minLength={6}
+                    minLength={15}
                     autoComplete="new-password"
                     placeholder="Confirm password"
                     value={custPasswordForm.confirmPassword}

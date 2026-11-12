@@ -30,3 +30,9 @@ test('network or readiness failures are visible and unknown response details are
 test('monitor rejects insecure origins and URL paths before sending its authentication token', async () => {
   for (const origin of ['http://yaans.lk', 'https://yaans.lk/private']) await assert.rejects(checkOperations({ ...configuration, origin, fetchImpl: responses() }));
 });
+
+test('monitor forwards only bounded security alert names', async () => {
+  const result = await checkOperations({ ...configuration, fetchImpl: responses({ operations: { alerts: ['admin_authentication_failures', 'login_failures', 'access_denials'] } }) });
+  assert.equal(result.status, 'alert');
+  assert.deepEqual(result.alerts, ['admin_authentication_failures', 'login_failures', 'access_denials'].map(name => `Application alert: ${name}`));
+});

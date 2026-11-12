@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import mongoose from 'mongoose';
 
-const transient = new Set(['ratelimits', 'operationalmetrics', '_restorecontrol']);
+const transient = new Set(['ratelimits', 'operationalmetrics', 'authchallenges', '_restorecontrol']);
 const ejson = mongoose.mongo.BSON.EJSON;
 const validName = (name) => /^[a-zA-Z][a-zA-Z0-9_]*$/.test(name) && !transient.has(name);
 const digest = (docs) => createHash('sha256').update(ejson.stringify([...docs].sort((a, b) => ejson.stringify(a._id, { relaxed: false }).localeCompare(ejson.stringify(b._id, { relaxed: false }))), { relaxed: false })).digest('hex');

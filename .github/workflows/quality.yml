@@ -18,8 +18,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -33,19 +36,31 @@ jobs:
           npm --prefix backend ci --no-audit --no-fund
           npm --prefix frontend ci --include=dev --no-audit --no-fund
       - name: Cache MongoDB test binary
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/mongodb-binaries
           key: mongodb-test-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Check preinstalled Chrome
         run: google-chrome --version
+      - name: Verify redacted secret scanning with a checksum-pinned tool
+        run: |
+          curl --fail --silent --show-error --location --retry 3 https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz --output "$RUNNER_TEMP/gitleaks.tar.gz"
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/gitleaks"
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP/gitleaks"
+          "$RUNNER_TEMP/gitleaks/gitleaks" git . --log-opts="--all" --redact=100 --no-banner --log-level=warn
+      - name: Check OWASP source rules without sending code or telemetry
+        run: |
+          python3 -m venv "$RUNNER_TEMP/semgrep"
+          "$RUNNER_TEMP/semgrep/bin/pip" install --disable-pip-version-check 'semgrep==1.185.0'
+          "$RUNNER_TEMP/semgrep/bin/semgrep" scan --oss-only --config p/owasp-top-ten --metrics off --disable-version-check --severity ERROR --error --exclude deploy/aws --exclude reports --exclude frontend/dist .
       - name: Verify Node, React, MongoDB, build and browser journeys
         env:
           YAANS_TEST_BROWSER_CHANNEL: chrome
         run: npm run verify
       - name: Retain test reports and failure traces
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: marketplace-test-reports
           path: |

@@ -59,6 +59,12 @@ The capacity phase now adds bounded-query regressions and a separate disposable 
 
 ## CI and required external release settings
 
+`npm run test:security` checks all three lockfiles using both npm advisories and OSV. Only public package names and versions are sent to the advisory feeds; an unavailable or incomplete feed fails verification. It is part of `npm run verify`, together with 42 Node, 37 React, 68 API and 20 desktop/mobile browser checks at the OWASP remediation baseline.
+
+The security regressions exercise malformed account inputs and password policy, identity-change reauthentication/revocation, HttpOnly cookies and CSRF, server-side sign-out, CORS, all banner-write aliases, fake/oversized/nested uploads, approved-seller upload authorization, purchase-backed reviews, TOTP/recovery-code replay and shared attempt limits, durable redacted security events, security alert names and shortened backup tags. Vite preview applies the deployment browser policy in local journeys; only the HTTPS-upgrade directive is omitted for HTTP loopback. A browser regression confirms that inline script injection is blocked.
+
+CI also runs checksum-verified Gitleaks against Git history and Semgrep OWASP rules. Actions are pinned to reviewed commit SHAs. The Gitleaks allowlist is limited to the explicitly rejected demonstration JWT constant. Semgrep's ERROR findings block CI; warnings and incomplete parsing still require human review. Scan output is not proof that the entire application is vulnerability-free. Tests and scanners run during development/CI, not customer requests.
+
 `.github/workflows/quality.yml` runs on every push, pull request, and manual dispatch. Its stable check name is **Marketplace verification**. It installs locked dependencies, checks the preinstalled Chrome version, runs `npm run verify`, and retains browser reports, JUnit output and failure traces for 14 days. No production secrets are supplied to this workflow.
 
 Vercel now runs `npm run verify:deploy`, so Node/React failures fail the deployment build. Browser/MongoDB checks run in GitHub Actions rather than downloading browsers/database executables into each Vercel build. **A green Vercel build alone does not imply the full suite passed.**

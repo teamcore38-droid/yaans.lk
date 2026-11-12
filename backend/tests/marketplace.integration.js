@@ -100,12 +100,12 @@ test('marketplace API with disposable MongoDB', { timeout: 600000 }, async (t) =
   });
 
   await t.test('credential changes require the current password and never expose hashes', async () => {
-    assert.equal((await request('/auth/update-credentials', { method: 'PUT', token: customerToken, body: { newPassword: 'Different@123' } })).status, 400);
-    assert.equal((await request('/auth/update-credentials', { method: 'PUT', token: customerToken, body: { currentPassword: 'wrong', newPassword: 'Different@123' } })).status, 401);
-    const result = await request('/auth/update-credentials', { method: 'PUT', token: customerToken, body: { currentPassword: TEST_PASSWORD, newPassword: 'Different@123' } });
+    assert.equal((await request('/auth/update-credentials', { method: 'PUT', token: customerToken, body: { newPassword: 'Different@123-passphrase!' } })).status, 400);
+    assert.equal((await request('/auth/update-credentials', { method: 'PUT', token: customerToken, body: { currentPassword: 'wrong', newPassword: 'Different@123-passphrase!' } })).status, 401);
+    const result = await request('/auth/update-credentials', { method: 'PUT', token: customerToken, body: { currentPassword: TEST_PASSWORD, newPassword: 'Different@123-passphrase!' } });
     assert.equal(result.status, 200);
     assert.equal(result.data.user.passwordHash, undefined);
-    const changed = await request('/auth/login', { method: 'POST', body: { email: accounts.customer, password: 'Different@123' } });
+    const changed = await request('/auth/login', { method: 'POST', body: { email: accounts.customer, password: 'Different@123-passphrase!' } });
     assert.equal(changed.status, 200);
     customerToken = changed.data.token;
   });

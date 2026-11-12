@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Revoked demonstration JWT constant; auth middleware explicitly rejects this value and regression tests enforce that rejection."
+regexes = ['''yaans_lk_sri_lanka_marketplace_jwt_secret_2026''']

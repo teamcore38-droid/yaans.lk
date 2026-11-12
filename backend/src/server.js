@@ -15,6 +15,8 @@ import orderRoutes from './routes/orderRoutes.js';
 import sellerRoutes from './routes/sellerRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import { operationalStatus, recordOperationalEvent } from './config/operations.js';
+import { corsOrigin } from './config/origins.js';
+import { recordSecurityEvent } from './config/securityEvents.js';
 
 dotenv.config();
 
@@ -31,18 +33,22 @@ app.set('trust proxy', process.env.VERCEL ? 1 : false);
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
-    contentSecurityPolicy: false
+    contentSecurityPolicy: { directives:{defaultSrc:["'none'"],frameAncestors:["'none'"],baseUri:["'none'"]} }
   })
 );
 app.use(compression());
 app.use(
   cors({
-    origin: true,
+    origin: corsOrigin,
     credentials: true
   })
 );
-app.use(express.json({ limit: '5mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: false, limit:'64kb', parameterLimit:100 }));
+app.use('/api',(req,_res,next)=>{
+  if(['POST','PUT','PATCH'].includes(req.method)&&req.is('application/json')&&(!req.body||typeof req.body!=='object'||Array.isArray(req.body)))return next(Object.assign(new Error('A JSON object is required.'),{status:400}));
+  next();
+});
 
 // Rate limiting for API protection
 const apiLimiter = rateLimit({
@@ -112,12 +118,13 @@ app.use('/api/admin', adminRoutes);
 
 // Global error handler
 app.use(async (err, _req, res, _next) => {
-  const status = err.status || (err.code === 11000 ? 409 : /Mongo|Mongoose/.test(err.name) ? 503 : 500);
+  const status = err.status || (err.name==='MulterError' ? (/SIZE|COUNT|LIMIT_PART/.test(err.code)?413:400) : err.code === 11000 ? 409 : /Mongo|Mongoose/.test(err.name) ? 503 : 500);
   if (status >= 500) {
     console.error('[Yaans.lk API Error]', { status, name: err.name, code: err.code });
     await recordOperationalEvent(/Mongo|Mongoose/.test(err.name) ? 'database_error' : 'server_error');
   }
-  res.status(status).json({ message: err.status ? err.message : status === 409 ? 'A record with these details already exists.' : 'The request could not be saved. Please try again.', ...(['WRITE_CONFLICT', 'IDEMPOTENCY_CONFLICT'].includes(err.code) ? { code: err.code } : {}) });
+  if(status===403)await recordSecurityEvent('request_denied',{ip:_req.ip,userId:_req.user?._id,role:_req.user?.role,outcome:'denied'});
+  res.status(status).json({ message: err.name==='MulterError'?'The upload exceeds the permitted file, field or nesting limits.':err.status ? err.message : status === 409 ? 'A record with these details already exists.' : 'The request could not be saved. Please try again.', ...(['WRITE_CONFLICT', 'IDEMPOTENCY_CONFLICT'].includes(err.code) ? { code: err.code } : {}) });
 });
 
 // Only listen on local TCP port when not imported as a Vercel Serverless Function

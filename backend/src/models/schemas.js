@@ -26,6 +26,8 @@ const UserSchema = new Schema(
     passwordHash: { type: String, required: true },
     tokenVersion: { type: Number, default: 0 },
     credentialsUpdatedAt: { type: Date, default: null },
+    adminMfa: { type:Schema.Types.Mixed, default:null, select:false },
+    adminMfaPending: { type:Schema.Types.Mixed, default:null, select:false },
     role: { type: String, enum: ['customer', 'seller', 'admin'], default: 'customer' },
     sellerId: { type: String, default: null },
     defaultDistrict: { type: String, default: 'Colombo' },
@@ -177,7 +179,9 @@ const ReviewSchema = new Schema(
     rating: { type: Number, required: true, min: 1, max: 5 },
     title: { type: String, default: '' },
     comment: { type: String, required: true },
-    verifiedPurchase: { type: Boolean, default: true }
+    verifiedPurchase: { type: Boolean, default: false },
+    purchaseOrderId: { type:String, default:null },
+    purchaseVerifiedAt: { type:Date, default:null }
   },
   { timestamps: true }
 );

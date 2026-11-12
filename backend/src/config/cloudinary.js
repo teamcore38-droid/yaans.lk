@@ -1,8 +1,7 @@
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
+import { randomUUID } from 'node:crypto';
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
+import { httpError } from './errors.js';
 
 // Initialize Cloudinary SDK
 function initCloudinary() {
@@ -12,7 +11,9 @@ function initCloudinary() {
   const cloudinaryUrl = process.env.CLOUDINARY_URL;
 
   if (cloudinaryUrl) {
-    cloudinary.config({ cloudinary_url: cloudinaryUrl });
+    const url=new URL(cloudinaryUrl);
+    if(url.protocol!=='cloudinary:')throw httpError(503,'Image storage is not configured securely.');
+    cloudinary.config({cloud_name:url.hostname,api_key:decodeURIComponent(url.username),api_secret:decodeURIComponent(url.password),secure:true});
     return true;
   }
 
@@ -32,12 +33,12 @@ function initCloudinary() {
 // Multer memory storage: direct stream to Cloudinary without writing to disk (ideal for Vercel Serverless)
 export const uploadMiddleware = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  limits: { fileSize: 4 * 1024 * 1024, files:1, fields:0, parts:1, fieldNameSize:40, fieldSize:1024, fieldNestingDepth:0, headerPairs:20 },
   fileFilter: (_req, file, cb) => {
     if (/^image\/(jpeg|png|webp|gif|jpg|avif)$/i.test(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Only JPG, PNG, WebP, AVIF, and GIF images are allowed.'));
+      cb(httpError(415,'Only JPG, PNG, WebP, AVIF, and GIF images are allowed.'));
     }
   }
 });
@@ -51,10 +52,18 @@ export const uploadMiddleware = multer({
  * - EXIF profile strip for faster mobile loading
  */
 export async function uploadToCloudinary(fileBuffer, options = {}) {
+  const bytes=fileBuffer;
+  if(!Buffer.isBuffer(bytes))throw httpError(415,'The uploaded file is not a supported image.');
+  const jpeg=bytes?.length>=4&&bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff;
+  const png=bytes?.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
+  const gif=['GIF87a','GIF89a'].includes(bytes?.subarray(0,6).toString('ascii'));
+  const webp=bytes?.subarray(0,4).toString('ascii')==='RIFF'&&bytes?.subarray(8,12).toString('ascii')==='WEBP';
+  const avif=bytes?.length>=16&&bytes.subarray(4,8).toString('ascii')==='ftyp'&&['avif','avis'].includes(bytes.subarray(8,12).toString('ascii'));
+  if(!Buffer.isBuffer(bytes)||bytes.length>4*1024*1024||!(jpeg||png||gif||webp||avif))throw httpError(415,'The uploaded file is not a supported image.');
   const isConfigured = initCloudinary();
   const requestedFolder = options.folder || process.env.CLOUDINARY_FOLDER || 'yaans_lk/products';
   const folder = process.env.APP_ENV === 'staging' ? requestedFolder.replace(/^yaans_lk\//, 'yaans_staging/') : requestedFolder;
-  const customPublicId = options.publicId || `ylk_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  const customPublicId = `ylk_${randomUUID()}`;
 
   if (isConfigured) {
     return new Promise((resolve, reject) => {
@@ -63,7 +72,8 @@ export async function uploadToCloudinary(fileBuffer, options = {}) {
           folder,
           public_id: customPublicId,
           resource_type: 'image',
-          overwrite: true,
+          overwrite: false,
+          allowed_formats:['jpg','jpeg','png','webp','gif','avif'],
           transformation: [
             {
               width: 1200,
@@ -77,7 +87,7 @@ export async function uploadToCloudinary(fileBuffer, options = {}) {
         },
         (error, result) => {
           if (error) {
-            return reject(new Error(`Cloudinary upload failed: ${error.message}`));
+            return reject(httpError(502,'Image storage could not process the upload. Please try again.'));
           }
           resolve({
             url: result.secure_url,
@@ -94,37 +104,7 @@ export async function uploadToCloudinary(fileBuffer, options = {}) {
     });
   }
 
-  // Graceful fallback for local development if Cloudinary env vars are missing
-  const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
-  if (IS_SERVERLESS) {
-    const mime = options.mimetype || 'image/jpeg';
-    const dataUrl = `data:${mime};base64,${fileBuffer.toString('base64')}`;
-    return {
-      url: dataUrl,
-      publicId: customPublicId,
-      provider: 'mongodb_inline_storage'
-    };
-  }
-
-  // Local uploads folder fallback
-  const uploadsDir = path.resolve(process.cwd(), 'backend/uploads');
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
-  const ext = (options.originalname && path.extname(options.originalname)) || '.jpg';
-  const filename = `${customPublicId}${ext}`;
-  const filePath = path.join(uploadsDir, filename);
-  fs.writeFileSync(filePath, fileBuffer);
-
-  const req = options.req;
-  const host = req?.get('host') || 'localhost:5000';
-  const protocol = req?.protocol || 'http';
-
-  return {
-    url: `${protocol}://${host}/uploads/${filename}`,
-    publicId: customPublicId,
-    provider: 'local_storage'
-  };
+  throw httpError(503,'Image storage is unavailable. Please try again after configuration is restored.');
 }
 
 /**
@@ -132,7 +112,7 @@ export async function uploadToCloudinary(fileBuffer, options = {}) {
  */
 export async function handleProductImageUpload(req) {
   if (!req.file) {
-    throw new Error('No image file was provided.');
+    throw httpError(400,'No image file was provided.');
   }
 
   return await uploadToCloudinary(req.file.buffer, {

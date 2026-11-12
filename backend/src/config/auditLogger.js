@@ -23,6 +23,9 @@ export function recordAdminAuditLog(store, entry) {
   };
 
   store.platformConfig.adminAuditLogs.unshift(logItem);
+  // Persist a separate append-only audit event in the same durable transaction.
+  (store.securityAuditEvents ||= []).push({ event:logItem.action, outcome:/fail|forbidden/i.test(logItem.action)?'denied':'success', userId:logItem.adminId,
+    metadata:logItem.metadata, createdAt:new Date(logItem.timestamp), expiresAt:new Date(Date.now()+30*86400000) });
 
   // Bound the audit array stored in the platform configuration.
   if (store.platformConfig.adminAuditLogs.length > 250) {

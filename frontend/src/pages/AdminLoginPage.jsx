@@ -12,6 +12,8 @@ export default function AdminLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [challengeToken,setChallengeToken]=useState('');
+  const [code,setCode]=useState('');
 
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -23,9 +25,9 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setErrorMsg('');
     const cleanEmail = email.trim().toLowerCase();
-    const cleanPassword = password.trim();
+    const cleanPassword = password;
 
-    if (!cleanEmail || !cleanPassword) {
+    if (!challengeToken && (!cleanEmail || !cleanPassword)) {
       const msg = 'Please enter both administrator email and password.';
       setErrorMsg(msg);
       showToast(msg, 'error');
@@ -34,7 +36,8 @@ export default function AdminLoginPage() {
 
     try {
       setLoading(true);
-      await adminLogin(cleanEmail, cleanPassword);
+      const result=await adminLogin(cleanEmail, cleanPassword,challengeToken,code.trim());
+      if(result?.requiresMfa){setChallengeToken(result.challengeToken);setPassword('');return;}
       navigate('/admin', { replace: true });
     } catch (err) {
       const msg = err.message || 'Invalid administrator credentials.';
@@ -98,7 +101,7 @@ export default function AdminLoginPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-            <div>
+            {!challengeToken && <div>
               <label className="block font-bold text-slate-300 mb-1.5">
                 Administrator Email
               </label>
@@ -113,9 +116,9 @@ export default function AdminLoginPage() {
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                 />
               </div>
-            </div>
+            </div>}
 
-            <div>
+            {!challengeToken && <div>
               <label className="block font-bold text-slate-300 mb-1.5">
                 Administrator Password
               </label>
@@ -138,7 +141,14 @@ export default function AdminLoginPage() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-            </div>
+            </div>}
+            {challengeToken && <div>
+              <label htmlFor="admin-otp" className="block font-bold text-slate-300 mb-1.5">Authenticator or recovery code</label>
+              <input id="admin-otp" autoComplete="one-time-code" required value={code} onChange={event=>setCode(event.target.value)} maxLength={32}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white" />
+              <p className="mt-2 text-slate-400">Enter the current code from your authenticator, or one unused recovery code.</p>
+              <button type="button" onClick={()=>{setChallengeToken('');setCode('');}} className="mt-2 underline">Start sign-in again</button>
+            </div>}
 
             <button
               type="submit"
@@ -154,7 +164,7 @@ export default function AdminLoginPage() {
           <div className="pt-4 border-t border-slate-800 grid grid-cols-2 gap-2 text-[11px] text-slate-400">
             <div className="flex items-center gap-1.5">
               <Key className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>6-Hour Scoped Session</span>
+              <span>1-Hour Scoped Session</span>
             </div>
             <div className="flex items-center gap-1.5 justify-end">
               <ShieldCheck className="w-3.5 h-3.5 text-sky-400 shrink-0" />

@@ -18,4 +18,10 @@ test('backup content is authenticated, encrypted and recoverable only with the m
   ciphertext[0] ^= 1;
   tampered.ciphertext = ciphertext.toString('base64');
   assert.throws(() => decryptBackup(JSON.stringify(tampered), privateKey));
+  for(const length of [0,4,12,15,17]){
+    const short=JSON.parse(first);short.tag=Buffer.alloc(length).toString('base64');
+    assert.throws(()=>decryptBackup(JSON.stringify(short),privateKey));
+  }
+  const prefix=JSON.parse(first);prefix.tag=Buffer.from(prefix.tag,'base64').subarray(0,4).toString('base64');
+  assert.throws(()=>decryptBackup(JSON.stringify(prefix),privateKey),'Even a correct prefix must not weaken tag verification');
 });

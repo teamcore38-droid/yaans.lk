@@ -19,7 +19,7 @@ export async function checkOperations({ origin, token, repository, githubToken, 
   const [health, operations, backup] = results;
   if (health.status !== 'fulfilled' || health.value.mongoConnected !== true || health.value.status !== 'ok') alerts.push('Website/database readiness check failed.');
   if (operations.status !== 'fulfilled') alerts.push('Authenticated operational monitoring failed.');
-  else for (const reason of operations.value.alerts || []) alerts.push(`Application alert: ${['checkout_failures', 'database_errors', 'server_errors'].includes(reason) ? reason : 'invalid_monitor_response'}`);
+  else for (const reason of operations.value.alerts || []) alerts.push(`Application alert: ${['checkout_failures', 'database_errors', 'server_errors', 'admin_authentication_failures', 'login_failures', 'access_denials'].includes(reason) ? reason : 'invalid_monitor_response'}`);
   if (backup.status !== 'fulfilled') alerts.push('Backup workflow history could not be checked.');
   else {
     const runs = backup.value.workflow_runs;

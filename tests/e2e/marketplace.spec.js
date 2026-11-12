@@ -137,13 +137,30 @@ test('a guest needs the private code to track and cancel an order', async ({ pag
   await expect(page.getByText('cancelled', { exact: true }).first()).toBeVisible();
 });
 
-test('customer sign-in restores the session and does not grant admin access', async ({ page }) => {
+test('customer sign-in uses HttpOnly cookies, rejects CSRF and restores the session without admin access', async ({ page, context }) => {
+  const authentication=page.waitForResponse(response=>response.url().endsWith('/api/auth/login'));
   await login(page, accounts.customer);
+  expect((await (await authentication).json()).token).toBeUndefined();
   await expect(page).toHaveURL(/\/account$/);
+  const cookies=await context.cookies();
+  expect(cookies.find(cookie=>cookie.name==='yaans_session').httpOnly).toBe(true);
+  expect(await page.evaluate(()=>localStorage.getItem('yaans_token'))).toBeNull();
+  expect((await page.request.put('/api/auth/profile',{data:{name:'Rejected CSRF change'}})).status()).toBe(403);
   await page.reload();
   await expect(page.getByRole('heading', { name: /Test Customer/ })).toBeVisible();
   await page.goto('/admin');
   await expect(page.getByRole('heading', { name: 'Access Denied', exact: true })).toBeVisible();
+});
+
+test('the deployed content policy blocks injected inline scripts while the storefront works',async({page})=>{
+  const response=await page.goto('/');
+  expect(response.headers()['content-security-policy']).toContain("script-src 'self'");
+  expect(response.headers()['x-frame-options']).toBe('DENY');
+  await page.evaluate(()=>{
+    const script=document.createElement('script');script.textContent='window.__unsafeInlineExecuted=true';document.head.append(script);
+  });
+  expect(await page.evaluate(()=>window.__unsafeInlineExecuted)).toBeUndefined();
+  await expect(page.getByRole('link',{name:'Browse All Products',exact:true})).toBeVisible();
 });
 
 test('invalid credentials show an error and leave sign-in available', async ({ page }) => {

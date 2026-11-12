@@ -469,6 +469,7 @@ export default function ProductDetailPage() {
           <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
             Write a Customer Review
           </h2>
+          <p className="text-xs text-slate-600">Sign in with the customer account that received this product. One review is allowed per purchased product after delivery.</p>
           <form onSubmit={handleReviewSubmit} className="space-y-3 text-xs">
             {!user && (
               <div>
@@ -476,6 +477,7 @@ export default function ProductDetailPage() {
                 <input
                   type="text"
                   value={reviewName}
+                  maxLength={120}
                   onChange={(e) => setReviewName(e.target.value)}
                   placeholder="e.g., Nuwan Perera"
                   className="w-full px-3 py-2 rounded-lg border border-slate-300"
@@ -501,6 +503,7 @@ export default function ProductDetailPage() {
               <input
                 type="text"
                 value={reviewTitle}
+                maxLength={160}
                 onChange={(e) => setReviewTitle(e.target.value)}
                 placeholder="e.g., Fresh quality and fast delivery"
                 className="w-full px-3 py-2 rounded-lg border border-slate-300"
@@ -512,6 +515,7 @@ export default function ProductDetailPage() {
                 rows={3}
                 required
                 value={reviewComment}
+                maxLength={3000}
                 onChange={(e) => setReviewComment(e.target.value)}
                 placeholder="Share your experience with the product quality and packaging..."
                 className="w-full px-3 py-2 rounded-lg border border-slate-300"
@@ -519,7 +523,7 @@ export default function ProductDetailPage() {
             </div>
             <button
               type="submit"
-              disabled={submittingReview}
+              disabled={submittingReview||user?.role!=='customer'}
               className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs"
             >
               {submittingReview ? 'Submitting...' : 'Submit Verified Review'}
@@ -529,7 +533,7 @@ export default function ProductDetailPage() {
 
         <div className="lg:col-span-7 space-y-4">
           <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
-            Verified Customer Reviews ({reviewPagination?.total ?? reviews.length})
+            Customer Reviews ({reviewPagination?.total ?? reviews.length})
           </h2>
           {reviews.length === 0 ? (
             <p className="text-xs text-slate-500">No reviews yet. Be the first to review this item!</p>
@@ -547,6 +551,7 @@ export default function ProductDetailPage() {
                     </span>
                   </div>
                   {rev.title && <div className="text-xs font-bold text-slate-800">{rev.title}</div>}
+                  {rev.verifiedPurchase&&<p className="text-xs text-emerald-700 font-semibold">Verified purchase</p>}
                   <p className="text-xs text-slate-600 leading-relaxed">{rev.comment}</p>
                 </div>
               ))}

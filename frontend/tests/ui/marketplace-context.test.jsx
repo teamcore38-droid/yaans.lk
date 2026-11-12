@@ -64,13 +64,14 @@ test('guest wishlists persist and toggle without an authenticated request', asyn
 
 test.each([401, 403, 503])('session refresh with HTTP %i clears credentials only for an invalid session', async (status) => {
   localStorage.setItem('yaans_token', 'session-token');
+  document.cookie='yaans_csrf=synthetic-csrf; path=/';
   localStorage.setItem('yaans_user', JSON.stringify({ name: 'Saved Customer' }));
   fetch.mockImplementation(async (url) => url.endsWith('/auth/me')
     ? response({ message: 'Unavailable' }, status) : response({ categories: [] }));
   const { result } = renderHook(useMarketplace, { wrapper });
   await act(async () => {});
   if (status === 503) {
-    expect(localStorage.getItem('yaans_token')).toBe('session-token');
+    expect(localStorage.getItem('yaans_token')).toBeNull();
     expect(result.current.user.name).toBe('Saved Customer');
   } else {
     expect(localStorage.getItem('yaans_token')).toBeNull();
@@ -92,4 +93,14 @@ test('an older cart quote cannot overwrite the quote for the newly selected dist
   await act(async () => pending.Colombo(response({ destinationDistrict: 'Colombo' })));
   expect(result.current.cartQuote.destinationDistrict).toBe('Kandy');
   expect(localStorage.getItem('yaans_district')).toBe('Kandy');
+});
+
+test('sign-out waits for server revocation and keeps the session when the server fails',async()=>{
+  document.cookie='yaans_csrf=synthetic-session; path=/';
+  localStorage.setItem('yaans_user',JSON.stringify({name:'Saved Customer'}));
+  let fail=true;
+  fetch.mockImplementation(async url=>url.endsWith('/auth/me')?response({user:{name:'Saved Customer'}}):url.endsWith('/auth/logout')?response({message:'Unavailable'},fail?503:200):response({categories:[]}));
+  const {result}=renderHook(useMarketplace,{wrapper});await act(async()=>{});
+  await act(async()=>{expect(await result.current.logout()).toBe(false);});expect(result.current.user.name).toBe('Saved Customer');
+  fail=false;await act(async()=>{expect(await result.current.logout()).toBe(true);});expect(result.current.user).toBeNull();expect(localStorage.getItem('yaans_token')).toBeNull();
 });

@@ -17,8 +17,10 @@ export function decryptBackup(encrypted, privateKey) {
   const value = JSON.parse(encrypted);
   if (value.format !== 'yaans-backup-v2') throw new Error('Unsupported encrypted backup format');
   const key = privateDecrypt({ key: privateKey, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' }, Buffer.from(value.wrappedKey, 'base64'));
-  const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(value.iv, 'base64'));
+  const iv=Buffer.from(value.iv,'base64'),tag=Buffer.from(value.tag,'base64');
+  if(key.length!==32||iv.length!==12||tag.length!==16)throw new Error('Invalid backup encryption envelope.');
+  const decipher = createDecipheriv('aes-256-gcm', key, iv, { authTagLength:16 });
   decipher.setAAD(Buffer.from('yaans-backup-v2'));
-  decipher.setAuthTag(Buffer.from(value.tag, 'base64'));
+  decipher.setAuthTag(tag);
   return gunzipSync(Buffer.concat([decipher.update(Buffer.from(value.ciphertext, 'base64')), decipher.final()]), { maxOutputLength: 512 * 1024 * 1024 });
 }

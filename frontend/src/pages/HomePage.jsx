@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { safeInternalLink } from '../../../shared/safeLinks.js';
 import {
   ChevronRight,
   ChevronLeft,
@@ -107,12 +108,12 @@ export default function HomePage() {
               return (
                 <Link
                   key={banner.id || idx}
-                  to={
+                    to={safeInternalLink(
                     banner.ctaLink ||
                     (banner.categorySlug
                       ? `/products?category=${banner.categorySlug}`
-                      : '/products')
-                  }
+                        : '/products')
+                    )}
                   aria-label={banner.title || 'Sri Lankan Homemade & Everyday Essentials - Shop Now'}
                   className={`absolute inset-0 w-full h-full transition-opacity duration-700 ease-in-out ${
                     isCurrent

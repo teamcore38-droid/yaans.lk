@@ -38,7 +38,8 @@ try {
   const email = (option('email') || '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Provide the administrator email with --email=<address>.');
   const password = await passwordInput();
-  if (password.length < 14 || password.length > 256) throw new Error('Use a unique administrator password of 14–256 characters.');
+  if ([...password].length < 15 || Buffer.byteLength(password,'utf8') > 72) throw new Error('Use a unique administrator password of at least 15 characters and at most 72 UTF-8 bytes.');
+  if(args.includes('--reset-mfa')&&!args.includes('--reset-existing'))throw new Error('Authenticator recovery requires --reset-existing and --reset-mfa together.');
   await connectDatabase();
   const existing = await MODEL_MAP.users.collection.findOne({ email });
   if (!existing && args.includes('--reset-existing')) throw new Error('The administrator was not found. Check the email before attempting recovery.');
@@ -46,7 +47,8 @@ try {
   const passwordHash = await bcrypt.hash(password, 12);
   if (existing) {
     const result = await MODEL_MAP.users.collection.updateOne({ _id: existing._id, passwordHash: existing.passwordHash },
-      { $set: { passwordHash, isActive: true, credentialsUpdatedAt: new Date() }, $inc: { tokenVersion: 1, _writeVersion: 1 } });
+      { $set: { passwordHash, isActive: true, credentialsUpdatedAt: new Date() },
+        ...(args.includes('--reset-mfa')?{$unset:{adminMfa:'',adminMfaPending:''}}:{}), $inc: { tokenVersion: 1, _writeVersion: 1 } });
     if (result.matchedCount !== 1) throw new Error('The account changed during recovery. Retry after checking its current state.');
   } else {
     await MODEL_MAP.users.collection.insertOne({ _id: generateId('usr_admin'), email, passwordHash,

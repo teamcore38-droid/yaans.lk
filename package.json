@@ -17,9 +17,10 @@
     "test:e2e": "playwright test",
     "test:e2e:report": "playwright show-report",
     "test:capacity": "node scripts/benchmark-capacity.mjs",
+    "test:security": "node scripts/security-audit.mjs",
     "verify:fast": "npm test && npm run test:ui",
     "verify:deploy": "node scripts/require-production-verification.mjs && npm run verify:fast && npm run build",
-    "verify": "npm run verify:fast && npm run test:integration && npm run build && npm run test:e2e",
+    "verify": "npm run test:security && npm run verify:fast && npm run test:integration && npm run build && npm run test:e2e",
     "seed": "npm --prefix backend run seed",
     "backup": "node backend/scripts/backup_db.js",
     "start": "npm --prefix backend start"
@@ -35,7 +36,8 @@
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.9.5",
-    "multer": "^1.4.5-lts.1"
+    "multer": "2.5.0",
+    "otpauth": "9.6.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.0",

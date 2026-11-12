@@ -1,6 +1,11 @@
 import { createRouter } from '../config/router.js';
-import { getStore, persistStore, generateId, idFilter } from '../config/db.js';
-import { optionalAuthenticate } from '../middleware/auth.js';
+import { getStore, persistStore, generateId, idFilter, withTransaction, MODEL_MAP } from '../config/db.js';
+import { authenticate, requireRole } from '../middleware/auth.js';
+import { createHash } from 'node:crypto';
+import mongoose from 'mongoose';
+import { sharedRateLimit } from '../middleware/sharedRateLimit.js';
+import { stringField } from '../config/inputValidation.js';
+import { httpError } from '../config/errors.js';
 import { catalogHome, catalogSettings, catalogCategories, catalogProducts, catalogProduct, catalogSeller } from '../services/catalog.js';
 
 const router = createRouter();
@@ -22,47 +27,38 @@ router.get('/products', async (req, res) => res.json(await catalogProducts(req.q
 router.get('/products/:idOrSlug', async (req, res) => res.json(await catalogProduct(req.params.idOrSlug, req.query)));
 
 // POST /api/marketplace/products/:productId/reviews
-router.post('/products/:productId/reviews', optionalAuthenticate, async (req, res) => {
+router.post('/products/:productId/reviews', authenticate, requireRole('customer'), sharedRateLimit('review-user',5,86400000,req=>req.user._id), async (req, res) => {
   const { productId } = req.params;
-  const { customerName, district = 'Colombo', rating = 5, title = '', comment } = req.body;
-  if (!comment) {
-    return res.status(400).json({ message: 'Please write a review comment.' });
-  }
-
-  const store = await getStore({ products: idFilter(productId), reviews: { productId } });
-  const product = store.products.find((p) => p._id === productId);
-  if (!product) {
-    return res.status(404).json({ message: 'Product not found.' });
-  }
-
-  const numericRating = Math.min(5, Math.max(1, Number(rating) || 5));
-  const newReview = {
-    _id: generateId('rev'),
-    productId: product._id,
-    userId: req.user ? req.user._id : null,
-    customerName: (req.user ? req.user.name : customerName) || 'Verified Customer',
-    district,
-    rating: numericRating,
-    title: title.trim(),
-    comment: comment.trim(),
-    verifiedPurchase: true,
-    createdAt: new Date().toISOString()
-  };
-
-  store.reviews.unshift(newReview);
-
-  // Recalculate product rating
-  const prodReviews = store.reviews.filter((r) => r.productId === product._id);
-  const avg = prodReviews.reduce((acc, r) => acc + r.rating, 0) / prodReviews.length;
-  product.rating = Number(avg.toFixed(1));
-  product.reviewCount = prodReviews.length;
-
-  await persistStore(store);
-  return res.status(201).json({
-    review: newReview,
-    productRating: product.rating,
-    reviewCount: product.reviewCount
-  });
+  const title=stringField(req.body.title,'Review headline',{maximum:160});
+  const comment=stringField(req.body.comment,'Review comment',{required:true,maximum:3000});
+  const district=stringField(req.body.district??req.user.defaultDistrict??'Colombo','District',{maximum:80});
+  const rating=req.body.rating;
+  if(!Number.isInteger(rating)||rating<1||rating>5)throw httpError(400,'Choose a whole-number rating between 1 and 5.');
+  try {
+    const result=await withTransaction(async session=>{
+      const store=await getStore({products:idFilter(productId),reviews:{productId,userId:req.user._id}},{session});
+      const product=store.products[0];
+      if(!product||product.approvalStatus!=='approved')throw httpError(404,'Product not found.');
+      if(store.reviews.length)throw httpError(409,'You have already reviewed this product.');
+      const [purchase]=await MODEL_MAP.orders.collection.aggregate([
+        {$match:{userId:req.user._id,'items.productId':product._id}},
+        {$lookup:{from:'suborders',let:{parent:{$toString:'$_id'}},pipeline:[{$match:{$expr:{$eq:['$parentOrderId','$$parent']},fulfillmentStatus:'delivered','items.productId':product._id}},{$limit:1}],as:'deliveredPackages'}},
+        {$match:{'deliveredPackages.0':{$exists:true}}},{$project:{_id:1}},{$limit:1}
+      ],{session,maxTimeMS:3000}).toArray();
+      if(!purchase)throw httpError(403,'Reviews require a delivered purchase from your signed-in account.');
+      const claim=createHash('sha256').update(JSON.stringify([product._id,req.user._id])).digest('hex');
+      await mongoose.connection.db.collection('reviewclaims').insertOne({_id:claim,productId:product._id,userId:req.user._id},{session});
+      const review={_id:generateId('rev'),productId:product._id,userId:req.user._id,customerName:req.user.name,district,rating,title,comment,
+        verifiedPurchase:true,purchaseOrderId:String(purchase._id),purchaseVerifiedAt:new Date().toISOString(),createdAt:new Date().toISOString()};
+      store.reviews.push(review);await persistStore(store);
+      const [stats]=await MODEL_MAP.reviews.collection.aggregate([{$match:{productId:product._id}},{$group:{_id:null,rating:{$avg:'$rating'},count:{$sum:1}}}],{session}).toArray();
+      const productRating=Number(stats.rating.toFixed(1));
+      await MODEL_MAP.products.collection.updateOne(idFilter(product._id),{$set:{rating:productRating,reviewCount:stats.count},$inc:{_writeVersion:1}},{session});
+      const {userId,purchaseOrderId,purchaseVerifiedAt,...publicReview}=review;
+      return {review:publicReview,productRating,reviewCount:stats.count};
+    });
+    return res.status(201).json(result);
+  }catch(error){if(error.code===11000)throw httpError(409,'You have already reviewed this product.');throw error;}
 });
 
 router.get('/sellers/:slugOrId', async (req, res) => res.json(await catalogSeller(req.params.slugOrId, req.query)));

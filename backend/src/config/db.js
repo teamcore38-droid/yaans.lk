@@ -144,6 +144,7 @@ export async function persistStore(store) {
         throw httpError(409, 'This record changed during your request. Refresh and try again.', 'WRITE_CONFLICT');
       }
     }
+    if (store.securityAuditEvents?.length) await mongoose.connection.db.collection('securityevents').insertMany(store.securityAuditEvents, { session });
   };
   if (changes.length) {
     if (state.session) await write(state.session);

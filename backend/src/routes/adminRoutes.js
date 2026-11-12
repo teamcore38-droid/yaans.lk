@@ -5,10 +5,31 @@ import { uploadMiddleware, uploadToCloudinary } from '../config/cloudinary.js';
 import { recordAdminAuditLog } from '../config/auditLogger.js';
 import { recordCashMovement, recordSellerPayout, payoutEligible, restockReturnedPackage } from '../services/finance.js';
 import { uploadLimit } from '../middleware/sharedRateLimit.js';
+import { isSafeInternalLink } from '../../../shared/safeLinks.js';
+import { stringField } from '../config/inputValidation.js';
+import { httpError } from '../config/errors.js';
 
 const router = createRouter();
 
 router.use(authenticate, requireRole('admin'));
+router.use((req,_res,next)=>{
+  try {
+    if(!['POST','PUT','PATCH'].includes(req.method))return next();
+    const validateBanner=entry=>{
+      if(!entry||typeof entry!=='object'||Array.isArray(entry))throw httpError(400,'Invalid banner.');
+      for(const field of ['id','title','imageUrl','mobileImageUrl','categorySlug','ctaLink'])if(entry[field]!==undefined)stringField(entry[field],field,{maximum:field.includes('Url')||field==='ctaLink'?2048:160});
+      if(entry.ctaLink&&!isSafeInternalLink(entry.ctaLink))throw httpError(400,'Banner links must be internal marketplace paths beginning with a single /.');
+      if(entry.active!==undefined&&typeof entry.active!=='boolean')throw httpError(400,'Invalid banner visibility.');
+      if(entry.displayOrder!==undefined&&(!Number.isFinite(Number(entry.displayOrder))||Math.abs(Number(entry.displayOrder))>10000))throw httpError(400,'Invalid banner display order.');
+    };
+    if(req.body?.banners!==undefined){
+      if(!Array.isArray(req.body.banners)||req.body.banners.length>30)throw httpError(400,'Provide at most 30 banners.');
+      req.body.banners.forEach(validateBanner);
+    }
+    if(req.path.startsWith('/banners'))validateBanner(req.body);
+    next();
+  }catch(error){next(error);}
+});
 
 // GET /api/admin/audit-logs
 router.get('/audit-logs', async (req, res) => {
@@ -561,7 +582,7 @@ router.post('/upload-image', uploadLimit, uploadMiddleware.single('image'), asyn
     });
     return res.status(201).json(uploaded);
   } catch (err) {
-    return res.status(500).json({ message: err.message || 'Image upload failed.' });
+    throw err;
   }
 });
 

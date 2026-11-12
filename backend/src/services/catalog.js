@@ -11,6 +11,11 @@ const dateSort = { $set: { _catalogDate: { $convert: { input: '$createdAt', to: 
 const settingsProjection = { key: 1, districts: 1, codEnabledGlobally: 1, globalFreeShippingMinLkr: 1, shippingMode: 1, flatShippingRateLkr: 1, banners: 1 };
 const sellerFields = ['_id', 'storeName', 'slug', 'sellerType', 'isHomemadeVendor', 'description', 'logoUrl', 'bannerUrl', 'district', 'city', 'rating', 'reviewCount', 'totalSalesCount', 'shippingPolicy', 'isVacationMode', 'vacationNotice', 'createdAt'];
 const sellerProjection = Object.fromEntries(sellerFields.map((field) => [field, 1]));
+const publicReview = doc => {
+  const value=clean(doc);
+  const {userId,purchaseOrderId,purchaseVerifiedAt,...view}=value;
+  return {...view,verifiedPurchase:Boolean(value.verifiedPurchase&&userId&&purchaseOrderId&&purchaseVerifiedAt)};
+};
 const sellerView = (doc) => ({ ...Object.fromEntries(sellerFields.map((field) => [field, doc[field]])), _id: String(doc._id), isVacationMode: Boolean(doc.isVacationMode), vacationNotice: doc.vacationNotice || '' });
 
 function text(query, key, fallback = '', maximum = 200) {
@@ -118,7 +123,7 @@ export async function catalogProduct(idOrSlug, query = {}) {
     $or: [{ categorySlug: product.categorySlug }, { sellerId: product.sellerId }]
   }, { ...readOptions, projection }).limit(6).toArray();
   const reviews = reviewResult[0] || { rows: [], count: [] };
-  return { product, seller: sellerView(seller), reviews: reviews.rows.map(clean), relatedProducts: relatedProducts.map(clean),
+  return { product, seller: sellerView(seller), reviews: reviews.rows.map(publicReview), relatedProducts: relatedProducts.map(clean),
     reviewPagination: paginationView(page, reviews.count[0]?.total || 0),
     shippingEstimate: calculateSellerDeliveryFee({ sellerDistrict: seller.district, destinationDistrict: text(query, 'destinationDistrict', 'Colombo', 80),
       sellerSubtotalLkr: product.priceLkr, totalItemCount: 1, sellerShippingPolicy: seller.shippingPolicy || {}, districtConfigs: config.districts,

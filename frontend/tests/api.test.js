@@ -5,6 +5,7 @@ import { imageUrl, imageSrcSet } from '../src/utils/images.js';
 
 const originalFetch = globalThis.fetch;
 const originalNow = Date.now;
+const originalDocument = globalThis.document;
 const storage = () => {
   const values = new Map();
   return { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: (key) => values.delete(key) };
@@ -14,9 +15,10 @@ const response = (body, status = 200) => ({ ok: status < 400, status, json: asyn
 beforeEach(() => {
   globalThis.localStorage = storage();
   globalThis.sessionStorage = storage();
+  globalThis.document = {cookie:''};
   invalidateCatalogCache();
 });
-afterEach(() => { globalThis.fetch = originalFetch; Date.now = originalNow; });
+afterEach(() => { globalThis.fetch = originalFetch; Date.now = originalNow; globalThis.document=originalDocument; });
 
 test('shares concurrent public requests and canonicalizes query ordering', async () => {
   let calls = 0;
@@ -58,7 +60,7 @@ test('home response also supplies categories without a second request', async ()
   assert.equal(calls, 1);
 });
 
-test('never caches account/order responses and keeps tokens isolated', async () => {
+test('never caches account/order responses or reads persisted bearer tokens', async () => {
   const tokens = [];
   globalThis.fetch = async (_url, options) => {
     tokens.push(options.headers.Authorization);
@@ -70,9 +72,22 @@ test('never caches account/order responses and keeps tokens isolated', async () 
   localStorage.setItem('yaans_token', 'two');
   await apiRequest('/auth/me');
   await apiRequest('/orders/my-orders');
-  assert.deepEqual(tokens, ['Bearer one', 'Bearer one', 'Bearer two', 'Bearer two']);
+  assert.deepEqual(tokens, [undefined, undefined, undefined, undefined]);
   assert.equal(getCachedApiResponse('/auth/me'), null);
   assert.equal(getCachedApiResponse('/orders/my-orders'), null);
+});
+
+test('cookie session changes isolate in-flight account reads and mutations carry CSRF proof',async()=>{
+  const pending=[];
+  globalThis.fetch=(_url,options)=>new Promise(resolve=>pending.push({resolve,options}));
+  document.cookie='yaans_csrf=first-session';const first=apiRequest('/auth/me');
+  document.cookie='yaans_csrf=second-session';const second=apiRequest('/auth/me');
+  assert.equal(pending.length,2);
+  pending[0].resolve(response({user:'first'}));pending[1].resolve(response({user:'second'}));
+  assert.equal((await first).user,'first');assert.equal((await second).user,'second');
+  let sent;globalThis.fetch=async(_url,options)=>{sent=options;return response({saved:true});};
+  await apiRequest('/auth/profile',{method:'PUT',body:'{}'});
+  assert.equal(sent.credentials,'same-origin');assert.equal(sent.headers['X-CSRF-Token'],'second-session');assert.equal(sent.headers.Authorization,undefined);
 });
 
 test('successful edits invalidate catalog data, while cart quotes retain it', async () => {

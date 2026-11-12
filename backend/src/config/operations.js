@@ -5,6 +5,9 @@ export function ensureOperationalIndexes(db) {
   if (!initializations.has(db)) initializations.set(db, (async () => {
     await db.collection('ratelimits').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, name: 'rate_limit_expiry' });
     await db.collection('operationalmetrics').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, name: 'operational_metric_expiry' });
+    await db.collection('securityevents').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, name: 'security_event_expiry' });
+    await db.collection('securityevents').createIndex({ createdAt: -1 }, { name: 'security_event_recent' });
+    await db.collection('authchallenges').createIndex({ expiresAt: 1 }, { expireAfterSeconds:0, name:'auth_challenge_expiry' });
   })().catch((error) => { initializations.delete(db); throw error; }));
   return initializations.get(db);
 }
@@ -27,9 +30,18 @@ export async function operationalStatus() {
     { $match: { bucket: { $gte: since } } }, { $group: { _id: '$name', count: { $sum: '$count' } } }
   ], { maxTimeMS: 3000 }).toArray();
   const counts = Object.fromEntries(metrics.map(({ _id, count }) => [_id, count]));
+  // Only the private monitoring endpoint receives these aggregate counts.
+  const security = await mongoose.connection.db.collection('securityevents').aggregate([
+    { $match: { createdAt: { $gte: since }, event: { $in: ['login_failed', 'admin_login_failed', 'admin_mfa_login_failed', 'authentication_denied', 'authorization_denied'] } } },
+    { $group: { _id: '$event', count: { $sum: 1 } } }
+  ], { maxTimeMS: 3000 }).toArray();
+  const securityCounts = Object.fromEntries(security.map(({ _id, count }) => [_id, count]));
   const alerts = [];
   if ((counts.checkout_failure || 0) >= 3) alerts.push('checkout_failures');
   if ((counts.database_error || 0) >= 3) alerts.push('database_errors');
   if ((counts.server_error || 0) >= 5) alerts.push('server_errors');
-  return { status: alerts.length ? 'degraded' : 'ok', windowMinutes: 60, counts, alerts };
+  if ((securityCounts.admin_login_failed || 0) + (securityCounts.admin_mfa_login_failed || 0) >= 5) alerts.push('admin_authentication_failures');
+  if ((securityCounts.login_failed || 0) >= 20) alerts.push('login_failures');
+  if ((securityCounts.authentication_denied || 0) + (securityCounts.authorization_denied || 0) >= 30) alerts.push('access_denials');
+  return { status: alerts.length ? 'degraded' : 'ok', windowMinutes: 60, counts, securityCounts, alerts };
 }

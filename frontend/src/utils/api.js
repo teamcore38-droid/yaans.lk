@@ -5,6 +5,16 @@ const STORAGE_PREFIX = 'yaans_catalog_v1:';
 const MAX_CACHE_ENTRIES = 40;
 let cacheGeneration = 0;
 
+export function browserSessionKey() {
+  if(typeof document==='undefined')return '';
+  const entries=document.cookie.split(';').map(value=>value.trim());
+  for(const name of ['__Host-yaans_csrf','yaans_csrf']){
+    const value=entries.find(entry=>entry.startsWith(`${name}=`));
+    if(value){try{return decodeURIComponent(value.slice(name.length+1));}catch{return '';}}
+  }
+  return '';
+}
+
 function catalogKey(endpoint) {
   const url = new URL(endpoint, 'http://catalog.local');
   if (!/^\/marketplace\/(home|categories|districts|products(?:\/[^/]+)?|sellers\/[^/]+)$/.test(url.pathname)) {
@@ -74,20 +84,21 @@ export async function apiRequest(endpoint, options = {}) {
     if (cached) return cached;
   }
   // Public catalog responses are identical for guests and signed-in users.
-  const token = publicKey ? null : localStorage.getItem('yaans_token');
+  const session = browserSessionKey();
   const headers = {
     ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    'X-Yaans-Client':'browser',
+    ...(!['GET','HEAD','OPTIONS'].includes(method)&&session?{'X-CSRF-Token':session}:{}),
     ...(options.headers || {})
   };
 
   const generation = cacheGeneration;
-  const requestKey = `${generation}:${publicKey || endpoint}:${token || ''}`;
+  const requestKey = `${generation}:${publicKey || endpoint}:${publicKey?'':session}`;
   const canShare = method === 'GET' && !options.signal && !options.headers && options.cache !== 'no-store' && options.cache !== 'reload';
   if (canShare && pendingRequests.has(requestKey)) return pendingRequests.get(requestKey);
 
   const request = (async () => {
-    const response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+    const response = await fetch(`${API_BASE}${endpoint}`, { ...options, credentials:'same-origin', headers });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       const error = new Error(data.message || `Request failed (${response.status})`);

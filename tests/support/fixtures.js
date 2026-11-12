@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { getInitialSeedState } from '../../backend/src/seed/initialState.js';
 
 // Synthetic accounts only. Never copy a developer or production database into tests.
-export const TEST_PASSWORD = 'Testing@123';
+export const TEST_PASSWORD = 'Testing@123-passphrase!';
 export const accounts = {
   admin: 'admin@test.yaans.invalid',
   customer: 'customer@test.yaans.invalid',

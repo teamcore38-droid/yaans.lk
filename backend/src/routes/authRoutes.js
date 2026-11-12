@@ -1,11 +1,18 @@
 import { createRouter } from '../config/router.js';
 import bcrypt from 'bcryptjs';
 import { getStore, persistStore, generateId, idFilter } from '../config/db.js';
-import { authenticate, signToken, signAdminToken, getJwtSecret, usesDefaultAdminPassword, credentialsRevoked } from '../middleware/auth.js';
+import { authenticate, signToken, getJwtSecret, usesDefaultAdminPassword, credentialsRevoked } from '../middleware/auth.js';
 import { recordAdminAuditLog } from '../config/auditLogger.js';
 import { loginIpLimit, loginAccountLimit, adminAccountLimit, sharedRateLimit } from '../middleware/sharedRateLimit.js';
+import { validateAuthBody, validateNewPassword } from '../config/inputValidation.js';
+import { setSessionCookies, clearSessionCookies, newCsrfToken } from '../config/sessionCookies.js';
+import { recordSecurityEvent } from '../config/securityEvents.js';
+import { beginMfaEnrollment, completeMfaEnrollment, createMfaChallenge, verifyMfaLogin } from '../services/adminMfa.js';
+import { httpError } from '../config/errors.js';
 
 const router = createRouter();
+router.use((_req,res,next)=>{res.set('Cache-Control','private, no-store');next();});
+router.use(validateAuthBody);
 
 function sanitizeUser(user, store) {
   const seller = user.sellerId ? store.sellers.find((s) => s._id === user.sellerId) : null;
@@ -15,6 +22,7 @@ function sanitizeUser(user, store) {
     email: user.email,
     phone: user.phone,
     role: user.role,
+    ...(user.role === 'admin' ? { mfaEnabled:Boolean(user.adminMfa?.enabled) } : {}),
     sellerId: user.sellerId,
     sellerStatus: seller ? seller.status : null,
     sellerStoreName: seller ? seller.storeName : null,
@@ -22,6 +30,12 @@ function sanitizeUser(user, store) {
     addresses: user.addresses || [],
     wishlist: user.wishlist || []
   };
+}
+
+function issueSession(req,res,user,store,extra={},status=200) {
+  const csrf=newCsrfToken();const token=signToken(user,csrf);
+  setSessionCookies(res,token,csrf,user.role==='admin');
+  return res.status(status).json({...(req.headers['x-yaans-client']==='browser'?{}:{token}),user:sanitizeUser(user,store),...extra});
 }
 
 // POST /api/auth/login (Customer & Seller Storefront Login ONLY)
@@ -35,6 +49,7 @@ router.post('/login', loginIpLimit, loginAccountLimit, async (req, res) => {
   const normalizedEmail = String(email).toLowerCase().trim();
   const user = store.users.find((u) => u.email.toLowerCase() === normalizedEmail);
   if (!user || !await bcrypt.compare(String(password), user.passwordHash)) {
+    await recordSecurityEvent('login_failed',{identity:normalizedEmail,ip:req.ip,outcome:'denied'});
     return res.status(401).json({ message: 'Invalid email or password.' });
   }
   if (user.role === 'admin') {
@@ -47,11 +62,8 @@ router.post('/login', loginIpLimit, loginAccountLimit, async (req, res) => {
     return res.status(403).json({ message: 'This account has been deactivated.' });
   }
 
-  const token = signToken(user);
-  return res.json({
-    token,
-    user: sanitizeUser(user, store)
-  });
+  await recordSecurityEvent('login_success',{userId:user._id,role:user.role,ip:req.ip});
+  return issueSession(req,res,user,store);
 });
 
 // POST /api/auth/admin/login (Dedicated Gated Marketplace Admin Authentication)
@@ -69,6 +81,7 @@ router.post('/admin/login', loginIpLimit, adminAccountLimit, async (req, res) =>
   const user = store.users.find((u) => u.email.toLowerCase() === normalizedEmail);
 
   if (!user || !await bcrypt.compare(String(password), user.passwordHash)) {
+    await recordSecurityEvent('admin_login_failed',{identity:normalizedEmail,ip:req.ip,outcome:'denied'});
     recordAdminAuditLog(store, {
       event: 'ADMIN_LOGIN_FAILED',
       email: normalizedEmail,
@@ -105,6 +118,8 @@ router.post('/admin/login', loginIpLimit, adminAccountLimit, async (req, res) =>
     return res.status(403).json({ message: 'This administrator account requires a secure password reset by the site owner.' });
   }
 
+  if (user.adminMfa?.enabled) return res.json({requiresMfa:true,challengeToken:createMfaChallenge(user)});
+
   recordAdminAuditLog(store, {
     event: 'ADMIN_LOGIN_SUCCESS',
     email: user.email,
@@ -114,12 +129,31 @@ router.post('/admin/login', loginIpLimit, adminAccountLimit, async (req, res) =>
   });
   await persistStore(store);
 
-  const token = signAdminToken(user);
-  return res.json({
-    token,
-    sessionExpiresIn: '6h',
-    user: sanitizeUser(user, store)
-  });
+  await recordSecurityEvent('admin_login_success',{userId:user._id,role:user.role,ip:req.ip});
+  return issueSession(req,res,user,store,{sessionExpiresIn:'1h',mfaEnrollmentRecommended:true});
+});
+
+router.post('/admin/mfa/login',loginIpLimit,sharedRateLimit('mfa-verification',10,15*60000),async(req,res)=>{
+  try {
+    const user=await verifyMfaLogin(req.body.challengeToken,req.body.code);
+    const store=await getStore({sellers:{_id:{$in:[]}}});
+    await recordSecurityEvent('admin_mfa_login_success',{userId:user._id,role:user.role,ip:req.ip});
+    return issueSession(req,res,user,store,{sessionExpiresIn:'1h'});
+  } catch(error) {await recordSecurityEvent('admin_mfa_login_failed',{ip:req.ip,outcome:'denied'});throw error;}
+});
+
+router.post('/admin/mfa/enroll',authenticate,sharedRateLimit('mfa-enrollment',5,15*60000,req=>req.user._id),async(req,res)=>{
+  if(req.user.role!=='admin')throw httpError(403,'Administrator access required.');
+  if(!req.body.currentPassword||!await bcrypt.compare(req.body.currentPassword,req.user.passwordHash))throw httpError(401,'Current password is required.');
+  return res.json(await beginMfaEnrollment(req.user));
+});
+
+router.post('/admin/mfa/confirm',authenticate,sharedRateLimit('mfa-confirmation',10,15*60000,req=>req.user._id),async(req,res)=>{
+  if(req.user.role!=='admin')throw httpError(403,'Administrator access required.');
+  const result=await completeMfaEnrollment(req.user,req.body.code);
+  const store=await getStore({sellers:{_id:{$in:[]}}});
+  await recordSecurityEvent('admin_mfa_enabled',{userId:req.user._id,role:req.user.role,ip:req.ip});
+  return issueSession(req,res,result.user,store,{recoveryCodes:result.recoveryCodes});
 });
 
 // POST /api/auth/register-customer
@@ -129,6 +163,7 @@ router.post('/register-customer', sharedRateLimit('registration', 10, 60 * 60000
   if (!name || !email || !phone || !password) {
     return res.status(400).json({ message: 'Name, email, Sri Lankan phone number, and password are required.' });
   }
+  validateNewPassword(password);
 
   const store = await getStore({ users: { email: String(email).toLowerCase().trim() } });
   const exists = store.users.find((u) => u.email.toLowerCase() === String(email).toLowerCase().trim());
@@ -154,11 +189,7 @@ router.post('/register-customer', sharedRateLimit('registration', 10, 60 * 60000
   store.users.push(newUser);
   await persistStore(store);
 
-  const token = signToken(newUser);
-  return res.status(201).json({
-    token,
-    user: sanitizeUser(newUser, store)
-  });
+  return issueSession(req,res,newUser,store,{},201);
 });
 
 // POST /api/auth/register-seller
@@ -187,6 +218,7 @@ router.post('/register-seller', sharedRateLimit('registration', 10, 60 * 60000),
       message: 'Please complete all required seller registration and Sri Lankan business/NIC fields.'
     });
   }
+  validateNewPassword(password);
 
   const store = await getStore({ users: { email: String(email).toLowerCase().trim() }, sellers: { _id: { $in: [] } } });
   const exists = store.users.find((u) => u.email.toLowerCase() === String(email).toLowerCase().trim());
@@ -260,13 +292,10 @@ router.post('/register-seller', sharedRateLimit('registration', 10, 60 * 60000),
   store.users.push(newUser);
   await persistStore(store);
 
-  const token = signToken(newUser);
-  return res.status(201).json({
-    token,
-    user: sanitizeUser(newUser, store),
+  return issueSession(req,res,newUser,store,{
     seller: newSeller,
     message: 'Seller application submitted! Your store is now pending Yaans.lk Admin review.'
-  });
+  },201);
 });
 
 // GET /api/auth/me
@@ -278,6 +307,7 @@ router.get('/me', authenticate, async (req, res) => {
 // PUT /api/auth/profile
 router.put('/profile', authenticate, async (req, res) => {
   const { name, phone, defaultDistrict, email } = req.body;
+  if(email&&email.trim().toLowerCase()!==req.user.email.toLowerCase())throw httpError(400,'Use the credentials form and your current password to change your email.');
   const store = await getStore({ users: { $or: [idFilter(req.user._id), { email: typeof email === 'string' ? email.toLowerCase().trim() : '' }] }, sellers: { _id: req.user.sellerId || null } });
   const user = store.users.find((u) => u._id === req.user._id);
   if (!user) {
@@ -330,26 +360,26 @@ router.put('/update-credentials', authenticate, async (req, res) => {
   }
 
   if (newPassword) {
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: 'New password must be at least 6 characters.' });
-    }
-    if (user.role === 'admin' && (newPassword.length < 14 || newPassword === 'Admin@123')) {
-      return res.status(400).json({ message: 'Administrator passwords must contain at least 14 characters.' });
-    }
-    user.passwordHash = await bcrypt.hash(newPassword, 10);
-    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    validateNewPassword(newPassword);
+    user.passwordHash = await bcrypt.hash(newPassword, user.role==='admin'?12:10);
   }
+  if(newPassword||(newEmail&&newEmail.trim().toLowerCase()!==req.user.email.toLowerCase()))user.tokenVersion=(user.tokenVersion||0)+1;
 
   if (newName && newName.trim()) user.name = newName.trim();
   if (newPhone !== undefined) user.phone = newPhone.trim();
 
   await persistStore(store);
-  const token = signToken(user);
-  return res.json({
-    token,
-    user: sanitizeUser(user, store),
-    message: 'Credentials updated successfully.'
-  });
+  await recordSecurityEvent('credentials_changed',{userId:user._id,role:user.role,ip:req.ip});
+  return issueSession(req,res,user,store,{message:'Credentials updated successfully.'});
+});
+
+router.post('/logout',authenticate,async(req,res)=>{
+  const store=await getStore({users:idFilter(req.user._id)});
+  const user=store.users[0];user.tokenVersion=(user.tokenVersion||0)+1;
+  await persistStore(store);
+  clearSessionCookies(res);
+  await recordSecurityEvent('logout_all_sessions',{userId:user._id,role:user.role,ip:req.ip});
+  return res.json({message:'Signed out on all devices.'});
 });
 
 // POST /api/auth/addresses

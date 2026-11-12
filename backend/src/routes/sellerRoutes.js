@@ -5,6 +5,7 @@ import { uploadMiddleware, handleProductImageUpload } from '../config/cloudinary
 import { fulfillmentTransitions } from '../../../shared/orderStatus.js';
 import { releaseInventory } from '../services/orders.js';
 import { uploadLimit } from '../middleware/sharedRateLimit.js';
+import { httpError } from '../config/errors.js';
 
 const router = createRouter();
 
@@ -108,12 +109,17 @@ router.get('/dashboard', async (req, res) => {
 });
 
 // POST /api/seller/upload-image
-router.post('/upload-image', uploadLimit, uploadMiddleware.single('image'), async (req, res) => {
+router.post('/upload-image', async(req,_res,next)=>{
+  if(req.user.role==='admin')return next();
+  const store=await getStore({sellers:{userId:req.user._id}});
+  if(!store.sellers.some(s=>s.status==='approved'))throw httpError(403,'Your store must be approved before uploading images.');
+  next();
+}, uploadLimit, uploadMiddleware.single('image'), async (req, res) => {
   try {
     const uploaded = await handleProductImageUpload(req);
     return res.status(201).json(uploaded);
   } catch (err) {
-    return res.status(500).json({ message: err.message || 'Image upload failed.' });
+    throw err;
   }
 });
 

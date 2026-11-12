@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { apiRequest } from '../../utils/api.js';
+import AdminMfaSettings from './AdminMfaSettings.jsx';
 
 export default function AdminAccountTab({ user, refreshUser, showToast }) {
   const [adminProfileForm, setAdminProfileForm] = useState({
@@ -37,7 +38,7 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
     const cleanName = adminProfileForm.name.trim();
     const cleanEmail = adminProfileForm.email.trim().toLowerCase();
     const cleanPhone = adminProfileForm.phone.trim();
-    const cleanPassword = adminProfileForm.currentPasswordForEmail.trim();
+    const cleanPassword = adminProfileForm.currentPasswordForEmail;
 
     if (!cleanName || !cleanEmail) {
       showToast('Admin display name and email are required.', 'error');
@@ -61,7 +62,6 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
           currentPassword: cleanPassword || undefined
         })
       });
-      localStorage.setItem('yaans_token', res.token);
       localStorage.setItem('yaans_user', JSON.stringify(res.user));
       await refreshUser();
       setAdminProfileForm((prev) => ({ ...prev, currentPasswordForEmail: '' }));
@@ -75,9 +75,9 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
 
   const handleUpdateAdminPassword = async (e) => {
     e.preventDefault();
-    const currentPassword = adminPasswordForm.currentPassword.trim();
-    const newPassword = adminPasswordForm.newPassword.trim();
-    const confirmPassword = adminPasswordForm.confirmPassword.trim();
+    const currentPassword = adminPasswordForm.currentPassword;
+    const newPassword = adminPasswordForm.newPassword;
+    const confirmPassword = adminPasswordForm.confirmPassword;
 
     if (!currentPassword) {
       showToast('Current password is required.', 'error');
@@ -87,8 +87,8 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
       showToast('New passwords do not match.', 'error');
       return;
     }
-    if (newPassword.length < 6) {
-      showToast('New password must be at least 6 characters.', 'error');
+    if (newPassword.length < 15) {
+      showToast('New password must be at least 15 characters.', 'error');
       return;
     }
     try {
@@ -100,7 +100,6 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
           newPassword
         })
       });
-      localStorage.setItem('yaans_token', res.token);
       localStorage.setItem('yaans_user', JSON.stringify(res.user));
       await refreshUser();
       setAdminPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -290,7 +289,7 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
                 <input
                   type={showAdminNewPassword ? 'text' : 'password'}
                   required
-                  minLength={6}
+                  minLength={15}
                   autoComplete="new-password"
                   value={adminPasswordForm.newPassword}
                   onChange={(e) =>
@@ -316,7 +315,7 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
                 <input
                   type={showAdminConfirmPassword ? 'text' : 'password'}
                   required
-                  minLength={6}
+                  minLength={15}
                   autoComplete="new-password"
                   value={adminPasswordForm.confirmPassword}
                   onChange={(e) =>
@@ -349,6 +348,7 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
           </form>
         </div>
       </div>
+      <AdminMfaSettings user={user} refreshUser={refreshUser} showToast={showToast} />
     </div>
   );
 }

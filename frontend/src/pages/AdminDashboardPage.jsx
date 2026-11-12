@@ -127,9 +127,8 @@ export default function AdminDashboardPage() {
             </Link>
             <button
               type="button"
-              onClick={() => {
-                logout();
-                navigate('/admin/login');
+              onClick={async () => {
+                if(await logout())navigate('/admin/login');
               }}
               className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs"
             >

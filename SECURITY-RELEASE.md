@@ -12,7 +12,7 @@ Provision or recover an administrator from a trusted terminal with the intended 
 node backend/scripts/provision-admin.js --email=OWNER_EMAIL --reset-existing
 ```
 
-The command prompts twice with hidden password input. Use a unique password of at least 14 characters. Omit `--reset-existing` when creating a new administrator. The command cannot promote an existing customer/seller and does not print the password. `--password-stdin` is for a secure non-interactive input source; never pass a password as a command argument or paste it into chat.
+The command prompts twice with hidden password input. Use a unique password of at least 15 characters, within bcrypt's 72 UTF-8 byte limit. Omit `--reset-existing` when creating a new administrator. The command cannot promote an existing customer/seller and does not print the password. `--password-stdin` is for a secure non-interactive input source; never pass a password as a command argument or paste it into chat. Add `--reset-mfa` only with `--reset-existing` when the verified owner has lost both the authenticator and recovery codes; ordinary password recovery preserves MFA.
 
 Registered orders require the owning account. Guests receive a random-looking private access code at checkout, valid for 90 days. The code is sent in an API header, not an API query string. Save it from the confirmation screen; browser session storage is only a convenience. The database stores a one-way hash. Sequential order numbers and recipient phone numbers do not authorize access or cancellation. Legacy guest orders without a code require verified support recovery.
 
@@ -56,4 +56,4 @@ Do not overlap the old snapshot writer and the new writer against the same produ
 
 The read-only setting is reversible and does not change hosting plans. Dedicated staging credentials are required before enabling mutations on preview deployments that currently inherit production database settings.
 
-Further audit work includes populated-catalog pagination/query performance, shared abuse limits, COD remittance/refund reconciliation, media failure/size handling, monitoring and measured concurrency testing. This release does not establish a capacity guarantee for 200–500 simultaneous users.
+The subsequent OWASP remediation introduces HttpOnly sessions, CSRF checks, administrator authenticators, upload limits, verified-purchase review rules, browser policies and security CI gates. See [OWASP-REMEDIATION.md](OWASP-REMEDIATION.md) for deployment requirements and the remaining owner/provider checks. Operational and capacity work is documented in [OPERATIONS.md](OPERATIONS.md) and [PERFORMANCE.md](PERFORMANCE.md). These changes do not establish a capacity guarantee for 200–500 simultaneous users.

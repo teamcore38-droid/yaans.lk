@@ -10,5 +10,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
   localStorage.clear();
   sessionStorage.clear();
+  for(const value of document.cookie.split(';'))document.cookie=`${value.split('=')[0].trim()}=; Max-Age=0; path=/`;
   invalidateCatalogCache();
 });

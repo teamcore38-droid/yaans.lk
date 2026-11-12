@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { apiRequest, getCachedApiResponse } from '../utils/api.js';
+import { apiRequest, getCachedApiResponse, browserSessionKey, invalidateCatalogCache } from '../utils/api.js';
 
 const MarketplaceContext = createContext(null);
 
@@ -14,6 +14,7 @@ export const DEFAULT_SL_DISTRICTS = [
 export function MarketplaceProvider({ children }) {
   const [user, setUser] = useState(() => {
     try {
+      if(!browserSessionKey())return null;
       const saved = localStorage.getItem('yaans_user');
       return saved ? JSON.parse(saved) : null;
     } catch {
@@ -79,12 +80,14 @@ export function MarketplaceProvider({ children }) {
     localStorage.setItem('yaans_district', district);
   }, []);
 
-  // Sync user session on mount if token exists
+  // Restore the HttpOnly session; discard bearer tokens left by older releases.
   useEffect(() => {
-    const token = localStorage.getItem('yaans_token');
-    if (token) {
+    localStorage.removeItem('yaans_token');
+    const initialSession=browserSessionKey();
+    if (initialSession) {
       apiRequest('/auth/me')
         .then((res) => {
+          if(browserSessionKey()!==initialSession)return;
           setUser(res.user);
           localStorage.setItem('yaans_user', JSON.stringify(res.user));
           if (res.user.defaultDistrict && !localStorage.getItem('yaans_district')) {
@@ -92,6 +95,7 @@ export function MarketplaceProvider({ children }) {
           }
         })
         .catch((error) => {
+          if(browserSessionKey()!==initialSession)return;
           if (error.status !== 401 && error.status !== 403) return;
           localStorage.removeItem('yaans_token');
           localStorage.removeItem('yaans_user');
@@ -144,7 +148,6 @@ export function MarketplaceProvider({ children }) {
       method: 'POST',
       body: JSON.stringify({ email, password })
     });
-    localStorage.setItem('yaans_token', res.token);
     localStorage.setItem('yaans_user', JSON.stringify(res.user));
     setUser(res.user);
     if (res.user.defaultDistrict) {
@@ -154,16 +157,16 @@ export function MarketplaceProvider({ children }) {
     return res.user;
   };
 
-  const adminLogin = async (email, password) => {
-    const res = await apiRequest('/auth/admin/login', {
+  const adminLogin = async (email, password, challengeToken, code) => {
+    const res = await apiRequest(challengeToken?'/auth/admin/mfa/login':'/auth/admin/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify(challengeToken?{challengeToken,code}:{ email, password })
     });
-    localStorage.setItem('yaans_token', res.token);
+    if(res.requiresMfa)return res;
     localStorage.setItem('yaans_user', JSON.stringify(res.user));
     setUser(res.user);
     showToast(`Signed in to Admin Console as ${res.user.name}`);
-    return res.user;
+    return res;
   };
 
   const registerCustomer = async (payload) => {
@@ -171,7 +174,6 @@ export function MarketplaceProvider({ children }) {
       method: 'POST',
       body: JSON.stringify(payload)
     });
-    localStorage.setItem('yaans_token', res.token);
     localStorage.setItem('yaans_user', JSON.stringify(res.user));
     setUser(res.user);
     if (res.user.defaultDistrict) {
@@ -186,18 +188,19 @@ export function MarketplaceProvider({ children }) {
       method: 'POST',
       body: JSON.stringify(payload)
     });
-    localStorage.setItem('yaans_token', res.token);
     localStorage.setItem('yaans_user', JSON.stringify(res.user));
     setUser(res.user);
     showToast('Seller application submitted for Admin review!');
     return res;
   };
 
-  const logout = () => {
-    localStorage.removeItem('yaans_token');
-    localStorage.removeItem('yaans_user');
-    setUser(null);
-    showToast('Signed out of Yaans.lk', 'info');
+  const logout = async () => {
+    try {
+      await apiRequest('/auth/logout',{method:'POST',body:'{}'});
+      localStorage.removeItem('yaans_token');localStorage.removeItem('yaans_user');
+      invalidateCatalogCache();setUser(null);
+      showToast('Signed out on all devices', 'info');return true;
+    }catch(error){showToast(error.message||'Could not sign out. Please retry.','error');return false;}
   };
 
   const refreshUser = async () => {

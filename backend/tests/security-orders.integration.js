@@ -276,6 +276,7 @@ test('security, durable orders and recovery with real MongoDB transactions', { t
     assert.equal(await app.mongo.collection('orders').countDocuments(), 0);
     assert.equal(await app.mongo.collection('suborders').countDocuments(), 0);
     assert.equal(await app.mongo.collection('checkoutrequests').countDocuments(), 0);
+    assert.equal(await app.mongo.collection('ordernotifications').countDocuments(), 0);
     assert.equal((await app.mongo.collection('products').findOne({ _id: 'prd_test_spice' })).stock, 100);
     assert.equal((await request('/orders/checkout', { key, body: payload() })).status, 201);
     assert.equal((await request('/orders/checkout', { key, body: payload() })).status, 200);

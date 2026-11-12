@@ -174,13 +174,23 @@ test('invalid credentials show an error and leave sign-in available', async ({ p
 
 test('seller fulfillment and admin payout are reflected in the settlement ledger', async ({ page, request }) => {
   const created = await request.post('/api/orders/checkout', { headers: { 'Idempotency-Key': randomUUID() }, data: {
-    items: [{ productId: 'prd_test_spice', variantLabel: '100 g', quantity: 1 }],
+    items: [{ productId: 'prd_test_spice', variantLabel: '100 g', quantity: 1 }, { productId: 'prd_test_lamp', quantity: 1 }],
     shippingAddress, customerEmail: 'fulfillment@test.yaans.invalid', paymentMethod: 'COD', codConfirmedByCustomer: true
   } });
   expect(created.status()).toBe(201);
-  const { subOrders: [subOrder] } = await created.json();
+  const { order, subOrders } = await created.json();
+  const subOrder = subOrders.find(sub => sub.items.some(item => item.productId === 'prd_test_spice'));
+  const otherPackage = subOrders.find(sub => sub._id !== subOrder._id);
   await login(page, accounts.seller);
   await expect(page.getByRole('heading', { name: /Test Kandy Pantry.*Seller Portal/ })).toBeVisible();
+  const inbox = page.getByRole('region', { name: 'Order notifications' });
+  await expect(inbox.getByRole('status')).toContainText('New order received');
+  await inbox.getByRole('button', { name: /Notifications/ }).click();
+  const sellerAlert = inbox.getByRole('listitem').filter({ hasText: subOrder.subOrderNumber });
+  await expect(sellerAlert).toBeVisible();
+  await expect(sellerAlert).not.toContainText(otherPackage.items[0].title);
+  await sellerAlert.getByRole('button', { name: 'View orders and mark as read' }).click();
+  await expect(sellerAlert).toHaveCount(0);
   const card = page.getByText(`Sub-Order #${subOrder.subOrderNumber}`, { exact: true })
     .locator('xpath=ancestor::div[contains(@class, "shadow-sm")][1]');
   for (const label of ['Mark Packed', 'Mark Shipped', 'Mark Delivered']) {
@@ -190,6 +200,11 @@ test('seller fulfillment and admin payout are reflected in the settlement ledger
   }
   await login(page, accounts.admin, true);
   await expect(page).toHaveURL(/\/admin$/);
+  await inbox.getByRole('button', { name: /Notifications/ }).click();
+  const adminAlert = inbox.getByRole('listitem').filter({ hasText: order.orderNumber }).filter({ hasText: subOrder.items[0].title });
+  await expect(adminAlert).toContainText(otherPackage.items[0].title);
+  await adminAlert.getByRole('button', { name: 'View orders and mark as read' }).click();
+  await expect(adminAlert).toHaveCount(0);
   await page.getByRole('button', { name: 'Commissions & Seller Settlements' }).click();
   const receiptForm = page.getByRole('article', { name: `Reconcile ${subOrder.subOrderNumber}` }).getByRole('form', { name: 'Confirm platform receipt' });
   await receiptForm.getByLabel('Actual bank or courier reference').fill(`E2E-RECEIPT-${subOrder._id}`);

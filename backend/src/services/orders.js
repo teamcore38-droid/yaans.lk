@@ -1,3 +1,4 @@
+import { saveOrderNotifications } from './orderNotifications.js';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import mongoose from 'mongoose';
 import { getStore, loadCollections, persistStore, withTransaction, idFilter, generateId, connectDatabase, MODEL_MAP } from '../config/db.js';
@@ -165,6 +166,7 @@ export async function checkout(body, user, key) {
       store.orders.push(order);
       store.subOrders.push(...subOrders);
       await persistStore(store);
+      await saveOrderNotifications(order, subOrders, session);
       return { order: customerOrder(order), subOrders: subOrders.map(customerPackage),
         ...(token ? { guestAccessToken: token } : {}), replayed: false, message: `Order ${orderNumber} placed successfully!` };
     });

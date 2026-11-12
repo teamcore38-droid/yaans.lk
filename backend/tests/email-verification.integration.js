@@ -124,8 +124,8 @@ test('email ownership and identity changes with disposable MongoDB', {timeout:60
     const sent=await app.mongo.collection('securityemailoutbox').findOne({_id:notice._id});assert.ok(sent.sentAt);assert.equal(sent.to,undefined);assert.equal(sent.text,undefined);
   });
   await scenario('recipient limits restrict resend abuse and challenges are excluded from backups',async()=>{
-    for(let i=0;i<3;i++)assert.equal((await post('/auth/register-customer',payload)).status,202);
-    const denied=await post('/auth/register-customer',payload);assert.equal(denied.status,429);assert.ok(Number(denied.headers.get('retry-after'))>0);assert.equal(app.mailbox.length,3);
+    for(let i=0;i<3;i++)assert.equal((await post('/auth/register-customer',{...payload,newEmail:`unrelated-${i}@test.invalid`})).status,202);
+    const denied=await post('/auth/register-customer',{...payload,newEmail:'unrelated-extra@test.invalid'});assert.equal(denied.status,429);assert.ok(Number(denied.headers.get('retry-after'))>0);assert.equal(app.mailbox.length,3);
     const backup=await captureBackup(app.mongo);assert.equal(backup.data.emailchallenges,undefined);assert.ok(Array.isArray(backup.data.securityemailoutbox));
   });
   await scenario('real transport uses the fixed Resend endpoint, limits staging recipients and fails closed on provider errors',async()=>{

@@ -160,8 +160,9 @@ router.post('/admin/mfa/confirm',authenticate,sharedRateLimit('mfa-confirmation'
 });
 
 // POST /api/auth/register-customer
-const emailRecipientLimit = sharedRateLimit('email-recipient', 3, 60 * 60000, req => String(req.body?.newEmail || req.body?.email || req.user?.email || '').trim().toLowerCase());
-router.post('/register-customer', sharedRateLimit('registration', 10, 60 * 60000), emailRecipientLimit, async (req, res) => {
+const registrationEmailLimit = sharedRateLimit('email-recipient', 3, 60 * 60000, req => String(req.body?.email || '').trim().toLowerCase());
+const currentEmailLimit = sharedRateLimit('email-recipient', 3, 60 * 60000, req => req.user.email.toLowerCase());
+router.post('/register-customer', sharedRateLimit('registration', 10, 60 * 60000), registrationEmailLimit, async (req, res) => {
   getJwtSecret();
   const { name, email, phone, password, defaultDistrict = 'Colombo' } = req.body;
   if (!name || !email || !phone || !password) {
@@ -194,7 +195,7 @@ router.post('/register-customer', sharedRateLimit('registration', 10, 60 * 60000
 });
 
 // POST /api/auth/register-seller
-router.post('/register-seller', sharedRateLimit('registration', 10, 60 * 60000), emailRecipientLimit, async (req, res) => {
+router.post('/register-seller', sharedRateLimit('registration', 10, 60 * 60000), registrationEmailLimit, async (req, res) => {
   getJwtSecret();
   const {
     name,
@@ -300,7 +301,7 @@ router.post('/verify-email', sharedRateLimit('email-confirm-ip',20,15*60000),
     return res.json(result);
   });
 
-router.post('/email-verification',authenticate,sharedRateLimit('email-request-account',3,60*60000,req=>req.user._id),emailRecipientLimit,async(req,res)=>{
+router.post('/email-verification',authenticate,sharedRateLimit('email-request-account',3,60*60000,req=>req.user._id),currentEmailLimit,async(req,res)=>{
   if(!req.body.currentPassword||!await bcrypt.compare(req.body.currentPassword,req.user.passwordHash))throw httpError(401,'Current password is required.');
   return res.json(await requestCurrentEmailVerification(req.user));
 });

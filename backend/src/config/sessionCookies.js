@@ -19,8 +19,8 @@ export function assertCsrf(req, decoded) {
   if (typeof actual !== 'string' || actual.length > 128 || typeof decoded.csrf !== 'string' ||
     !timingSafeEqual(createHash('sha256').update(actual).digest(),createHash('sha256').update(decoded.csrf).digest())) throw httpError(403,'Refresh this page before making changes.');
 }
-export function setSessionCookies(res, token, csrf, administrator) {
-  const names=cookieNames(), options={ secure:secure(), sameSite:'lax', path:'/', maxAge:(administrator?3600:86400)*1000 };
+export function setSessionCookies(res, token, csrf, administrator, staff = false) {
+  const names=cookieNames(), options={ secure:secure(), sameSite:'lax', path:'/', maxAge:(administrator?3600:staff?28800:86400)*1000 };
   res.cookie(names.session,token,{...options,httpOnly:true});
   res.cookie(names.csrf,csrf,{...options,httpOnly:false});
   res.set('Cache-Control','private, no-store');

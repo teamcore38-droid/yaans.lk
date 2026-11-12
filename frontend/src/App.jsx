@@ -17,6 +17,8 @@ const TrackOrderPage = lazy(pageLoaders.tracking);
 const SellerStorefrontPage = lazy(pageLoaders.store);
 const SellerDashboardPage = lazy(pageLoaders.seller);
 const AdminDashboardPage = lazy(pageLoaders.admin);
+const StaffDashboardPage = lazy(pageLoaders.staff);
+const StaffLoginPage = lazy(pageLoaders.staffLogin);
 const AdminLoginPage = lazy(pageLoaders.adminLogin);
 const PrivacyPolicyPage = lazy(pageLoaders.privacy);
 const TermsConditionsPage = lazy(pageLoaders.terms);
@@ -98,6 +100,8 @@ export default function App() {
                       </ErrorBoundary>
                     }
                   />
+                  <Route path="/staff/login" element={<StaffLoginPage />} />
+                  <Route path="/staff" element={<StaffDashboardPage />} />
                   <Route path="/admin/login" element={<AdminLoginPage />} />
                   <Route
                     path="/admin"

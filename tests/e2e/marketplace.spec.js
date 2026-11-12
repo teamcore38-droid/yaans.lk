@@ -228,7 +228,7 @@ test('seller fulfillment and admin payout are reflected in the settlement ledger
   await expect(page.getByRole('cell', { name: settlement.settlementReference, exact: true })).toBeVisible();
 });
 
-test('administrator security settings stay inside the screen and can be opened',async({page})=>{
+test('administrator security and staff provisioning work on desktop and mobile',async({page,request})=>{
   await login(page,accounts.admin,true);
   await expect(page).toHaveURL(/\/admin$/);
   const tab=page.getByRole('button',{name:'Admin Account & Security',exact:true});
@@ -240,6 +240,45 @@ test('administrator security settings stay inside the screen and can be opened',
   await tab.click();
   await expect(page.getByRole('heading',{name:'Administrator authenticator',exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'Set up authenticator',exact:true})).toBeVisible();
+  await page.getByRole('button', { name: 'Staff Accounts', exact: true }).click();
+  const email = `operator-${randomUUID()}@test.invalid`;
+  const temporary = 'Temporary-staff-passphrase!123', permanent = 'Personal-staff-passphrase!456';
+  const form = page.getByRole('form', { name: 'Create staff account' });
+  await form.getByLabel('Staff name').fill('Browser Order Staff');
+  await form.getByLabel('Staff email').fill(email);
+  await form.getByLabel('Staff phone').fill('0771234567');
+  await form.getByLabel('Temporary staff password').fill(temporary);
+  await form.getByLabel('Your administrator password').fill(TEST_PASSWORD);
+  await form.getByRole('button', { name: 'Create staff account' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Staff account created' })).toBeVisible();
+  const created = await request.post('/api/orders/checkout', { headers: { 'Idempotency-Key': randomUUID() }, data: {
+    items: [{ productId: 'prd_test_lamp', quantity: 1 }], shippingAddress,
+    customerEmail: 'staff-orders@test.invalid', paymentMethod: 'COD', codConfirmedByCustomer: true
+  } });
+  expect(created.status()).toBe(201); const { order } = await created.json();
+  await page.goto('/staff/login');
+  await page.getByLabel('Staff email').fill(email); await page.getByLabel('Password', { exact: true }).fill(temporary);
+  await page.getByRole('button', { name: 'Sign in to Staff Dashboard' }).click();
+  await expect(page).toHaveURL(/\/staff$/);
+  await expect(page.getByRole('region', { name: 'Order notifications' })).not.toBeVisible();
+  const passwordForm = page.getByRole('form', { name: 'Change staff password' });
+  await passwordForm.getByLabel('Temporary password').fill(temporary);
+  await passwordForm.getByLabel('New password', { exact: true }).fill(permanent);
+  await passwordForm.getByLabel('Confirm new password').fill(permanent);
+  await passwordForm.getByRole('button', { name: 'Save staff password' }).click();
+  await expect(page.getByRole('region', { name: 'Order notifications' }).getByRole('status')).toContainText('New order received');
+  expect((await page.request.get('/api/admin/overview')).status()).toBe(403);
+  expect((await page.request.get('/api/admin/staff')).status()).toBe(403);
+  expect((await page.request.get('/api/seller/dashboard')).status()).toBe(403);
+  expect((await page.request.post('/api/auth/staff/activity', { data: {} })).status()).toBe(403);
+  await page.getByRole('button', { name: `View delivery details for ${order.orderNumber}` }).click();
+  const details = page.getByRole('region', { name: 'Order delivery details' });
+  await expect(details).toContainText(shippingAddress.recipientName);
+  await expect(details).toContainText(shippingAddress.addressLine1);
+  await expect(page.getByRole('button', { name: 'Commissions & Seller Settlements' })).not.toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Staff Dashboard', exact: true })).toBeVisible();
+
 });
 
 test('legal route aliases and direct refreshes render their actual pages', async ({ page }) => {

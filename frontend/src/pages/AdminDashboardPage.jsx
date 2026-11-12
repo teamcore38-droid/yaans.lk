@@ -24,6 +24,7 @@ const DistrictShippingTab = lazy(() => import('./admin/DistrictShippingTab.jsx')
 const SettlementsTab = lazy(() => import('./admin/SettlementsTab.jsx'));
 const OrdersTab = lazy(() => import('./admin/OrdersTab.jsx'));
 const AdminAccountTab = lazy(() => import('./admin/AdminAccountTab.jsx'));
+const StaffManagementTab = lazy(() => import('./admin/StaffManagementTab.jsx'));
 const AdminAuditLogTab = lazy(() => import('./admin/AdminAuditLogTab.jsx'));
 
 export default function AdminDashboardPage() {
@@ -302,6 +303,7 @@ export default function AdminDashboardPage() {
           },
           { id: 'settlements', label: 'Commissions & Seller Settlements', icon: Banknote },
           { id: 'orders', label: `All Split Orders (${orders.length})`, icon: Package },
+          { id: 'staff', label: 'Staff Accounts', icon: ShieldCheck },
           { id: 'account', label: 'Admin Account & Security', icon: ShieldCheck },
           { id: 'audit', label: `Security & Audit Logs (${data?.platformConfig?.adminAuditLogs?.length || 0})`, icon: ShieldAlert }
         ].map((tab) => {
@@ -390,6 +392,7 @@ export default function AdminDashboardPage() {
         {activeTab === 'orders' && <OrdersTab orders={orders} subOrders={subOrders} />}
 
         {/* TAB 7: ADMIN ACCOUNT & SECURITY CREDENTIALS */}
+        {activeTab === 'staff' && <StaffManagementTab />}
         {activeTab === 'account' && (
           <AdminAccountTab user={user} refreshUser={refreshUser} showToast={showToast} />
         )}

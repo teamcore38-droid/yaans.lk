@@ -28,3 +28,15 @@ test('legacy banner links cannot become executable or external navigation',()=>{
   }
   for(const link of ['/','/products?category=home&sort=price','/store/example#products'])assert.equal(safeInternalLink(link),link);
 });
+
+
+test('staff cookies have a bounded eight-hour lifetime and preserve secure cookie safeguards', () => {
+  const previous = process.env.VERCEL_ENV; process.env.VERCEL_ENV = 'production';
+  try {
+    const cookies = []; const res = { cookie: (name, value, options) => cookies.push({ name, options }), set: () => {} };
+    setSessionCookies(res, 'synthetic-staff', 'synthetic-csrf', false, true);
+    assert.equal(cookies[0].options.maxAge, 8 * 3600 * 1000);
+    assert.equal(cookies[0].options.httpOnly, true);
+    for (const { options } of cookies) { assert.equal(options.secure, true); assert.equal(options.sameSite, 'lax'); assert.equal(options.path, '/'); assert.equal(options.domain, undefined); }
+  } finally { if (previous === undefined) delete process.env.VERCEL_ENV; else process.env.VERCEL_ENV = previous; }
+});

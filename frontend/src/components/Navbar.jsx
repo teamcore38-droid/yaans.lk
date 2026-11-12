@@ -176,7 +176,7 @@ export default function Navbar() {
                 <div className="flex items-center gap-1">
                   <Link
                     to={
-                      user.role === 'admin'
+                      user.role === 'staff' ? '/staff' : user.role === 'admin'
                         ? '/admin'
                         : user.role === 'seller'
                         ? '/seller/dashboard'
@@ -187,14 +187,14 @@ export default function Navbar() {
                     <User className="w-5 h-5 text-slate-700" />
                     <div className="hidden xl:block text-left leading-tight">
                       <div className="text-[10px] text-slate-500">
-                        {user.role === 'admin'
+                        {user.role === 'staff' ? 'Order Staff' : user.role === 'admin'
                           ? 'Super Admin'
                           : user.role === 'seller'
                           ? 'Verified Seller'
                           : `Hello, ${user.name.split(' ')[0]}`}
                       </div>
                       <div className="text-xs font-bold text-slate-900">
-                        {user.role === 'admin'
+                        {user.role === 'staff' ? 'Staff Dashboard' : user.role === 'admin'
                           ? 'Admin Console'
                           : user.role === 'seller'
                           ? (user.sellerStoreName || 'Seller Portal')
@@ -362,7 +362,7 @@ export default function Navbar() {
                   <div className="pt-2 flex items-center gap-2">
                     <Link
                       to={
-                        user.role === 'admin'
+                        user.role === 'staff' ? '/staff' : user.role === 'admin'
                           ? '/admin'
                           : user.role === 'seller'
                           ? '/seller/dashboard'
@@ -371,7 +371,7 @@ export default function Navbar() {
                       onClick={() => setMobileMenuOpen(false)}
                       className="flex-1 py-1.5 px-3 rounded-lg bg-slate-900 text-white text-xs font-bold text-center"
                     >
-                      {user.role === 'admin'
+                      {user.role === 'staff' ? 'Staff Dashboard' : user.role === 'admin'
                         ? 'Admin Console'
                         : user.role === 'seller'
                         ? 'Seller Dashboard'

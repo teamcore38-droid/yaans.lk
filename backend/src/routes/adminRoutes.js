@@ -6,7 +6,7 @@ import { recordAdminAuditLog } from '../config/auditLogger.js';
 import { recordCashMovement, recordSellerPayout, payoutEligible, restockReturnedPackage } from '../services/finance.js';
 import { uploadLimit } from '../middleware/sharedRateLimit.js';
 import { isSafeInternalLink } from '../../../shared/safeLinks.js';
-import { stringField, sanitizeHighlights } from '../config/inputValidation.js';
+import { stringField, sanitizeHighlights, sanitizeSlug } from '../config/inputValidation.js';
 import { httpError } from '../config/errors.js';
 
 const router = createRouter();
@@ -200,8 +200,8 @@ router.put('/products/:productId', async (req, res) => {
 
   if (title !== undefined) product.title = title.trim();
   if (sku !== undefined) product.sku = sku.trim();
-  if (categorySlug !== undefined) product.categorySlug = categorySlug;
-  if (subCategorySlug !== undefined) product.subCategorySlug = subCategorySlug;
+  if (categorySlug !== undefined) product.categorySlug = sanitizeSlug(categorySlug) || product.categorySlug;
+  if (subCategorySlug !== undefined) product.subCategorySlug = sanitizeSlug(subCategorySlug);
   if (description !== undefined) product.description = description.trim();
   if (highlights !== undefined) {
     product.highlights = sanitizeHighlights(highlights);

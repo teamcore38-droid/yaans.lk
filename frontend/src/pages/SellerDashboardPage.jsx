@@ -121,6 +121,7 @@ export default function SellerDashboardPage() {
     title: '',
     sku: '',
     categorySlug: 'homemade-pantry',
+    subCategorySlug: '',
     description: '',
     highlights: '',
     priceLkr: '',
@@ -380,6 +381,7 @@ export default function SellerDashboardPage() {
         title: prodForm.title,
         sku: prodForm.sku,
         categorySlug: prodForm.categorySlug,
+        subCategorySlug: prodForm.subCategorySlug || '',
         description: prodForm.description,
         highlights: prodForm.highlights,
         priceLkr: Number(prodForm.priceLkr),
@@ -419,6 +421,7 @@ export default function SellerDashboardPage() {
         title: '',
         sku: '',
         categorySlug: 'homemade-pantry',
+        subCategorySlug: '',
         description: '',
         highlights: '',
         priceLkr: '',
@@ -439,6 +442,7 @@ export default function SellerDashboardPage() {
       title: prod.title,
       sku: prod.sku,
       categorySlug: prod.categorySlug,
+      subCategorySlug: prod.subCategorySlug || '',
       description: prod.description,
       highlights: Array.isArray(prod.highlights) ? prod.highlights.join('\n') : (prod.highlights || ''),
       priceLkr: String(prod.priceLkr),
@@ -976,6 +980,7 @@ export default function SellerDashboardPage() {
                       title: '',
                       sku: '',
                       categorySlug: 'homemade-pantry',
+                      subCategorySlug: '',
                       description: '',
                       highlights: '',
                       priceLkr: '',
@@ -1005,12 +1010,22 @@ export default function SellerDashboardPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Department *</label>
+                <label htmlFor="seller-product-department" className="block font-bold text-slate-700 mb-1">Department *</label>
                 <select
+                  id="seller-product-department"
                   value={prodForm.categorySlug}
-                  onChange={(e) => setProdForm({ ...prodForm, categorySlug: e.target.value })}
+                  onChange={(e) => {
+                    const nextCatSlug = e.target.value;
+                    const nextCat = (categories.length > 0 ? categories : (data?.categories || [])).find((c) => c.slug === nextCatSlug);
+                    const subExists = nextCat?.subCategories?.some((s) => s.slug === prodForm.subCategorySlug);
+                    setProdForm({
+                      ...prodForm,
+                      categorySlug: nextCatSlug,
+                      subCategorySlug: subExists ? prodForm.subCategorySlug : ''
+                    });
+                  }}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-semibold"
                 >
                   {(categories.length > 0 ? categories : (data?.categories || [])).map((cat) => (
@@ -1021,15 +1036,33 @@ export default function SellerDashboardPage() {
                 </select>
               </div>
               <div>
-                <label className="block font-bold text-slate-700 mb-1">SKU Code</label>
-                <input
-                  type="text"
-                  value={prodForm.sku}
-                  onChange={(e) => setProdForm({ ...prodForm, sku: e.target.value })}
-                  placeholder="Auto-generated if empty"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300"
-                />
+                <label htmlFor="seller-product-subcategory" className="block font-bold text-slate-700 mb-1">Subcategory / Tile</label>
+                <select
+                  id="seller-product-subcategory"
+                  value={prodForm.subCategorySlug}
+                  onChange={(e) => setProdForm({ ...prodForm, subCategorySlug: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-semibold"
+                >
+                  <option value="">None (General Department)</option>
+                  {((categories.length > 0 ? categories : (data?.categories || [])).find((c) => c.slug === prodForm.categorySlug)?.subCategories || []).map((sub) => (
+                    <option key={sub.slug} value={sub.slug}>
+                      {sub.name}
+                    </option>
+                  ))}
+                </select>
               </div>
+            </div>
+
+            <div>
+              <label htmlFor="seller-product-sku" className="block font-bold text-slate-700 mb-1">SKU Code</label>
+              <input
+                id="seller-product-sku"
+                type="text"
+                value={prodForm.sku}
+                onChange={(e) => setProdForm({ ...prodForm, sku: e.target.value })}
+                placeholder="Auto-generated if empty"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300"
+              />
             </div>
 
             <div className="grid grid-cols-3 gap-2.5">

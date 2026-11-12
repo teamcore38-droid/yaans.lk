@@ -6,7 +6,7 @@ import { fulfillmentTransitions } from '../../../shared/orderStatus.js';
 import { releaseInventory } from '../services/orders.js';
 import { uploadLimit } from '../middleware/sharedRateLimit.js';
 import { httpError } from '../config/errors.js';
-import { sanitizeHighlights } from '../config/inputValidation.js';
+import { sanitizeHighlights, sanitizeSlug } from '../config/inputValidation.js';
 
 const router = createRouter();
 
@@ -168,8 +168,8 @@ router.post('/products', async (req, res) => {
     title: title.trim(),
     slug: `${slugBase}-${Date.now().toString(36).slice(-4)}`,
     sku: sku || `YLK-${Date.now().toString().slice(-5)}`,
-    categorySlug,
-    subCategorySlug,
+    categorySlug: sanitizeSlug(categorySlug) || 'homemade-pantry',
+    subCategorySlug: sanitizeSlug(subCategorySlug),
     description: description.trim(),
     highlights: sanitizeHighlights(highlights),
     priceLkr: Number(priceLkr),
@@ -241,8 +241,8 @@ router.put('/products/:productId', async (req, res) => {
 
   if (title !== undefined) product.title = title.trim();
   if (sku !== undefined) product.sku = sku.trim();
-  if (categorySlug !== undefined) product.categorySlug = categorySlug;
-  if (subCategorySlug !== undefined) product.subCategorySlug = subCategorySlug;
+  if (categorySlug !== undefined) product.categorySlug = sanitizeSlug(categorySlug) || product.categorySlug;
+  if (subCategorySlug !== undefined) product.subCategorySlug = sanitizeSlug(subCategorySlug);
   if (description !== undefined) product.description = description.trim();
   if (highlights !== undefined) {
     product.highlights = sanitizeHighlights(highlights);
@@ -357,8 +357,8 @@ router.post('/products/bulk-import', async (req, res) => {
       title,
       slug: `${slugBase}-${Date.now().toString(36).slice(-4)}-${index}`,
       sku: item.sku?.trim() || `YLK-${Date.now().toString().slice(-4)}-${index + 1}`,
-      categorySlug: item.categorySlug?.trim() || 'homemade-pantry',
-      subCategorySlug: item.subCategorySlug?.trim() || '',
+      categorySlug: sanitizeSlug(item.categorySlug) || 'homemade-pantry',
+      subCategorySlug: sanitizeSlug(item.subCategorySlug || item.subcategory),
       description,
       highlights: sanitizeHighlights(item.highlights),
       priceLkr,

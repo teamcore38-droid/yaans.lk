@@ -50,3 +50,9 @@ export function sanitizeHighlights(input, { maxItems = 20, maxItemLength = 300 }
     .slice(0, maxItems);
 }
 
+export function sanitizeSlug(input, max = 80) {
+  if (typeof input !== 'string') return '';
+  return input.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, max);
+}
+
+

@@ -213,6 +213,20 @@ test('seller fulfillment and admin payout are reflected in the settlement ledger
   await expect(page.getByRole('cell', { name: settlement.settlementReference, exact: true })).toBeVisible();
 });
 
+test('administrator security settings stay inside the screen and can be opened',async({page})=>{
+  await login(page,accounts.admin,true);
+  await expect(page).toHaveURL(/\/admin$/);
+  const tab=page.getByRole('button',{name:'Admin Account & Security',exact:true});
+  const fitsScreen=await tab.evaluate(element=>{
+    const bounds=element.getBoundingClientRect();
+    return bounds.left>=0&&bounds.right<=document.documentElement.clientWidth;
+  });
+  expect(fitsScreen).toBe(true);
+  await tab.click();
+  await expect(page.getByRole('heading',{name:'Administrator authenticator',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Set up authenticator',exact:true})).toBeVisible();
+});
+
 test('legal route aliases and direct refreshes render their actual pages', async ({ page }) => {
   for (const [path, heading] of [
     ['/privacy', 'Privacy Policy'], ['/privacy-policy', 'Privacy Policy'],

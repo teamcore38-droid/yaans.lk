@@ -59,7 +59,7 @@ The capacity phase now adds bounded-query regressions and a separate disposable 
 
 ## CI and required external release settings
 
-`npm run test:security` checks all three lockfiles using both npm advisories and OSV. Only public package names and versions are sent to the advisory feeds; an unavailable or incomplete feed fails verification. It is part of `npm run verify`, together with 42 Node, 37 React, 68 API and 20 desktop/mobile browser checks at the OWASP remediation baseline.
+`npm run test:security` checks all three lockfiles using both npm advisories and OSV. Only public package names and versions are sent to the advisory feeds; an unavailable or incomplete feed fails verification. It is part of `npm run verify`, together with 42 Node, 37 React, 68 API and 22 desktop/mobile browser checks at the OWASP remediation baseline. Browser coverage includes finding and opening administrator security settings without a tab being clipped beyond the screen.
 
 The security regressions exercise malformed account inputs and password policy, identity-change reauthentication/revocation, HttpOnly cookies and CSRF, server-side sign-out, CORS, all banner-write aliases, fake/oversized/nested uploads, approved-seller upload authorization, purchase-backed reviews, TOTP/recovery-code replay and shared attempt limits, durable redacted security events, security alert names and shortened backup tags. Vite preview applies the deployment browser policy in local journeys; only the HTTPS-upgrade directive is omitted for HTTP loopback. A browser regression confirms that inline script injection is blocked.
 

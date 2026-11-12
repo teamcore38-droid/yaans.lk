@@ -285,7 +285,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Admin Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 overflow-x-auto no-scrollbar">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200">
         {[
           { id: 'sellers', label: `Seller Approvals & Commission (${sellers.length})`, icon: Store },
           { id: 'products', label: `Product & Category Moderation (${products.length})`, icon: ShoppingBag },

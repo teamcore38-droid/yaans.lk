@@ -179,13 +179,24 @@ test('marketplace API with disposable MongoDB', { timeout: 600000 }, async (t) =
 
   await t.test('seller product CRUD and bulk import retain ownership and report invalid rows', async () => {
     const created = await request('/seller/products', { method: 'POST', token: sellerToken, body: {
-      title: 'New Test Product', description: 'A test description', priceLkr: 1200, stock: 10
+      title: 'New Test Product', description: 'A test description', priceLkr: 1200, stock: 10,
+      highlights: '100% Sri Lankan Spices\nNo preservatives\nSealed 350g jar'
     } });
     assert.equal(created.status, 201);
     const id = created.data.product._id;
     assert.equal(created.data.product.sellerId, 'sel_test_pantry');
+    assert.deepEqual(created.data.product.highlights, [
+      '100% Sri Lankan Spices',
+      'No preservatives',
+      'Sealed 350g jar'
+    ]);
     assert.equal((await request(`/seller/products/${id}/stock`, { method: 'PATCH', token: sellerToken, body: { delta: 5 } })).data.stock, 15);
-    assert.equal((await request(`/seller/products/${id}`, { method: 'PUT', token: sellerToken, body: { title: 'Updated Test Product' } })).status, 200);
+    const updated = await request(`/seller/products/${id}`, { method: 'PUT', token: sellerToken, body: {
+      title: 'Updated Test Product',
+      highlights: 'Updated highlight 1\nClean line\x00with control char\nUpdated highlight 2'
+    } });
+    assert.equal(updated.status, 200);
+    assert.deepEqual(updated.data.product.highlights, ['Updated highlight 1', 'Updated highlight 2']);
     assert.equal((await request(`/seller/products/${id}`, { method: 'DELETE', token: otherSellerToken })).status, 403);
     assert.equal((await request(`/seller/products/${id}`, { method: 'DELETE', token: sellerToken })).status, 200);
     const imported = await request('/seller/products/bulk-import', { method: 'POST', token: sellerToken, body: { items: [

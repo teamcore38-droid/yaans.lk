@@ -35,3 +35,18 @@ export function validateAuthBody(req, _res, next) {
     next();
   } catch (error) { next(error); }
 }
+
+export function sanitizeHighlights(input, { maxItems = 20, maxItemLength = 300 } = {}) {
+  if (!input) return [];
+  const rawList = Array.isArray(input)
+    ? input
+    : String(input)
+        .split(/;|\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+  return rawList
+    .map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
+    .filter((item) => item.length > 0 && item.length <= maxItemLength && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(item))
+    .slice(0, maxItems);
+}
+

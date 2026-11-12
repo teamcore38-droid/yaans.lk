@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { catalogIndexes } from '../config/catalogIndexes.js';
 
 const { Schema } = mongoose;
 
@@ -374,6 +375,8 @@ const PlatformConfigSchema = new Schema(
   },
   { timestamps: true, strict: false }
 );
+
+for (const { key, name } of catalogIndexes) ProductSchema.index(key, { name });
 
 export const UserModel = mongoose.models.User || mongoose.model('User', UserSchema);
 export const SellerModel = mongoose.models.Seller || mongoose.model('Seller', SellerSchema);

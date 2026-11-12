@@ -53,7 +53,9 @@ The security/order regression suite also runs a second real API process against 
 
 Additional regressions verify that delivery and legacy remittance flags do not authorize payouts; receipt/refund amounts and actual references are required; concurrent payouts claim an order once; returns hold earnings; refunds after payout require seller recovery; and inspected returns restore stock once. Shared tracking limits and administrator lockouts are tested across two API processes, including a protection-store outage. Monitoring tests cover authentication, aggregate-only counters, stale backups/drills and network failures. Recovery tests restore nonempty orders, inventory and accounts, verify BSON/indexes, and exercise the automated drill cleanup.
 
-These checks do not establish a concurrent-user capacity ceiling. Populated-catalog performance, Cloudinary failure/size handling and measured load tests remain follow-up work. Private scheduled operations and the hosted staging journey are separate from ordinary isolated CI; see [OPERATIONS.md](OPERATIONS.md).
+These checks do not establish a hosted concurrent-user capacity ceiling. Private scheduled operations and the hosted staging journey are separate from ordinary isolated CI; see [OPERATIONS.md](OPERATIONS.md).
+
+The capacity phase now adds bounded-query regressions and a separate disposable load runner. Run `npm run test:capacity` for local measurements and see [PERFORMANCE.md](PERFORMANCE.md) for profiles, stop conditions, explicit index preparation, provider approval and the limits of local results. Cloudinary and hosted saturation testing remain separate.
 
 ## CI and required external release settings
 

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Star,
   MapPin,
@@ -20,6 +20,8 @@ import { imageUrl, imageSrcSet } from '../utils/images.js';
 export default function ProductDetailPage() {
   const { idOrSlug } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const reviewPage = Math.max(1, parseInt(searchParams.get('reviews'), 10) || 1);
   const {
     user,
     selectedDistrict,
@@ -30,11 +32,12 @@ export default function ProductDetailPage() {
     showToast
   } = useMarketplace();
 
-  const endpoint = `/marketplace/products/${idOrSlug}?destinationDistrict=${encodeURIComponent(selectedDistrict)}`;
+  const endpoint = `/marketplace/products/${idOrSlug}?destinationDistrict=${encodeURIComponent(selectedDistrict)}&reviewPage=${reviewPage}`;
   const { data, setData, loading } = useCatalogResource(endpoint);
   const [activeImage, setActiveImage] = useState(0);
   const [selectedVariant, setSelectedVariant] = useState('');
   const [quantity, setQuantity] = useState(1);
+  const initializedProduct = useRef(null);
 
   // Review form state
   const [reviewName, setReviewName] = useState('');
@@ -44,6 +47,8 @@ export default function ProductDetailPage() {
   const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
+    if (!data?.product?._id || initializedProduct.current === data.product._id) return;
+    initializedProduct.current = data.product._id;
     setActiveImage(0);
     setQuantity(1);
     setSelectedVariant(data?.product?.variants?.[0]?.values?.[0]?.label || 'Standard');
@@ -73,7 +78,12 @@ export default function ProductDetailPage() {
     );
   }
 
-  const { product, seller, reviews = [], relatedProducts = [], shippingEstimate } = data;
+  const { product, seller, reviews = [], relatedProducts = [], shippingEstimate, reviewPagination } = data;
+  const changeReviewPage = (page) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('reviews', String(page));
+    setSearchParams(next, { preventScrollReset: true });
+  };
   const isWishlisted = wishlistIds.includes(product._id);
 
   // Compute active price based on selected variant
@@ -112,8 +122,12 @@ export default function ProductDetailPage() {
           rating: res.productRating,
           reviewCount: res.reviewCount
         },
-        reviews: [res.review, ...(prev.reviews || [])]
+        reviews: [res.review, ...(prev.reviews || [])].slice(0, prev.reviewPagination?.limit || 20),
+        ...(prev.reviewPagination ? { reviewPagination: { ...prev.reviewPagination,
+          total: prev.reviewPagination.total + 1,
+          totalPages: Math.max(1, Math.ceil((prev.reviewPagination.total + 1) / prev.reviewPagination.limit)) } } : {})
       }));
+      if (reviewPage !== 1) changeReviewPage(1);
       setReviewTitle('');
       setReviewComment('');
       showToast('Thank you! Your review has been published.');
@@ -515,7 +529,7 @@ export default function ProductDetailPage() {
 
         <div className="lg:col-span-7 space-y-4">
           <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
-            Verified Customer Reviews ({reviews.length})
+            Verified Customer Reviews ({reviewPagination?.total ?? reviews.length})
           </h2>
           {reviews.length === 0 ? (
             <p className="text-xs text-slate-500">No reviews yet. Be the first to review this item!</p>
@@ -537,6 +551,15 @@ export default function ProductDetailPage() {
                 </div>
               ))}
             </div>
+          )}
+          {reviewPagination?.totalPages > 1 && (
+            <nav aria-label="Review pages" className="flex items-center justify-between gap-3 text-xs">
+              <button type="button" disabled={loading || reviewPage <= 1} onClick={() => changeReviewPage(reviewPage - 1)}
+                className="px-3 py-2 rounded border border-slate-300 disabled:opacity-40">Previous reviews</button>
+              <span aria-live="polite">Page {reviewPage} of {reviewPagination.totalPages}</span>
+              <button type="button" disabled={loading || reviewPage >= reviewPagination.totalPages} onClick={() => changeReviewPage(reviewPage + 1)}
+                className="px-3 py-2 rounded border border-slate-300 disabled:opacity-40">Next reviews</button>
+            </nav>
           )}
         </div>
       </div>

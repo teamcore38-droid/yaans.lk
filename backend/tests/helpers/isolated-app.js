@@ -6,7 +6,7 @@ import mongoose from 'mongoose';
 import { MongoMemoryReplSet } from 'mongodb-memory-server-core';
 import { buildTestStore } from '../../../tests/support/fixtures.js';
 
-export async function startIsolatedApp(port = 0) {
+export async function startIsolatedApp(port = 0, { monitorCommands = false } = {}) {
   const temporaryRoot = path.resolve(os.tmpdir());
   const directory = await fs.mkdtemp(path.join(temporaryRoot, 'yaans-test-'));
   const removeTemporaryDirectory = async () => {
@@ -35,7 +35,11 @@ export async function startIsolatedApp(port = 0) {
     process.env.MONGODB_URI = mongo.getUri();
     const { default: app } = await import('../../src/server.js');
     const db = await import('../../src/config/db.js');
-    assert.equal((await db.connectDatabase()).isMongoConnected, true, 'Tests require real temporary MongoDB; fallback must not pass');
+    const originalConnect = mongoose.connect;
+    try {
+      if (monitorCommands) mongoose.connect = (uri, options) => originalConnect.call(mongoose, uri, { ...options, monitorCommands: true });
+      assert.equal((await db.connectDatabase()).isMongoConnected, true, 'Tests require real temporary MongoDB; fallback must not pass');
+    } finally { mongoose.connect = originalConnect; }
     const fixtures = buildTestStore();
     for (const [collection, model] of Object.entries(db.MODEL_MAP)) {
       await model.collection.deleteMany({});

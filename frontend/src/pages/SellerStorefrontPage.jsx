@@ -1,5 +1,5 @@
 import React from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { Store, MapPin, Star, Truck, Sparkles, CheckCircle2 } from 'lucide-react';
 import { formatLkr } from '../utils/api.js';
 import ProductCard from '../components/ProductCard.jsx';
@@ -7,7 +7,9 @@ import { useCatalogResource } from '../hooks/useCatalogResource.js';
 
 export default function SellerStorefrontPage() {
   const { slugOrId } = useParams();
-  const { data, loading } = useCatalogResource(`/marketplace/sellers/${slugOrId}`);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const page = Math.max(1, parseInt(searchParams.get('page'), 10) || 1);
+  const { data, loading } = useCatalogResource(`/marketplace/sellers/${slugOrId}?page=${page}`);
 
   if (loading) {
     return (
@@ -33,7 +35,12 @@ export default function SellerStorefrontPage() {
     );
   }
 
-  const { seller, products = [] } = data;
+  const { seller, products = [], pagination } = data;
+  const changePage = (value) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('page', String(value));
+    setSearchParams(next);
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 py-5 space-y-6">
@@ -117,13 +124,22 @@ export default function SellerStorefrontPage() {
       {/* Seller Catalog */}
       <section>
         <h2 className="text-base sm:text-lg font-extrabold text-slate-900 mb-3">
-          Products from {seller.storeName} ({products.length})
+          Products from {seller.storeName} ({pagination?.total ?? products.length})
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
           {products.map((product) => (
             <ProductCard key={product._id} product={product} />
           ))}
         </div>
+        {pagination?.totalPages > 1 && (
+          <nav aria-label="Store product pages" className="mt-5 flex items-center justify-between gap-3 text-xs">
+            <button type="button" disabled={page <= 1} onClick={() => changePage(page - 1)}
+              className="px-3 py-2 rounded border border-slate-300 disabled:opacity-40">Previous products</button>
+            <span>Page {page} of {pagination.totalPages}</span>
+            <button type="button" disabled={page >= pagination.totalPages} onClick={() => changePage(page + 1)}
+              className="px-3 py-2 rounded border border-slate-300 disabled:opacity-40">Next products</button>
+          </nav>
+        )}
       </section>
     </div>
   );

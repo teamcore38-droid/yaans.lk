@@ -6,7 +6,7 @@ import { recordAdminAuditLog } from '../config/auditLogger.js';
 import { recordCashMovement, recordSellerPayout, payoutEligible, restockReturnedPackage } from '../services/finance.js';
 import { uploadLimit } from '../middleware/sharedRateLimit.js';
 import { isSafeInternalLink } from '../../../shared/safeLinks.js';
-import { stringField } from '../config/inputValidation.js';
+import { stringField, sanitizeHighlights } from '../config/inputValidation.js';
 import { httpError } from '../config/errors.js';
 
 const router = createRouter();
@@ -204,12 +204,7 @@ router.put('/products/:productId', async (req, res) => {
   if (subCategorySlug !== undefined) product.subCategorySlug = subCategorySlug;
   if (description !== undefined) product.description = description.trim();
   if (highlights !== undefined) {
-    product.highlights = Array.isArray(highlights)
-      ? highlights
-      : String(highlights)
-          .split('\n')
-          .map((s) => s.trim())
-          .filter(Boolean);
+    product.highlights = sanitizeHighlights(highlights);
   }
   if (priceLkr !== undefined) product.priceLkr = Math.max(0, Number(priceLkr));
   if (compareAtPriceLkr !== undefined) {

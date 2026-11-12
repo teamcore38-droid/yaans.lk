@@ -6,6 +6,7 @@ import { fulfillmentTransitions } from '../../../shared/orderStatus.js';
 import { releaseInventory } from '../services/orders.js';
 import { uploadLimit } from '../middleware/sharedRateLimit.js';
 import { httpError } from '../config/errors.js';
+import { sanitizeHighlights } from '../config/inputValidation.js';
 
 const router = createRouter();
 
@@ -170,12 +171,7 @@ router.post('/products', async (req, res) => {
     categorySlug,
     subCategorySlug,
     description: description.trim(),
-    highlights: Array.isArray(highlights)
-      ? highlights.filter(Boolean)
-      : String(highlights)
-          .split('\n')
-          .map((s) => s.trim())
-          .filter(Boolean),
+    highlights: sanitizeHighlights(highlights),
     priceLkr: Number(priceLkr),
     compareAtPriceLkr: compareAtPriceLkr ? Number(compareAtPriceLkr) : null,
     stock: Number(stock) || 0,
@@ -249,12 +245,7 @@ router.put('/products/:productId', async (req, res) => {
   if (subCategorySlug !== undefined) product.subCategorySlug = subCategorySlug;
   if (description !== undefined) product.description = description.trim();
   if (highlights !== undefined) {
-    product.highlights = Array.isArray(highlights)
-      ? highlights
-      : String(highlights)
-          .split('\n')
-          .map((s) => s.trim())
-          .filter(Boolean);
+    product.highlights = sanitizeHighlights(highlights);
   }
   if (priceLkr !== undefined) product.priceLkr = Number(priceLkr);
   if (compareAtPriceLkr !== undefined) {
@@ -369,12 +360,7 @@ router.post('/products/bulk-import', async (req, res) => {
       categorySlug: item.categorySlug?.trim() || 'homemade-pantry',
       subCategorySlug: item.subCategorySlug?.trim() || '',
       description,
-      highlights: Array.isArray(item.highlights)
-        ? item.highlights.filter(Boolean)
-        : String(item.highlights || '')
-            .split(/[\n;]/)
-            .map((s) => s.trim())
-            .filter(Boolean),
+      highlights: sanitizeHighlights(item.highlights),
       priceLkr,
       compareAtPriceLkr: item.compareAtPriceLkr ? Number(item.compareAtPriceLkr) : null,
       stock: item.stock !== undefined ? Math.max(0, Number(item.stock) || 0) : 15,

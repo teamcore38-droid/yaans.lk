@@ -440,7 +440,7 @@ export default function SellerDashboardPage() {
       sku: prod.sku,
       categorySlug: prod.categorySlug,
       description: prod.description,
-      highlights: (prod.highlights || []).join('\n'),
+      highlights: Array.isArray(prod.highlights) ? prod.highlights.join('\n') : (prod.highlights || ''),
       priceLkr: String(prod.priceLkr),
       compareAtPriceLkr: prod.compareAtPriceLkr ? String(prod.compareAtPriceLkr) : '',
       stock: String(prod.stock),
@@ -968,7 +968,23 @@ export default function SellerDashboardPage() {
               {editingProductId && (
                 <button
                   type="button"
-                  onClick={() => setEditingProductId(null)}
+                  onClick={() => {
+                    setEditingProductId(null);
+                    setVariantGroupName('Set Size');
+                    setVariantRows([]);
+                    setProdForm({
+                      title: '',
+                      sku: '',
+                      categorySlug: 'homemade-pantry',
+                      description: '',
+                      highlights: '',
+                      priceLkr: '',
+                      compareAtPriceLkr: '',
+                      stock: '25',
+                      imageUrl: '',
+                      isHomemade: seller?.isHomemadeVendor ?? true
+                    });
+                  }}
                   className="text-sky-700 font-bold"
                 >
                   Cancel Edit
@@ -977,8 +993,9 @@ export default function SellerDashboardPage() {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Product Title *</label>
+              <label htmlFor="seller-product-title" className="block font-bold text-slate-700 mb-1">Product Title *</label>
               <input
+                id="seller-product-title"
                 type="text"
                 required
                 value={prodForm.title}
@@ -1017,8 +1034,9 @@ export default function SellerDashboardPage() {
 
             <div className="grid grid-cols-3 gap-2.5">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Price (Rs.) *</label>
+                <label htmlFor="seller-product-price" className="block font-bold text-slate-700 mb-1">Price (Rs.) *</label>
                 <input
+                  id="seller-product-price"
                   type="number"
                   required
                   value={prodForm.priceLkr}
@@ -1182,8 +1200,23 @@ export default function SellerDashboardPage() {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Description *</label>
+              <label htmlFor="seller-product-highlights" className="block font-bold text-slate-700 mb-1">
+                Key Highlights <span className="font-normal text-slate-500">(1 point per line)</span>
+              </label>
               <textarea
+                id="seller-product-highlights"
+                rows={3}
+                value={prodForm.highlights}
+                onChange={(e) => setProdForm({ ...prodForm, highlights: e.target.value })}
+                placeholder="100% Sri Lankan Spices&#10;No preservatives&#10;Sealed 350g jar"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono text-xs"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="seller-product-description" className="block font-bold text-slate-700 mb-1">Description *</label>
+              <textarea
+                id="seller-product-description"
                 rows={3}
                 required
                 value={prodForm.description}

@@ -23,7 +23,7 @@ The request mix is 40% product lists/search, 20% product details, 20% home, 15% 
 
 Waves stop after five unexpected failures or a request over ten seconds. A fifteen-second client timeout can leave a committed order with an ambiguous response. The runner replays only the original checkout key/body at low load, then verifies all saved orders/packages, stock deductions and variant deductions. Recovery after a timeout does not clear the original wave's error or latency result.
 
-Exit code 0 means all requested local waves met the configured sample targets: no unexpected errors, no rate-limit responses, no stop condition, catalog p95 below one second and checkout p95 below two seconds. Code 2 means a capacity target or stop condition was reached; code 1 means a harness or consistency check failed. These timings are diagnostic targets and are not part of the normal hardware-independent CI gate. CI instead verifies bounded database results, index usage, privacy/visibility, pagination, filters, BSON compatibility and browser behavior.
+Exit code 0 means all requested local waves met the configured sample targets: no unexpected errors, no rate-limit responses, no stop condition, each sampled list/search/home/detail/quote path's p95 below one second and checkout p95 below two seconds. Unsampled routes are not timing-certified. Code 2 means a capacity target or stop condition was reached; code 1 means a harness or consistency check failed. These timings are diagnostic targets and are not part of the normal hardware-independent CI gate. CI instead verifies bounded database results, index usage, privacy/visibility, pagination, filters, BSON compatibility and browser behavior.
 
 ## Production preparation
 

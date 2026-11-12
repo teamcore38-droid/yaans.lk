@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { startIsolatedApp } from '../backend/tests/helpers/isolated-app.js';
 import { populateCapacityData } from '../tests/performance/fixtures.mjs';
+import { assessCapacitySample } from '../tests/performance/targets.mjs';
 import { shippingAddress } from '../tests/support/fixtures.js';
 
 const supported = new Set(['users', 'seconds', 'think-ms', 'instances', 'products', 'sellers', 'reviews', 'orders', 'label', 'out']);
@@ -142,15 +143,17 @@ try {
     const wallMs = performance.now() - started;
     const samples = await Promise.all(workers.map(async (worker) => (await worker.send('sample')).sample));
     const networkAfter = (await app.mongo.admin().command({ serverStatus: 1 })).network;
+    const routes = Object.fromEntries(Object.entries(byKind).map(([kind, values]) => [kind, { requests: values.length,
+      p50Ms: percentile(values, .5), p95Ms: percentile(values, .95), p99Ms: percentile(values, .99), maxMs: Math.max(...values) }]));
+    const targets = assessCapacitySample({ routes, statuses, unexpectedErrors: unexpected, aborted });
     const wave = { activeUsers: users, requests, wallSeconds: wallMs / 1000, achievedRps: requests / (wallMs / 1000),
       latencyMs: { p50: percentile(latencies, .5), p95: percentile(latencies, .95), p99: percentile(latencies, .99), max: Math.max(0, ...latencies) },
-      routes: Object.fromEntries(Object.entries(byKind).map(([kind, values]) => [kind, { requests: values.length,
-        p50Ms: percentile(values, .5), p95Ms: percentile(values, .95), p99Ms: percentile(values, .99), maxMs: Math.max(...values) }])),
+      routes,
       statuses, unexpectedErrors: unexpected, responseBytes: bytes,
       mongoNetworkBytesOut: networkAfter.bytesOut - networkBefore.bytesOut,
       peakDatabaseConnections: Math.max(...connectionSamples), peakInFlightRequests: peakInFlight, idealRpsBeforeResponseTime: users / (thinkMs / 1000),
       workers: samples, aborted,
-      meetsLocalTargets: unexpected === 0 && !statuses['429'] && percentile(byKind.catalog || [], .95) < 1000 && (!byKind.checkout || percentile(byKind.checkout, .95) < 2000) };
+      targetBreaches: targets.breaches, meetsLocalTargets: targets.passed };
     report.waves.push(wave);
     console.log(JSON.stringify({ wave: users, requests, achievedRps: wave.achievedRps, p95Ms: wave.latencyMs.p95, statuses, unexpectedErrors: unexpected, aborted }));
     if (aborted) break;

@@ -13,12 +13,12 @@ const router = createRouter();
 router.use(authenticate, requireRole('admin'));
 router.use((_req, res, next) => { res.set('Cache-Control', 'private, no-store'); next(); });
 router.use(validateAuthBody);
-const publicStaff = ({ _id, name, email, phone, isActive, staffMustChangePassword, createdAt }) =>
-  ({ _id: String(_id), name, email, phone, isActive, staffMustChangePassword, createdAt });
+const publicStaff = ({ _id, name, email, phone, isActive, staffMustChangePassword, canEditProducts, createdAt }) =>
+  ({ _id: String(_id), name, email, phone, isActive, staffMustChangePassword, canEditProducts, createdAt });
 router.get('/', async (req, res) => {
   const before = stringField(req.query.after, 'Cursor', { maximum: 128 });
   const rows = await mongoose.connection.db.collection('users').find({ role: 'staff', ...(before ? { _id: { $gt: before } } : {}) },
-    { projection: { _id: 1, name: 1, email: 1, phone: 1, isActive: 1, staffMustChangePassword: 1, createdAt: 1 }, maxTimeMS: 3000 })
+    { projection: { _id: 1, name: 1, email: 1, phone: 1, isActive: 1, staffMustChangePassword: 1, canEditProducts: 1, createdAt: 1 }, maxTimeMS: 3000 })
     .sort({ _id: 1 }).limit(26).toArray();
   res.json({ staff: rows.slice(0, 25).map(publicStaff), nextCursor: rows.length > 25 ? String(rows[24]._id) : null });
 });
@@ -68,6 +68,14 @@ router.patch('/:id', async (req, res) => {
     const user = staffTarget(store); user.isActive = req.body.isActive; user.tokenVersion = (user.tokenVersion || 0) + 1; return user;
   });
   res.json({ staff });
+});
+router.patch('/:id/product-permission', async (req, res) => {
+  if (typeof req.body.canEditProducts !== 'boolean' || Object.keys(req.body).some(key => !['canEditProducts', 'currentPassword'].includes(key))) throw httpError(400, 'Provide a product editing permission only.');
+  const staff = await change(req, 'STAFF_PRODUCT_PERMISSION_UPDATED', store => {
+    const user = staffTarget(store); user.canEditProducts = req.body.canEditProducts;
+    user.tokenVersion = (user.tokenVersion || 0) + 1; return user;
+  });
+  res.json({ staff, message: 'Product editing permission updated. Previous sessions have been revoked.' });
 });
 router.post('/:id/reset-password', async (req, res) => {
   if (Object.keys(req.body).some(key => !['newPassword','currentPassword'].includes(key))) throw httpError(400, 'Unsupported password reset field.');

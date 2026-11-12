@@ -251,6 +251,12 @@ test('administrator security and staff provisioning work on desktop and mobile',
   await form.getByLabel('Your administrator password').fill(TEST_PASSWORD);
   await form.getByRole('button', { name: 'Create staff account' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Staff account created' })).toBeVisible();
+  const staffCard = page.getByRole('article', { name: 'Staff member Browser Order Staff' }).filter({ hasText: email });
+  await staffCard.getByRole('button', { name: 'Allow product editing', exact: true }).click();
+  const permissionForm = page.getByRole('form', { name: 'Confirm staff access change' });
+  await permissionForm.getByLabel('Confirm with your administrator password').fill(TEST_PASSWORD);
+  await permissionForm.getByRole('button', { name: 'Confirm staff change' }).click();
+  await expect(staffCard).toContainText('Product editing: Allowed');
   const created = await request.post('/api/orders/checkout', { headers: { 'Idempotency-Key': randomUUID() }, data: {
     items: [{ productId: 'prd_test_lamp', quantity: 1 }], shippingAddress,
     customerEmail: 'staff-orders@test.invalid', paymentMethod: 'COD', codConfirmedByCustomer: true
@@ -278,6 +284,19 @@ test('administrator security and staff provisioning work on desktop and mobile',
   await expect(page.getByRole('button', { name: 'Commissions & Seller Settlements' })).not.toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Staff Dashboard', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Products', exact: true }).click();
+  const products = page.getByRole('region', { name: 'Staff products' });
+  await products.getByRole('button', { name: 'Edit Test Desk Lamp', exact: true }).click();
+  const editorForm = page.getByRole('form', { name: 'Edit seller product' });
+  const description = editorForm.getByRole('textbox', { name: 'Description', exact: true });
+  const updatedDescription = (await description.inputValue()) + ' Staff edit verified.';
+  await description.fill(updatedDescription);
+  await editorForm.getByRole('button', { name: 'Save product changes' }).click();
+  await expect(products.getByRole('status')).toContainText('Product updated');
+  const published = await request.get('/api/marketplace/products/prd_test_lamp');
+  expect((await published.json()).product.description).toBe(updatedDescription);
+  expect((await page.request.delete('/api/staff/products/prd_test_lamp')).status()).toBe(403);
+
 
 });
 

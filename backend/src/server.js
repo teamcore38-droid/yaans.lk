@@ -1,3 +1,4 @@
+import staffProductRoutes from './routes/staffProductRoutes.js';
 import staffRoutes from './routes/staffRoutes.js';
 import staffAdminRoutes from './routes/staffAdminRoutes.js';
 import path from 'path';
@@ -120,6 +121,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/seller', sellerRoutes);
 app.use('/api/admin/staff', staffAdminRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/staff/products', staffProductRoutes);
 app.use('/api/staff', staffRoutes);
 
 // Global error handler

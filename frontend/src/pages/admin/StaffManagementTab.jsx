@@ -29,8 +29,8 @@ export default function StaffManagementTab() {
     setBusy(true); setError(''); setMessage('');
     try {
       const endpoint = `/admin/staff/${encodeURIComponent(operation.staff._id)}`;
-      await apiRequest(operation.reset ? `${endpoint}/reset-password` : endpoint, {
-        method: operation.reset ? 'POST' : 'PATCH', body: JSON.stringify(operation.reset ? { currentPassword, newPassword } : { currentPassword, isActive: !operation.staff.isActive })
+      await apiRequest(operation.permission ? `${endpoint}/product-permission` : operation.reset ? `${endpoint}/reset-password` : endpoint, {
+        method: operation.reset ? 'POST' : 'PATCH', body: JSON.stringify(operation.permission ? { currentPassword, canEditProducts: !operation.staff.canEditProducts } : operation.reset ? { currentPassword, newPassword } : { currentPassword, isActive: !operation.staff.isActive })
       });
       setMessage(operation.reset ? 'Temporary password reset. Share it privately; previous sessions have been revoked.' : 'Staff access updated. Previous sessions have been revoked.');
       setOperation(null); setNew(''); setCurrent(''); await load();
@@ -39,7 +39,7 @@ export default function StaffManagementTab() {
   }
   const field = (name, label, type = 'text') => <label className="block">{label}<input className="block w-full border rounded p-2" type={type} required minLength={type === 'password' && name === 'password' ? 15 : undefined} autoComplete={type === 'password' ? name === 'password' ? 'new-password' : 'current-password' : 'off'} value={form[name]} onChange={e => setForm(previous => ({ ...previous, [name]: e.target.value }))} /></label>;
   return <div className="space-y-5">
-    <div><h2 className="text-xl font-bold">Staff accounts</h2><p className="text-sm">Create individual accounts for order monitoring. Staff can view orders and delivery details, but cannot change orders, payments, sellers, or platform settings.</p><Link to="/staff/login" className="text-sky-800 underline">Staff login page</Link></div>
+    <div><h2 className="text-xl font-bold">Staff accounts</h2><p className="text-sm">Create individual accounts for order monitoring. Staff can view orders and delivery details. You can grant product editing individually. Orders, payments, seller accounts, and settings remain restricted.</p><Link to="/staff/login" className="text-sky-800 underline">Staff login page</Link></div>
     {error && <p role="alert" className="text-red-700">{error}</p>}{message && <p role="status" className="text-emerald-800">{message}</p>}
     <form aria-label="Create staff account" onSubmit={create} className="bg-white border rounded-xl p-5 space-y-3 max-w-lg">
       <h3 className="font-bold">Add staff member</h3>
@@ -49,7 +49,7 @@ export default function StaffManagementTab() {
       <button disabled={busy} className="bg-slate-900 text-white px-4 py-2 rounded">Create staff account</button>
     </form>
     {operation && <form aria-label="Confirm staff access change" onSubmit={apply} className="bg-amber-50 border rounded-xl p-5 space-y-3 max-w-lg">
-      <h3 className="font-bold">{operation.reset ? 'Reset password' : operation.staff.isActive ? 'Disable staff access' : 'Enable staff access'}: {operation.staff.name}</h3>
+      <h3 className="font-bold">{operation.permission ? 'Change product editing permission' : operation.reset ? 'Reset password' : operation.staff.isActive ? 'Disable staff access' : 'Enable staff access'}: {operation.staff.name}</h3>
       <p>All existing sessions for this staff member will be revoked.</p>
       {operation.reset && <label className="block">New temporary password<input className="block border rounded p-2 w-full" type="password" required minLength={15} autoComplete="new-password" value={newPassword} onChange={e => setNew(e.target.value)} /></label>}
       <label className="block">Confirm with your administrator password<input className="block border rounded p-2 w-full" type="password" required autoComplete="current-password" value={currentPassword} onChange={e => setCurrent(e.target.value)} /></label>
@@ -57,8 +57,8 @@ export default function StaffManagementTab() {
     </form>}
     <div className="flex gap-3"><button disabled={busy} onClick={() => load()} className="underline">Refresh staff list</button>{data.nextCursor && <button disabled={busy} onClick={() => load(data.nextCursor)} className="underline">More staff accounts</button>}</div>
     <div className="grid gap-3 md:grid-cols-2">{data.staff.map(staff => <article key={staff._id} aria-label={`Staff member ${staff.name}`} className="border rounded-xl bg-white p-4 space-y-2">
-      <h3 className="font-bold">{staff.name}</h3><p className="break-all">{staff.email}</p><p>{staff.isActive ? 'Active' : 'Disabled'}{staff.staffMustChangePassword ? ' · Password change required' : ''}</p>
-      <div className="flex flex-wrap gap-4"><button disabled={busy} className="text-sky-800 underline" onClick={() => { setOperation({ staff }); setCurrent(''); setNew(''); }}>{staff.isActive ? 'Disable access' : 'Enable access'}</button><button disabled={busy} className="text-sky-800 underline" onClick={() => { setOperation({ staff, reset: true }); setCurrent(''); setNew(''); }}>Reset password</button></div>
+      <h3 className="font-bold">{staff.name}</h3><p className="break-all">{staff.email}</p><p>Product editing: {staff.canEditProducts ? 'Allowed' : 'Not allowed'}</p><p>{staff.isActive ? 'Active' : 'Disabled'}{staff.staffMustChangePassword ? ' · Password change required' : ''}</p>
+      <div className="flex flex-wrap gap-4"><button disabled={busy} className="text-sky-800 underline" onClick={() => { setOperation({ staff, permission: true }); setCurrent(''); setNew(''); }}>{staff.canEditProducts ? 'Remove product editing' : 'Allow product editing'}</button><button disabled={busy} className="text-sky-800 underline" onClick={() => { setOperation({ staff }); setCurrent(''); setNew(''); }}>{staff.isActive ? 'Disable access' : 'Enable access'}</button><button disabled={busy} className="text-sky-800 underline" onClick={() => { setOperation({ staff, reset: true }); setCurrent(''); setNew(''); }}>Reset password</button></div>
     </article>)}</div>
     {!data.staff.length && <p>No staff accounts yet.</p>}
   </div>;

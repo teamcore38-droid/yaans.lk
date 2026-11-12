@@ -17,6 +17,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import { operationalStatus, recordOperationalEvent } from './config/operations.js';
 import { corsOrigin } from './config/origins.js';
 import { recordSecurityEvent } from './config/securityEvents.js';
+import { flushSecurityEmailNotices } from './services/securityEmail.js';
 
 dotenv.config();
 
@@ -106,7 +107,7 @@ app.get('/api/operations/status', async (req, res, next) => {
   if (!secret || secret.length < 32 || !timingSafeEqual(createHash('sha256').update(provided).digest(), createHash('sha256').update(`Bearer ${secret}`).digest())) {
     return res.status(401).json({ message: 'Monitoring authentication required.' });
   }
-  try { res.json(await operationalStatus()); } catch (error) { next(error); }
+  try { await flushSecurityEmailNotices(); res.json(await operationalStatus()); } catch (error) { next(error); }
 });
 
 // Mount API Routes

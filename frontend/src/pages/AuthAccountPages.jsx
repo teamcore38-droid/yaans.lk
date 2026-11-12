@@ -16,6 +16,7 @@ import {
 import { apiRequest, formatLkr } from '../utils/api.js';
 import { useMarketplace, DEFAULT_SL_DISTRICTS } from '../context/MarketplaceContext.jsx';
 import ProductCard from '../components/ProductCard.jsx';
+import EmailSecuritySettings from '../components/EmailSecuritySettings.jsx';
 
 export function LoginPage() {
   const { login, showToast } = useMarketplace();
@@ -131,7 +132,7 @@ export function LoginPage() {
 
 export function RegisterCustomerPage() {
   const { registerCustomer, showToast } = useMarketplace();
-  const navigate = useNavigate();
+  const [verificationMessage, setVerificationMessage] = useState('');
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -159,14 +160,15 @@ export function RegisterCustomerPage() {
 
     try {
       setLoading(true);
-      await registerCustomer({
+      const result = await registerCustomer({
         name: cleanName,
         email: cleanEmail,
         phone: cleanPhone,
         defaultDistrict,
         password: cleanPassword
       });
-      navigate('/');
+      setVerificationMessage(result.message);
+      setPassword('');
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -178,6 +180,7 @@ export function RegisterCustomerPage() {
     <div className="max-w-md mx-auto px-4 py-8">
       <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
         <h1 className="text-lg font-extrabold text-slate-900">Create Your Yaans.lk Account</h1>
+        {verificationMessage && <p role="status" className="text-sm text-emerald-800">{verificationMessage}</p>}
         <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
           <div>
             <label className="block font-bold text-slate-700 mb-1">Full Name *</label>
@@ -237,7 +240,7 @@ export function RegisterCustomerPage() {
                 autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Minimum 6 characters"
+                placeholder="Minimum 15 characters"
                 className="w-full pl-3.5 pr-10 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
               <button
@@ -278,7 +281,7 @@ export function RegisterCustomerPage() {
 
 export function SellerRegisterPage() {
   const { registerSeller, showToast } = useMarketplace();
-  const navigate = useNavigate();
+  const [verificationMessage, setVerificationMessage] = useState('');
 
   const [form, setForm] = useState({
     name: '',
@@ -329,8 +332,9 @@ export function SellerRegisterPage() {
 
     try {
       setSubmitting(true);
-      await registerSeller(cleanForm);
-      navigate('/seller/dashboard');
+      const result = await registerSeller(cleanForm);
+      setVerificationMessage(result.message);
+      setForm(previous => ({ ...previous, password: '' }));
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -353,6 +357,7 @@ export function SellerRegisterPage() {
           </p>
         </div>
 
+        {verificationMessage && <p role="status" className="text-sm text-emerald-800">{verificationMessage}</p>}
         <form onSubmit={handleSubmit} className="space-y-5 text-xs">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -760,6 +765,7 @@ export function CustomerAccountPage() {
         </div>
       </div>
 
+      <EmailSecuritySettings user={user} refreshUser={refreshUser} />
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Saved Sri Lankan Addresses */}
         <div className="lg:col-span-5 bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">

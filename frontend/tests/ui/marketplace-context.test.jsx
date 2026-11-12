@@ -27,6 +27,13 @@ test('corrupt saved user/cart/wishlist data falls back to an empty session', asy
   expect(result.current.wishlistIds).toEqual([]);
 });
 
+test.each(['registerCustomer','registerSeller'])('%s waits for email proof and stores no authenticated user',async method=>{
+  fetch.mockImplementation(async url=>url.includes('/register-')?response({requiresEmailVerification:true,message:'Check your inbox.'},202):response({categories:[]}));
+  const {result}=renderHook(useMarketplace,{wrapper});await act(async()=>{});
+  await act(async()=>{expect((await result.current[method]({email:'new@test.invalid'})).requiresEmailVerification).toBe(true);});
+  expect(result.current.user).toBeNull();expect(localStorage.getItem('yaans_user')).toBeNull();
+});
+
 test('merges identical variants while retaining a separate price and row for other variants', async () => {
   const { result } = renderHook(useMarketplace, { wrapper });
   await act(async () => {

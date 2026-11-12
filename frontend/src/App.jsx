@@ -21,6 +21,7 @@ const AdminLoginPage = lazy(pageLoaders.adminLogin);
 const PrivacyPolicyPage = lazy(pageLoaders.privacy);
 const TermsConditionsPage = lazy(pageLoaders.terms);
 const CookiePolicyPage = lazy(pageLoaders.cookies);
+const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage.jsx'));
 
 const LoginPage = lazy(() =>
   pageLoaders.account().then((m) => ({ default: m.LoginPage }))
@@ -89,6 +90,7 @@ export default function App() {
                   <Route path="/store/:slugOrId" element={<SellerStorefrontPage />} />
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/register" element={<RegisterCustomerPage />} />
+                  <Route path="/verify-email" element={<VerifyEmailPage />} />
                   <Route path="/seller/register" element={<SellerRegisterPage />} />
                   <Route
                     path="/seller/dashboard"

@@ -22,6 +22,10 @@ async function close() {
   }
 }
 // Registered only in the test bootstrap, never in the production API.
+testApp.app.get('/__test/mailbox', (req,res)=>{
+  if(req.get('x-yaans-test-control')!==controlSecret)return res.sendStatus(403);
+  res.json({messages:testApp.mailbox});
+});
 testApp.app.post('/__test/shutdown', (req, res) => {
   if (req.get('x-yaans-test-control') !== controlSecret) return res.sendStatus(403);
   res.sendStatus(202);

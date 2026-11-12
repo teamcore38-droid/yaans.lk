@@ -27,7 +27,7 @@ export function validateAuthBody(req, _res, next) {
       phone:32, newPhone:32, defaultDistrict:80, district:80, city:120, storeName:120, sellerType:80, description:3000,
       businessAddress:500, nicOrBrNumber:80, bankName:120, branchName:120, accountHolderName:120, accountNumber:80,
       recipientName:120, label:80, addressLine1:256, addressLine2:256, postalCode:20, productId:128, addressId:128,
-      challengeToken:2048, code:128 };
+      challengeToken:2048, code:128, verificationToken:128 };
     for (const [name, maximum] of Object.entries(limits)) if (req.body[name] !== undefined) stringField(req.body[name], name, { maximum, trim: !/password/i.test(name) });
     for (const name of ['email','newEmail']) if (req.body[name] !== undefined && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(req.body[name].trim())) throw httpError(400, 'Enter a valid email address.');
     for (const name of ['phone','newPhone']) if (req.body[name] && !/^(?:0|\+?94)7\d{8}$/.test(req.body[name].replace(/[\s()-]/g, ''))) throw httpError(400, 'Enter a valid Sri Lankan mobile number.');

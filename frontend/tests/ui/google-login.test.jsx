@@ -40,12 +40,12 @@ test('new Google customer completes required profile without a password and rest
   provider(); page('/login?google=complete'); const user = userEvent.setup();
   await screen.findByRole('heading', { name: 'Complete your customer profile' });
   expect(screen.queryByLabelText(/password/i)).toBeNull();
-  await user.type(screen.getByLabelText('Sri Lankan mobile number'), '0771234567');
-  await user.selectOptions(screen.getByLabelText('Your district'), 'Kandy');
+  expect(screen.queryByLabelText('Sri Lankan mobile number')).toBeNull();
+  expect(screen.queryByLabelText('Your district')).toBeNull();
   await user.click(screen.getByRole('checkbox'));
   await user.click(screen.getByRole('button', { name: 'Create customer account' }));
   await screen.findByRole('heading', { name: 'Checkout destination' });
-  expect(apiRequest).toHaveBeenCalledWith('/auth/google/complete', expect.objectContaining({ method: 'POST', headers: { 'X-Google-CSRF': 'pending-proof' }, body: JSON.stringify({ name: 'Google Customer', phone: '0771234567', defaultDistrict: 'Kandy', acceptTerms: true }) }));
+  expect(apiRequest).toHaveBeenCalledWith('/auth/google/complete', expect.objectContaining({ method: 'POST', headers: { 'X-Google-CSRF': 'pending-proof' }, body: JSON.stringify({ name: 'Google Customer', acceptTerms: true }) }));
   expect(refreshUser).toHaveBeenCalledTimes(1);
 });
 

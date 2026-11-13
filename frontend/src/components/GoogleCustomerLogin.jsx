@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { apiRequest } from '../utils/api.js';
-import { DEFAULT_SL_DISTRICTS, useMarketplace } from '../context/MarketplaceContext.jsx';
+import { useMarketplace } from '../context/MarketplaceContext.jsx';
 import { customerRedirect } from '../../../shared/customerRedirect.js';
 
 function GoogleMark() {
@@ -25,7 +25,7 @@ export default function GoogleCustomerLogin({ purpose = 'login' }) {
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
   const [error, setError] = useState(params.get('google') === 'failed' ? 'Google sign-in was cancelled or could not be verified. Please try again, or use email and password.' : '');
-  const [form, setForm] = useState({ name: '', phone: '', defaultDistrict: 'Colombo', currentPassword: '', newPassword: '', confirmPassword: '', acceptTerms: false });
+  const [form, setForm] = useState({ name: '', currentPassword: '', newPassword: '', confirmPassword: '', acceptTerms: false });
 
   useEffect(() => {
     let active = true;
@@ -58,7 +58,7 @@ export default function GoogleCustomerLogin({ purpose = 'login' }) {
     submitting.current = true;
     setBusy(true);
     try {
-      const body = pending.mode === 'register' ? { name: form.name, phone: form.phone, defaultDistrict: form.defaultDistrict, acceptTerms: form.acceptTerms }
+      const body = pending.mode === 'register' ? { name: form.name, acceptTerms: form.acceptTerms }
         : pending.mode === 'link' ? { currentPassword: form.currentPassword } : { newPassword: form.newPassword };
       const result = await apiRequest('/auth/google/complete', { method: 'POST', headers: { 'X-Google-CSRF': pending.csrf }, body: JSON.stringify(body) });
       await refreshUser();
@@ -77,10 +77,8 @@ export default function GoogleCustomerLogin({ purpose = 'login' }) {
       <p className="break-words text-slate-600">Google account: {pending.email}</p>
       {pending.mode === 'register' && <>
         <label className="block space-y-1"><span>Full name</span><input className={inputClass} name="name" autoComplete="name" required maxLength={120} value={form.name} onChange={update} /></label>
-        <label className="block space-y-1"><span>Sri Lankan mobile number</span><input className={inputClass} name="phone" type="tel" autoComplete="tel" required maxLength={32} placeholder="077 123 4567" value={form.phone} onChange={update} /></label>
-        <label className="block space-y-1"><span>Your district</span><select className={inputClass} name="defaultDistrict" value={form.defaultDistrict} onChange={update}>{DEFAULT_SL_DISTRICTS.map(district => <option key={district}>{district}</option>)}</select></label>
         <label className="flex items-start gap-2"><input name="acceptTerms" type="checkbox" required checked={form.acceptTerms} onChange={update} /><span>I accept the <Link className="underline" to="/terms" target="_blank" rel="noopener noreferrer">Terms</Link> and acknowledge the <Link className="underline" to="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</Link>.</span></label>
-        <p className="text-slate-500">Your mobile number is used for delivery. Google sign-in does not verify your phone number.</p>
+        <p className="text-slate-500">Add your delivery phone number, district and address at checkout when you place an order.</p>
       </>}
       {pending.mode === 'link' && <>
         <p className="text-slate-600">An existing Yaans account uses this email. Confirm its password once to link Google and keep your orders, addresses and wishlist.</p>

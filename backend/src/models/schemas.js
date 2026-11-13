@@ -22,7 +22,7 @@ const UserSchema = new Schema(
     _writeVersion: { type: Number, default: 0, select: false },
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    phone: { type: String, required: true, trim: true },
+    phone: { type: String, required: function () { return this.role !== 'customer' || !this.googleSubject; }, trim: true },
     passwordHash: { type: String, required: function () { return !this.googleSubject; }, default: null },
     googleSubject: { type: String, select: false },
     googleLinkedAt: { type: Date, default: null },
@@ -35,7 +35,7 @@ const UserSchema = new Schema(
     canEditProducts: { type: Boolean, default: false },
     staffMustChangePassword: { type: Boolean, default: false },
     sellerId: { type: String, default: null },
-    defaultDistrict: { type: String, default: 'Colombo' },
+    defaultDistrict: { type: String, default: function () { return this.role === 'customer' && this.googleSubject ? null : 'Colombo'; } },
     addresses: [AddressSchema],
     wishlist: [{ type: String }], // Product IDs
     isActive: { type: Boolean, default: true }

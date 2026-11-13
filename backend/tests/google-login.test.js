@@ -2,6 +2,18 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { googleConfiguration, validateGoogleIdentity } from '../src/services/googleLogin.js';
 import { customerRedirect } from '../../shared/customerRedirect.js';
+import { UserModel } from '../src/models/schemas.js';
+
+test('only Google customer accounts can omit profile phone and start without a delivery district', () => {
+  const base = { _id: 'profile-test', name: 'Customer', email: 'customer@test.invalid', passwordHash: 'synthetic-hash' };
+  const google = new UserModel({ ...base, googleSubject: '123456789', role: 'customer', phone: '' });
+  assert.equal(google.validateSync(), undefined);
+  assert.equal(google.defaultDistrict, null);
+  for (const role of ['customer', 'seller', 'staff', 'admin']) {
+    const account = new UserModel({ ...base, role, ...(role !== 'customer' ? { googleSubject: '123456789' } : {}) });
+    assert.ok(account.validateSync()?.errors.phone, `${role} must retain its existing phone requirement`);
+  }
+});
 
 test('Google login fails closed unless explicitly and safely configured', () => {
   const keys = ['GOOGLE_LOGIN_ENABLED', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_LOGIN_ORIGIN', 'NODE_ENV'];

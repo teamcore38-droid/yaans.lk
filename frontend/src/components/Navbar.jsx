@@ -243,13 +243,14 @@ export default function Navbar() {
 
               <Link
                 to="/cart"
+                aria-label={`Cart, ${totalCartItems} ${totalCartItems === 1 ? 'item' : 'items'}`}
                 className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-900 font-semibold transition"
               >
                 <div className="relative">
                   <ShoppingCart className="w-5 h-5 text-slate-900" />
-                  <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-slate-950 text-[11px] font-extrabold flex items-center justify-center">
+                  {totalCartItems > 0 && <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-slate-950 text-[11px] font-extrabold flex items-center justify-center">
                     {totalCartItems}
-                  </span>
+                  </span>}
                 </div>
                 <span className="hidden sm:inline text-xs font-bold ml-1">Cart</span>
               </Link>
@@ -591,6 +592,7 @@ export default function Navbar() {
         </Link>
         <Link
           to="/cart"
+          aria-label={`Cart, ${totalCartItems} ${totalCartItems === 1 ? 'item' : 'items'}`}
           className={`relative flex flex-col items-center gap-0.5 px-2 py-1 ${
             location.pathname === '/cart' ? 'text-slate-950 font-bold' : ''
           }`}

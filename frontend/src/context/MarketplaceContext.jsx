@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { apiRequest, getCachedApiResponse, browserSessionKey, invalidateCatalogCache } from '../utils/api.js';
 import { bindCheckoutDraft, clearCheckoutDraft } from '../utils/checkoutDraft.js';
+import { normalizeSavedCart } from '../utils/cart.js';
 
 const MarketplaceContext = createContext(null);
 
@@ -30,7 +31,7 @@ export function MarketplaceProvider({ children }) {
   const [cartItems, setCartItems] = useState(() => {
     try {
       const saved = localStorage.getItem('yaans_cart');
-      return saved ? JSON.parse(saved) : [];
+      return normalizeSavedCart(saved ? JSON.parse(saved) : []);
     } catch {
       return [];
     }
@@ -45,8 +46,13 @@ export function MarketplaceProvider({ children }) {
     }
   });
 
-  const [cartQuote, setCartQuote] = useState(null);
-  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteState, setQuoteState] = useState(null);
+  const [quoteVersion, setQuoteVersion] = useState(0);
+  const quoteMatches = quoteState?.items === cartItems && quoteState?.district === selectedDistrict && quoteState?.version === quoteVersion;
+  const cartQuote = cartItems.length > 0 && quoteMatches ? quoteState.quote : null;
+  const quoteError = cartItems.length > 0 && quoteMatches ? quoteState.error : null;
+  const quoteLoading = cartItems.length > 0 && (!quoteMatches || quoteState.loading);
+  const retryCartQuote = useCallback(() => setQuoteVersion((version) => version + 1), []);
   const [toast, setToast] = useState(null);
   const [categories, setCategories] = useState(() =>
     getCachedApiResponse('/marketplace/categories')?.categories ||
@@ -111,17 +117,30 @@ export function MarketplaceProvider({ children }) {
     localStorage.setItem('yaans_cart', JSON.stringify(cartItems));
   }, [cartItems]);
 
+  useEffect(() => {
+    const syncCart = (event) => {
+      if (event.storageArea !== localStorage || (event.key !== 'yaans_cart' && event.key !== null)) return;
+      let next;
+      try { next = normalizeSavedCart(JSON.parse(event.newValue)); } catch { next = []; }
+      setCartItems((previous) => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
+    };
+    window.addEventListener('storage', syncCart);
+    return () => window.removeEventListener('storage', syncCart);
+  }, []);
+
   // Fetch multi-seller shipping & subtotal breakdown whenever cartItems or selectedDistrict changes
   useEffect(() => {
     if (cartItems.length === 0) {
-      setCartQuote(null);
-      setQuoteLoading(false);
+      setQuoteState(null);
       return;
     }
     let active = true;
-    setQuoteLoading(true);
+    const controller = new AbortController();
+    const snapshot = { items: cartItems, district: selectedDistrict, version: quoteVersion };
+    setQuoteState({ ...snapshot, quote: null, error: null, loading: true });
     apiRequest('/orders/quote', {
       method: 'POST',
+      signal: controller.signal,
       body: JSON.stringify({
         items: cartItems.map((c) => ({
           productId: c.productId,
@@ -132,18 +151,16 @@ export function MarketplaceProvider({ children }) {
       })
     })
       .then((quote) => {
-        if (active) setCartQuote(quote);
+        if (active) setQuoteState({ ...snapshot, quote, error: null, loading: false });
       })
-      .catch(() => {
-        // Ignore transient quote error
-      })
-      .finally(() => {
-        if (active) setQuoteLoading(false);
+      .catch((error) => {
+        if (active) setQuoteState({ ...snapshot, quote: null, error: error.message || 'Unable to check your cart. Please retry.', loading: false });
       });
     return () => {
       active = false;
+      controller.abort();
     };
-  }, [cartItems, selectedDistrict]);
+  }, [cartItems, selectedDistrict, quoteVersion]);
 
   const login = async (email, password) => {
     const res = await apiRequest('/auth/login', {
@@ -231,10 +248,24 @@ export function MarketplaceProvider({ children }) {
   };
 
   const addToCart = (product, variantLabel = null, quantity = 1) => {
+    if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 99) {
+      showToast('Choose a quantity between 1 and 99.', 'error');
+      return;
+    }
     const chosenVariant =
       variantLabel ||
       product.variants?.[0]?.values?.[0]?.label ||
       'Standard';
+
+    const existing = cartItems.find((item) => item.productId === product._id && item.variantLabel === chosenVariant);
+    if (!existing && cartItems.length >= 50) {
+      showToast('Your cart can contain up to 50 product selections. Remove an item before adding another.', 'error');
+      return;
+    }
+    if (existing && existing.quantity + quantity > 99) {
+      showToast('The quantity for a product selection cannot exceed 99.', 'error');
+      return;
+    }
 
     let unitPriceLkr = product.priceLkr;
     if (product.variants?.length > 0) {
@@ -252,11 +283,11 @@ export function MarketplaceProvider({ children }) {
         const updated = [...prev];
         updated[existingIdx] = {
           ...updated[existingIdx],
-          quantity: updated[existingIdx].quantity + quantity
+          quantity: Math.min(99, updated[existingIdx].quantity + quantity)
         };
         return updated;
       }
-      return [
+      return normalizeSavedCart([
         ...prev,
         {
           productId: product._id,
@@ -271,12 +302,13 @@ export function MarketplaceProvider({ children }) {
           sellerDistrict: product.sellerDistrict,
           isHomemade: product.isHomemade
         }
-      ];
+      ]);
     });
     showToast(`Added "${product.title.slice(0, 36)}..." to cart`);
   };
 
   const updateCartQuantity = (productId, variantLabel, newQty) => {
+    if (!Number.isSafeInteger(newQty) || newQty > 99) return;
     if (newQty <= 0) {
       removeFromCart(productId, variantLabel);
       return;
@@ -300,7 +332,6 @@ export function MarketplaceProvider({ children }) {
 
   const clearCart = () => {
     setCartItems([]);
-    setCartQuote(null);
   };
 
   const wishlistIds = user ? user.wishlist || [] : guestWishlist;
@@ -356,6 +387,8 @@ export function MarketplaceProvider({ children }) {
         clearCart,
         cartQuote,
         quoteLoading,
+        quoteError,
+        retryCartQuote,
         wishlistIds,
         toggleWishlist,
         toast,

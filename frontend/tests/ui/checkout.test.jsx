@@ -6,6 +6,7 @@ import { beforeEach, expect, test, vi } from 'vitest';
 import CheckoutPage from '../../src/pages/CheckoutPage.jsx';
 import { useMarketplace } from '../../src/context/MarketplaceContext.jsx';
 import * as api from '../../src/utils/api.js';
+import { prepareCustomerAuth, readCheckoutDraft, saveCheckoutDraft } from '../../src/utils/checkoutDraft.js';
 
 vi.mock('../../src/context/MarketplaceContext.jsx', async (importOriginal) => ({
   ...await importOriginal(), useMarketplace: vi.fn()
@@ -63,6 +64,32 @@ test('failed checkout keeps the cart and allows a retry', async () => {
   expect(container.querySelector('button[type="submit"]')).toBeEnabled();
 });
 
+test('checkout offers optional sign-in and saves delivery fields only on auth navigation', async () => {
+  checkout(); await fillAddress();
+  expect(sessionStorage.getItem('yaans_checkout_draft_v1')).toBeNull();
+  expect(screen.getByRole('link', { name: 'Continue as guest' })).toHaveAttribute('href', '#delivery-details');
+  expect(screen.getByRole('link', { name: 'Sign in to continue checkout' })).toHaveAttribute('href', '/login?redirect=%2Fcheckout');
+  prepareCustomerAuth();
+  expect(readCheckoutDraft(marketplace.cartItems, null).addressLine1).toBe('42 Test Street');
+});
+
+test('resuming checkout preserves the draft over account defaults and never submits automatically', () => {
+  saveCheckoutDraft(marketplace.cartItems, null, { recipientName: 'Draft Recipient', phone: '0771234567', addressLine1: 'Draft Street', city: 'Galle', district: 'Galle' });
+  marketplace.user = { _id: 'customer', role: 'customer', name: 'Account Name', addresses: [{ _id: 'saved', recipientName: 'Saved Name', phone: '0779999999', addressLine1: 'Saved Street', city: 'Colombo', district: 'Colombo' }] };
+  const request = vi.spyOn(api, 'apiRequest'); checkout();
+  expect(screen.getByPlaceholderText('e.g., No. 42/B, Fife Road, Thimbirigasyaya')).toHaveValue('Draft Street');
+  expect(marketplace.setSelectedDistrict).toHaveBeenCalledWith('Galle');
+  expect(request).not.toHaveBeenCalled();
+});
+
+test('expired session prompts reauthentication while keeping entered details', async () => {
+  vi.spyOn(api, 'apiRequest').mockRejectedValue(Object.assign(new Error('Please sign in again.'), { status: 401 }));
+  const { container } = checkout(); await fillAddress(); fireEvent.submit(container.querySelector('form'));
+  expect(await screen.findByRole('link', { name: 'Sign in again' })).toHaveAttribute('href', '/login?redirect=%2Fcheckout');
+  expect(screen.getByPlaceholderText('e.g., No. 42/B, Fife Road, Thimbirigasyaya')).toHaveValue('42 Test Street');
+  expect(marketplace.clearCart).not.toHaveBeenCalled();
+});
+
 test('COD confirmation is required before a checkout request is sent', async () => {
   const request = vi.spyOn(api, 'apiRequest');
   const { container } = checkout();
@@ -73,12 +100,23 @@ test('COD confirmation is required before a checkout request is sent', async () 
 });
 
 test('signed-in customers can start from their default saved address', () => {
-  marketplace.user = { name: 'Customer', email: 'customer@test.invalid', phone: '0771234567', addresses: [{
+  marketplace.selectedDistrict = 'Kandy';
+  marketplace.user = { _id: 'customer', role: 'customer', name: 'Customer', email: 'customer@test.invalid', phone: '0771234567', addresses: [{
     _id: 'address', label: 'Home', isDefault: true, recipientName: 'Saved Recipient', phone: '0771112222',
     addressLine1: '7 Saved Lane', city: 'Kandy', district: 'Kandy'
   }] };
   checkout();
   expect(screen.getByPlaceholderText('e.g., Kasun Perera')).toHaveValue('Saved Recipient');
+  expect(screen.getByPlaceholderText('e.g., No. 42/B, Fife Road, Thimbirigasyaya')).toHaveValue('7 Saved Lane');
+  expect(marketplace.setSelectedDistrict).not.toHaveBeenCalled();
+});
+
+test('a saved address in another district is applied only when explicitly selected', async () => {
+  marketplace.user = { _id: 'customer', role: 'customer', name: 'Customer', addresses: [{ _id: 'saved', label: 'Home', recipientName: 'Saved Recipient', phone: '0771112222', addressLine1: '7 Saved Lane', city: 'Kandy', district: 'Kandy' }] };
+  checkout();
+  expect(screen.getByPlaceholderText('e.g., No. 42/B, Fife Road, Thimbirigasyaya')).toHaveValue('');
+  expect(marketplace.setSelectedDistrict).not.toHaveBeenCalled();
+  await userEvent.setup().click(screen.getByRole('button', { name: /Home/ }));
   expect(screen.getByPlaceholderText('e.g., No. 42/B, Fife Road, Thimbirigasyaya')).toHaveValue('7 Saved Lane');
   expect(marketplace.setSelectedDistrict).toHaveBeenCalledWith('Kandy');
 });

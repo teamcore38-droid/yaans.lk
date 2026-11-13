@@ -2,6 +2,7 @@ import React from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, expect, test, vi } from 'vitest';
 import { MarketplaceProvider, useMarketplace } from '../../src/context/MarketplaceContext.jsx';
+import { saveCheckoutDraft, readCheckoutDraft } from '../../src/utils/checkoutDraft.js';
 
 const response = (body, status = 200) => ({ ok: status < 400, status, json: async () => body });
 const wrapper = ({ children }) => <MarketplaceProvider>{children}</MarketplaceProvider>;
@@ -93,6 +94,19 @@ test('an older cart quote cannot overwrite the quote for the newly selected dist
   await act(async () => pending.Colombo(response({ destinationDistrict: 'Colombo' })));
   expect(result.current.cartQuote.destinationDistrict).toBe('Kandy');
   expect(localStorage.getItem('yaans_district')).toBe('Kandy');
+});
+
+test('password login preserves the chosen shopping district and logout clears a pending checkout draft', async () => {
+  const customer = { _id: 'customer', role: 'customer', name: 'Customer', defaultDistrict: 'Colombo' };
+  localStorage.setItem('yaans_district', 'Galle');
+  fetch.mockImplementation(async url => response(url.endsWith('/auth/login') ? { user: customer } : { categories: [] }));
+  const { result } = renderHook(useMarketplace, { wrapper });
+  saveCheckoutDraft([{ productId: 'spice', quantity: 1 }], null, { district: 'Galle' });
+  await act(async () => { await result.current.login('customer@test.invalid', 'password'); });
+  expect(result.current.selectedDistrict).toBe('Galle');
+  expect(readCheckoutDraft([{ productId: 'spice', quantity: 1 }], customer)).not.toBeNull();
+  await act(async () => { await result.current.logout(); });
+  expect(readCheckoutDraft([{ productId: 'spice', quantity: 1 }], customer)).toBeNull();
 });
 
 test('sign-out waits for server revocation and keeps the session when the server fails',async()=>{

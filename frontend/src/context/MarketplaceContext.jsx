@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { apiRequest, getCachedApiResponse, browserSessionKey, invalidateCatalogCache } from '../utils/api.js';
+import { bindCheckoutDraft, clearCheckoutDraft } from '../utils/checkoutDraft.js';
 
 const MarketplaceContext = createContext(null);
 
@@ -88,6 +89,7 @@ export function MarketplaceProvider({ children }) {
       apiRequest('/auth/me')
         .then((res) => {
           if(browserSessionKey()!==initialSession)return;
+          bindCheckoutDraft(res.user);
           setUser(res.user);
           localStorage.setItem('yaans_user', JSON.stringify(res.user));
           if (res.user.defaultDistrict && !localStorage.getItem('yaans_district')) {
@@ -148,9 +150,10 @@ export function MarketplaceProvider({ children }) {
       method: 'POST',
       body: JSON.stringify({ email, password })
     });
+    bindCheckoutDraft(res.user);
     localStorage.setItem('yaans_user', JSON.stringify(res.user));
     setUser(res.user);
-    if (res.user.defaultDistrict) {
+    if (res.user.defaultDistrict && !localStorage.getItem('yaans_district')) {
       setSelectedDistrict(res.user.defaultDistrict);
     }
     showToast(`Welcome back, ${res.user.name}!`);
@@ -163,6 +166,7 @@ export function MarketplaceProvider({ children }) {
       body: JSON.stringify(challengeToken?{challengeToken,code}:{ email, password })
     });
     if(res.requiresMfa)return res;
+    clearCheckoutDraft();
     localStorage.setItem('yaans_user', JSON.stringify(res.user));
     setUser(res.user);
     showToast(`Signed in to Admin Console as ${res.user.name}`);
@@ -170,11 +174,13 @@ export function MarketplaceProvider({ children }) {
   };
 
   const clearSession = useCallback(() => {
+    clearCheckoutDraft();
     localStorage.removeItem('yaans_user'); localStorage.removeItem('yaans_token');
     invalidateCatalogCache(); setUser(null);
   }, []);
   const staffLogin = async (email, password) => {
     const res = await apiRequest('/auth/staff/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+    clearCheckoutDraft();
     localStorage.setItem('yaans_user', JSON.stringify(res.user)); setUser(res.user);
     return res.user;
   };
@@ -184,9 +190,10 @@ export function MarketplaceProvider({ children }) {
       method: 'POST',
       body: JSON.stringify(payload)
     });
+    bindCheckoutDraft(res.user);
     localStorage.setItem('yaans_user', JSON.stringify(res.user));
     setUser(res.user);
-    if (res.user.defaultDistrict) {
+    if (res.user.defaultDistrict && !localStorage.getItem('yaans_district')) {
       setSelectedDistrict(res.user.defaultDistrict);
     }
     showToast('Customer account created successfully!');
@@ -198,6 +205,7 @@ export function MarketplaceProvider({ children }) {
       method: 'POST',
       body: JSON.stringify(payload)
     });
+    clearCheckoutDraft();
     localStorage.setItem('yaans_user', JSON.stringify(res.user));
     setUser(res.user);
     showToast('Seller application submitted for Admin review!');
@@ -207,6 +215,7 @@ export function MarketplaceProvider({ children }) {
   const logout = async () => {
     try {
       await apiRequest('/auth/logout',{method:'POST',body:'{}'});
+      clearCheckoutDraft();
       localStorage.removeItem('yaans_token');localStorage.removeItem('yaans_user');
       invalidateCatalogCache();setUser(null);
       showToast('Signed out on all devices', 'info');return true;
@@ -215,6 +224,7 @@ export function MarketplaceProvider({ children }) {
 
   const refreshUser = async () => {
     const res = await apiRequest('/auth/me');
+    bindCheckoutDraft(res.user);
     setUser(res.user);
     localStorage.setItem('yaans_user', JSON.stringify(res.user));
     return res.user;

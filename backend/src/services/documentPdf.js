@@ -118,7 +118,7 @@ export async function documentPdf(doc) {
   if(!packing)text('All amounts in LKR',M,y,CW,{size:8,color:palette.muted,align:'right'});
   y+=22;
   if(y+90>bottom)y=continuation();
-  y=tableHeader(y);
+  let needsTableHeader=true;
   for(const [index,item] of doc.items.entries()){
     const details=[item.sku?`SKU: ${item.sku}`:'',item.variantLabel || 'Standard',doc.kind==='summary'?item.sellerName:''].filter(Boolean).join('  |  ');
     const descW=packing?CW-111:241;
@@ -127,7 +127,8 @@ export async function documentPdf(doc) {
     const amountW=W-M-437-20;
     const rowH=Math.max(titleH+detailH+22,height(String(item.quantity),packing?60:40,9)+22,packing?0:height(money(item.lineTotalLkr),amountW,9)+22,packing?0:height(money(item.unitPriceLkr),70,8.5)+22);
     const endingSpace=index===doc.items.length-1 ? (packing?145:180) : 0;
-    if(y+rowH+endingSpace>bottom)y=tableHeader(continuation());
+    if(y+rowH+endingSpace+(needsTableHeader?29:0)>bottom){y=continuation();needsTableHeader=true;}
+    if(needsTableHeader){y=tableHeader(y);needsTableHeader=false;}
     if(index%2===0)pdf.rect(M,y,CW,rowH).fill('#F7F8FA');
     text(item.title,M+12,y+11,descW,{size:9.5});
     text(details,M+12,y+11+titleH+3,descW,{size:7.5,color:palette.muted});

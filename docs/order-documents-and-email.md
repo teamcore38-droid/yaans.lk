@@ -2,7 +2,7 @@
 
 ## Customer and seller flow
 
-Checkout saves an order summary and one commercial invoice and packing slip per seller in the same transaction as inventory and the order. Each stores the order's prices, quantities, delivery fees, customer delivery address and seller identity at purchase time. Commercial invoices are not labelled tax invoices. The platform summary is not a substitute for a seller's tax invoice.
+Checkout saves an order summary and one commercial invoice and packing slip per seller in the same transaction as inventory and the order. Each stores the order's prices, quantities, delivery fees, customer delivery address and seller identity at purchase time. PDFs use the bundled Yaans.lk logo, burgundy/gold header, structured address cards, repeated item-table headers, LKR totals and page numbers. Receipts/refunds have distinct payment labels. Long orders paginate without splitting rows, and the final item stays with the totals. Packing slips omit all financial columns. Local Latin, Sinhala and Tamil fonts preserve multilingual names and items without remote asset fetching. Commercial invoices are not labelled tax invoices. The platform summary is not a substitute for a seller's tax invoice.
 
 Customers can view and download PDFs from checkout confirmation, order history and tracking. Guest access requires the existing unexpired capability in a request header. Sellers can access only their own packages. Administrators can access order documents from the order list. There are no public PDF URLs or shared caches. Documents and PDF code load only when requested; checkout does not render PDFs or await the email provider.
 

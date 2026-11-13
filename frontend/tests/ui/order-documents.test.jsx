@@ -27,3 +27,19 @@ test('email administration exposes setup gaps and does not send automatically on
   render(<OrderEmailStatus/>);expect(apiRequest).not.toHaveBeenCalled();const user=userEvent.setup();await user.click(screen.getByRole('button',{name:'Check email delivery status'}));
   expect(await screen.findByRole('status')).toHaveTextContent('setup required');expect(screen.getByRole('button',{name:'Process queued emails'})).toBeDisabled();
 });
+
+
+test('packing slip preview shows branded package quantities without financial columns',async()=>{
+  const packing={...doc,kind:'packing-slip',title:'Packing slip',_id:'sub1:packing-slip',number:'YLK-2026-1-S1-PACKING-SLIP'};
+  apiRequest.mockImplementation(async path=>path.endsWith('/sub1%3Apacking-slip')?{document:packing}:{documents:[packing]});
+  HTMLDialogElement.prototype.showModal=vi.fn(function(){this.setAttribute('open','');});
+  render(<OrderDocuments packageId="sub1"/>);const user=userEvent.setup();
+  await user.click(screen.getByRole('button',{name:'View invoices & documents'}));
+  await user.click(await screen.findByRole('button',{name:`View ${packing.number}`}));
+  expect(await screen.findByRole('dialog',{name:'Order document preview'})).toBeVisible();
+  expect(screen.getByRole('img',{name:'Yaans.lk'})).toHaveAttribute('src','/brand/yaans-logo-horizontal-white.png');
+  expect(screen.getByRole('table',{name:'Package contents'})).toBeVisible();
+  expect(screen.queryByRole('columnheader',{name:'Amount'})).not.toBeInTheDocument();
+  expect(screen.queryByRole('columnheader',{name:'Unit price'})).not.toBeInTheDocument();
+  expect(screen.getByRole('columnheader',{name:'Qty'})).toBeVisible();
+});

@@ -13,6 +13,8 @@ import {
 import { apiRequest, formatLkr } from '../utils/api.js';
 import { checkoutKey, clearCheckoutKey, rememberGuestAccess } from '../utils/orderAccess.js';
 import { useMarketplace, DEFAULT_SL_DISTRICTS } from '../context/MarketplaceContext.jsx';
+import { beforeCustomerAuth, prepareCustomerAuth, readCheckoutDraft, saveCheckoutDraft, clearCheckoutDraft } from '../utils/checkoutDraft.js';
+import { customerAuthPath } from '../../../shared/customerRedirect.js';
 
 export default function CheckoutPage() {
   const {
@@ -26,38 +28,62 @@ export default function CheckoutPage() {
   } = useMarketplace();
   const navigate = useNavigate();
 
-  const [recipientName, setRecipientName] = useState(user?.name || '');
-  const [phone, setPhone] = useState(user?.phone || '');
-  const [customerEmail, setCustomerEmail] = useState(user?.email || '');
-  const [addressLine1, setAddressLine1] = useState('');
-  const [addressLine2, setAddressLine2] = useState('');
-  const [city, setCity] = useState('');
-  const [postalCode, setPostalCode] = useState('');
-  const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [draft] = useState(() => readCheckoutDraft(cartItems, user));
+  const [recipientName, setRecipientName] = useState(draft?.recipientName || user?.name || '');
+  const [phone, setPhone] = useState(draft?.phone || user?.phone || '');
+  const [customerEmail, setCustomerEmail] = useState(draft?.customerEmail || user?.email || '');
+  const [addressLine1, setAddressLine1] = useState(draft?.addressLine1 || '');
+  const [addressLine2, setAddressLine2] = useState(draft?.addressLine2 || '');
+  const [city, setCity] = useState(draft?.city || '');
+  const [postalCode, setPostalCode] = useState(draft?.postalCode || '');
+  const [deliveryNotes, setDeliveryNotes] = useState(draft?.deliveryNotes || '');
   const [paymentMethod, setPaymentMethod] = useState('COD');
   const [codConfirmed, setCodConfirmed] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [placedResult, setPlacedResult] = useState(null);
   const submissionLock = useRef(false);
+  const previousAccount = useRef(user?._id);
+  const prefilledAccount = useRef(null);
+  const [signInRequired, setSignInRequired] = useState(false);
+
+  useEffect(() => {
+    if (draft && DEFAULT_SL_DISTRICTS.includes(draft.district)) setSelectedDistrict(draft.district);
+  }, [draft, setSelectedDistrict]);
+
+  useEffect(() => {
+    const save = () => {
+      if (!placedResult && !submissionLock.current) saveCheckoutDraft(cartItems, user, {
+        recipientName, phone, customerEmail, addressLine1, addressLine2, city, postalCode, deliveryNotes, district: selectedDistrict
+      });
+    };
+    window.addEventListener(beforeCustomerAuth, save);
+    return () => window.removeEventListener(beforeCustomerAuth, save);
+  }, [cartItems, user, recipientName, phone, customerEmail, addressLine1, addressLine2, city, postalCode, deliveryNotes, selectedDistrict, placedResult]);
 
   // Pre-fill default saved address when user is signed in
   useEffect(() => {
-    if (user) {
+    if (previousAccount.current && previousAccount.current !== user?._id) {
+      clearCheckoutDraft();
+      setRecipientName(''); setPhone(''); setCustomerEmail(''); setAddressLine1(''); setAddressLine2(''); setCity(''); setPostalCode(''); setDeliveryNotes('');
+      prefilledAccount.current = null;
+    }
+    previousAccount.current = user?._id;
+    if (user && prefilledAccount.current !== user._id) {
+      prefilledAccount.current = user._id;
       setRecipientName((prev) => prev || user.name || '');
       setPhone((prev) => prev || user.phone || '');
       setCustomerEmail((prev) => prev || user.email || '');
       const defAddr = (user.addresses || []).find((a) => a.isDefault) || user.addresses?.[0];
-      if (defAddr && !addressLine1) {
+      if (defAddr && defAddr.district === selectedDistrict && !addressLine1 && !draft) {
         setRecipientName(defAddr.recipientName);
         setPhone(defAddr.phone);
         setAddressLine1(defAddr.addressLine1);
         setAddressLine2(defAddr.addressLine2 || '');
         setCity(defAddr.city);
         setPostalCode(defAddr.postalCode || '');
-        if (defAddr.district) setSelectedDistrict(defAddr.district);
       }
     }
-  }, [user, addressLine1, setSelectedDistrict]);
+  }, [user, addressLine1, selectedDistrict, draft]);
 
   const applySavedAddress = (addr) => {
     setRecipientName(addr.recipientName);
@@ -81,6 +107,7 @@ export default function CheckoutPage() {
     const complete = (result) => {
       rememberGuestAccess(result.order.orderNumber, result.guestAccessToken);
       clearCheckoutKey(scope);
+      clearCheckoutDraft();
       setPlacedResult(result);
       clearCart();
       showToast(`Order ${result.order.orderNumber} placed successfully!`);
@@ -120,6 +147,7 @@ export default function CheckoutPage() {
           showToast('Your earlier checkout was completed. Please review the confirmed order.');
         } catch (recoveryError) { showToast(recoveryError.message, 'error'); }
       } else {
+        if (err.status === 401) setSignInRequired(true);
         // Keep the key after an ambiguous network/server failure, including reloads.
         showToast(err.message, 'error');
       }
@@ -241,11 +269,14 @@ export default function CheckoutPage() {
         <h1 className="text-lg sm:text-2xl font-extrabold text-slate-900">
           Sri Lankan Marketplace Checkout
         </h1>
-        <p className="text-xs text-slate-600">
-          {user
-            ? `Signed in as ${user.name} (${user.email})`
-            : 'Checking out as Guest — or Sign in to use saved addresses'}
-        </p>
+        {user && <p className="text-xs text-slate-600">Signed in as {user.name} ({user.email})</p>}
+        {(!user || signInRequired) && <div className="mt-3 rounded-lg border border-slate-200 bg-white p-4 text-sm space-y-2">
+          <p role={signInRequired ? 'alert' : undefined}>{signInRequired ? 'Your session has expired. Sign in again to continue safely; your order has not been resubmitted.' : 'You can purchase as a guest, or sign in to use saved addresses and keep this order in your account.'}</p>
+          <div className="flex flex-wrap items-center gap-4">
+            <Link to={customerAuthPath('login', '/checkout')} onClick={event => { if (submissionLock.current) event.preventDefault(); else prepareCustomerAuth(); }} className="font-bold text-sky-700 hover:underline">{signInRequired ? 'Sign in again' : 'Sign in to continue checkout'}</Link>
+            {!signInRequired && <a href="#delivery-details" className="font-semibold text-slate-700 hover:underline">Continue as guest</a>}
+          </div>
+        </div>}
       </div>
 
       <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -275,7 +306,7 @@ export default function CheckoutPage() {
           )}
 
           {/* Delivery Address Form */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+          <div id="delivery-details" className="scroll-mt-4 bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
             <h2 className="text-sm sm:text-base font-extrabold text-slate-900 flex items-center gap-2 border-b border-slate-200 pb-2.5">
               <MapPin className="w-4 h-4 text-slate-700" />
               1. Sri Lankan Delivery Address

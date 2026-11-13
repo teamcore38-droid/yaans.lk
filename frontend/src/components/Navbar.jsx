@@ -19,6 +19,8 @@ import {
   LogOut
 } from 'lucide-react';
 import { useMarketplace, DEFAULT_SL_DISTRICTS } from '../context/MarketplaceContext.jsx';
+import { customerAuthPath, customerReturnFromLocation } from '../../../shared/customerRedirect.js';
+import { prepareCustomerAuth } from '../utils/checkoutDraft.js';
 
 export default function Navbar() {
   const {
@@ -34,6 +36,7 @@ export default function Navbar() {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const returnTo = customerReturnFromLocation(location);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchCat, setSearchCat] = useState('');
@@ -213,7 +216,8 @@ export default function Navbar() {
                 </div>
               ) : (
                 <Link
-                  to="/login"
+                  to={customerAuthPath('login', returnTo)}
+                  onClick={prepareCustomerAuth}
                   className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-800"
                 >
                   <User className="w-5 h-5 text-slate-700" />
@@ -392,15 +396,15 @@ export default function Navbar() {
               ) : (
                 <div className="flex items-center gap-2">
                   <Link
-                    to="/login"
-                    onClick={() => setMobileMenuOpen(false)}
+                    to={customerAuthPath('login', returnTo)}
+                    onClick={() => { prepareCustomerAuth(); setMobileMenuOpen(false); }}
                     className="flex-1 py-2 px-3 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 text-xs font-extrabold text-center"
                   >
                     Sign In
                   </Link>
                   <Link
-                    to="/register"
-                    onClick={() => setMobileMenuOpen(false)}
+                    to={customerAuthPath('register', returnTo)}
+                    onClick={() => { prepareCustomerAuth(); setMobileMenuOpen(false); }}
                     className="flex-1 py-2 px-3 rounded-lg border border-slate-300 text-slate-800 text-xs font-bold text-center hover:bg-slate-100"
                   >
                     Register

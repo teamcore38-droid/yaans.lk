@@ -50,7 +50,7 @@ test('customer Google OAuth with real JWT verification, HTTP and isolated MongoD
   }
   async function prepare(options) {
     const flow = await begin(options); const callback = await request(flow.callback, { cookie: flow.cookie });
-    assert.equal(callback.status, 303); assert.equal(callback.headers.get('location'), app.url + '/login?google=complete');
+    assert.equal(callback.status, 303); assert.equal(callback.headers.get('location'), app.url + '/login?google=complete&redirect=%2Fcheckout');
     const cookie = cookieOf(callback); const pending = await request('/auth/google/pending', { cookie }); assert.equal(pending.status, 200);
     return { ...flow, cookie, pending: pending.data };
   }
@@ -121,29 +121,29 @@ test('customer Google OAuth with real JWT verification, HTTP and isolated MongoD
 
   await scenario('browser binding, CSRF, expiry and one-use state reject callback and completion replay', async () => {
     const flow = await begin(); const before = exchange.mock.callCount();
-    assert.equal((await request(flow.callback)).headers.get('location'), app.url + '/login?google=failed');
+    assert.equal((await request(flow.callback)).headers.get('location').split('&redirect=')[0], app.url + '/login?google=failed');
     assert.equal(exchange.mock.callCount(), before);
     const callback = await request(flow.callback, { cookie: flow.cookie }); const cookie = cookieOf(callback);
-    assert.equal((await request(flow.callback, { cookie: flow.cookie })).headers.get('location'), app.url + '/login?google=failed');
+    assert.equal((await request(flow.callback, { cookie: flow.cookie })).headers.get('location').split('&redirect=')[0], app.url + '/login?google=failed');
     const data = (await request('/auth/google/pending', { cookie })).data;
     assert.equal((await request('/auth/google/complete', { cookie, body: profile })).status, 403);
     assert.equal((await request('/auth/google/complete', { cookie, body: profile, headers: { Origin: 'https://www.yaans.lk', 'X-Google-CSRF': data.csrf } })).status, 403);
     await app.mongo.collection('authchallenges').updateMany({ _id: /^google-pending:/ }, { $set: { expiresAt: new Date(Date.now() - 1) } });
     assert.equal((await request('/auth/google/pending', { cookie })).status, 401);
     const expired = await begin(); await app.mongo.collection('authchallenges').updateMany({ _id: /^google-state:/ }, { $set: { expiresAt: new Date(Date.now() - 1) } });
-    assert.equal((await request(expired.callback, { cookie: expired.cookie })).headers.get('location'), app.url + '/login?google=failed');
+    assert.equal((await request(expired.callback, { cookie: expired.cookie })).headers.get('location').split('&redirect=')[0], app.url + '/login?google=failed');
     const cancel = await begin();
-    assert.equal((await request(`/auth/google/callback?state=${cancel.state}&error=access_denied`, { cookie: cancel.cookie })).headers.get('location'), app.url + '/login?google=failed');
+    assert.equal((await request(`/auth/google/callback?state=${cancel.state}&error=access_denied`, { cookie: cancel.cookie })).headers.get('location').split('&redirect=')[0], app.url + '/login?google=failed');
   });
 
   await scenario('real Google library rejects invalid audience, issuer, expiry and nonce; unverified emails cannot register', async () => {
     for (const claims of [{ aud: 'wrong-client' }, { iss: 'https://evil.invalid' }, { iat: 1, exp: 2 }, { nonce: 'another-request' }, { email_verified: false }]) {
       const flow = await begin({ claims });
-      assert.equal((await request(flow.callback, { cookie: flow.cookie })).headers.get('location'), app.url + '/login?google=failed');
+      assert.equal((await request(flow.callback, { cookie: flow.cookie })).headers.get('location').split('&redirect=')[0], app.url + '/login?google=failed');
     }
     const tampered = await begin();
     providerCodes.get(new URL('http://test' + tampered.callback).searchParams.get('code')).tampered = true;
-    assert.equal((await request(tampered.callback, { cookie: tampered.cookie })).headers.get('location'), app.url + '/login?google=failed');
+    assert.equal((await request(tampered.callback, { cookie: tampered.cookie })).headers.get('location').split('&redirect=')[0], app.url + '/login?google=failed');
     assert.equal(await app.mongo.collection('users').countDocuments({ email: 'new@gmail.com' }), 0);
   });
 
@@ -152,19 +152,19 @@ test('customer Google OAuth with real JWT verification, HTTP and isolated MongoD
       const email = role === 'staff' ? 'staff-google@test.invalid' : accounts[role];
       if (role === 'staff') await app.mongo.collection('users').insertOne({ _id: 'staff_google', email, role, isActive: true, passwordHash: 'synthetic' });
       const flow = await begin({ email, subject: `role-${role}` });
-      assert.equal((await request(flow.callback, { cookie: flow.cookie })).headers.get('location'), app.url + '/login?google=failed');
+      assert.equal((await request(flow.callback, { cookie: flow.cookie })).headers.get('location').split('&redirect=')[0], app.url + '/login?google=failed');
       assert.equal(await app.mongo.collection('users').countDocuments({ email, googleSubject: { $exists: true } }), 0);
     }
     await app.mongo.collection('users').updateOne({ email: accounts.customer }, { $set: { isActive: false } });
     const flow = await begin({ email: accounts.customer });
-    assert.equal((await request(flow.callback, { cookie: flow.cookie })).headers.get('location'), app.url + '/login?google=failed');
+    assert.equal((await request(flow.callback, { cookie: flow.cookie })).headers.get('location').split('&redirect=')[0], app.url + '/login?google=failed');
     const customer = await app.mongo.collection('users').findOne({ email: accounts.customer });
     const revoked = createHash('sha256').update(customer.passwordHash).digest('hex');
     revokedCredentialDigests.add(revoked);
     try {
       await app.mongo.collection('users').updateOne({ _id: customer._id }, { $set: { isActive: true } });
       const attempt = await begin({ email: accounts.customer });
-      assert.equal((await request(attempt.callback, { cookie: attempt.cookie })).headers.get('location'), app.url + '/login?google=failed');
+      assert.equal((await request(attempt.callback, { cookie: attempt.cookie })).headers.get('location').split('&redirect=')[0], app.url + '/login?google=failed');
     } finally { revokedCredentialDigests.delete(revoked); }
   });
 
@@ -181,7 +181,7 @@ test('customer Google OAuth with real JWT verification, HTTP and isolated MongoD
     const csrf = /yaans_csrf=([^;]+)/.exec(session)[1];
     const mismatch = await begin({ purpose: 'set-password', cookie: session, headers: { 'X-CSRF-Token': csrf } });
     const code = new URL('http://test' + mismatch.callback).searchParams.get('code'); providerCodes.get(code).payload.sub = 'wrong-account';
-    assert.equal((await request(mismatch.callback, { cookie: mismatch.cookie })).headers.get('location'), app.url + '/login?google=failed');
+    assert.equal((await request(mismatch.callback, { cookie: mismatch.cookie })).headers.get('location').split('&redirect=')[0], app.url + '/login?google=failed');
     // Cookie-session mutations require the normal session CSRF proof as well.
     const denied = await request('/auth/google/start', { body: { purpose: 'set-password' }, cookie: session }); assert.equal(denied.status, 403);
     const result = await request('/auth/google/start', { body: { purpose: 'set-password' }, cookie: session, headers: { 'X-CSRF-Token': csrf } });
@@ -211,5 +211,17 @@ test('customer Google OAuth with real JWT verification, HTTP and isolated MongoD
     const denied = await complete(flow, { currentPassword: TEST_PASSWORD }); assert.equal(denied.status, 429); assert.ok(denied.headers.get('retry-after'));
     const passwordLogin = await request('/auth/login', { body: { email: accounts.customer, password: TEST_PASSWORD } });
     assert.equal(passwordLogin.status, 200, 'Google rate limits must not consume the password login budget');
+  });
+
+  await scenario('expired sessions allow fresh Google login while live-session CSRF and password setup stay protected', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const expired = jwt.sign({ id: 'usr_test_customer', version: 3, tokenVersion: 0, csrf: 'expired-csrf', iat: now - 7200, exp: now - 3600 }, process.env.JWT_SECRET, { issuer: 'yaans.lk', audience: 'yaans.lk' });
+    const cookie = `yaans_session=${expired}; yaans_csrf=expired-csrf`;
+    const start = await request('/auth/google/start', { cookie, body: { returnTo: '/checkout' } });
+    assert.equal(start.status, 200);
+    assert.ok(start.headers.getSetCookie().some(value => value.startsWith('yaans_session=;')));
+    assert.equal((await request('/auth/google/start', { cookie, body: { purpose: 'set-password' } })).status, 401);
+    const live = await request('/auth/login', { body: { email: accounts.customer, password: TEST_PASSWORD } });
+    assert.equal((await request('/auth/google/start', { cookie: cookieOf(live), body: {} })).status, 403);
   });
 });

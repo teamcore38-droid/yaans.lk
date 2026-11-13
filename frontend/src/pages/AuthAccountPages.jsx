@@ -17,12 +17,13 @@ import { apiRequest, formatLkr } from '../utils/api.js';
 import { useMarketplace, DEFAULT_SL_DISTRICTS } from '../context/MarketplaceContext.jsx';
 import ProductCard from '../components/ProductCard.jsx';
 import GoogleCustomerLogin from '../components/GoogleCustomerLogin.jsx';
-import { customerRedirect } from '../../../shared/customerRedirect.js';
+import { customerRedirect, customerAuthPath } from '../../../shared/customerRedirect.js';
 
 export function LoginPage() {
   const { login, showToast } = useMarketplace();
   const navigate = useNavigate();
   const { search } = useLocation();
+  const returnTo = customerRedirect(new URLSearchParams(search).get('redirect'));
   const completingGoogle = new URLSearchParams(search).get('google') === 'complete';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -42,11 +43,8 @@ export function LoginPage() {
     try {
       setLoading(true);
       const loggedUser = await login(cleanEmail, cleanPassword);
-      const searchParams = new URLSearchParams(window.location.search);
-      const redirect = searchParams.get('redirect');
-
-      if (redirect && loggedUser.role === 'customer') {
-        navigate(customerRedirect(redirect));
+      if (loggedUser.role === 'customer') {
+        navigate(returnTo, { replace: true });
       } else if (loggedUser.role === 'seller') {
         navigate('/seller/dashboard');
       } else {
@@ -75,7 +73,7 @@ export function LoginPage() {
         </div>
 
         <GoogleCustomerLogin />
-        {completingGoogle ? <Link to="/login" className="block text-center text-xs font-semibold text-sky-700 hover:underline">Use email and password instead</Link> : <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+        {completingGoogle ? <Link to={customerAuthPath('login', returnTo)} className="block text-center text-xs font-semibold text-sky-700 hover:underline">Use email and password instead</Link> : <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
           <div>
             <label className="block font-bold text-slate-700 mb-1">Email Address / Username</label>
             <input
@@ -122,7 +120,7 @@ export function LoginPage() {
         </form>}
 
         <div className="pt-4 border-t border-slate-200 flex items-center justify-between text-xs">
-          <Link to="/register" className="font-bold text-sky-700 hover:underline">
+          <Link to={customerAuthPath('register', returnTo)} className="font-bold text-sky-700 hover:underline">
             Create Customer Account
           </Link>
           <Link to="/seller/register" className="font-bold text-slate-800 hover:underline">
@@ -137,6 +135,8 @@ export function LoginPage() {
 export function RegisterCustomerPage() {
   const { registerCustomer, showToast } = useMarketplace();
   const navigate = useNavigate();
+  const { search } = useLocation();
+  const returnTo = customerRedirect(new URLSearchParams(search).get('redirect'));
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -171,7 +171,7 @@ export function RegisterCustomerPage() {
         defaultDistrict,
         password: cleanPassword
       });
-      navigate('/');
+      navigate(returnTo, { replace: true });
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -273,7 +273,7 @@ export function RegisterCustomerPage() {
         </form>
         <div className="text-xs text-center text-slate-600 pt-2 border-t border-slate-100">
           Already have an account?{' '}
-          <Link to="/login" className="text-sky-700 font-bold hover:underline">
+          <Link to={customerAuthPath('login', returnTo)} className="text-sky-700 font-bold hover:underline">
             Sign in
           </Link>
         </div>

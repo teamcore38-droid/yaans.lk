@@ -160,12 +160,17 @@ export default function CookiePolicyPage() {
 
             <div className="divide-y divide-slate-100">
               <div className="grid grid-cols-12 p-3 items-start gap-2">
-                <div className="col-span-4 sm:col-span-3 font-mono text-xs font-bold text-slate-900">yaans_token</div>
+                <div className="col-span-4 sm:col-span-3 font-mono text-xs font-bold text-slate-900 break-all">yaans_checkout_draft_v1</div>
+                <div className="col-span-3 sm:col-span-2"><span className="px-2 py-0.5 rounded bg-sky-100 text-sky-800 text-[11px] font-semibold">Functional</span></div>
+                <div className="col-span-5 sm:col-span-7 text-xs text-slate-600">If you leave checkout to sign in, sessionStorage temporarily keeps your entered delivery details in that tab. Drafts can be restored for up to 30 minutes for the same cart and account, and are cleared on logout or completed checkout. Expired or invalid drafts are discarded when accessed. Passwords, authentication tokens and payment details are excluded.</div>
+              </div>
+              <div className="grid grid-cols-12 p-3 items-start gap-2">
+                <div className="col-span-4 sm:col-span-3 font-mono text-xs font-bold text-slate-900 break-all">__Host-yaans_session</div>
                 <div className="col-span-3 sm:col-span-2">
                   <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[11px] font-semibold">Strictly Necessary</span>
                 </div>
                 <div className="col-span-5 sm:col-span-7 text-xs text-slate-600">
-                  Stores your secure authentication token when you log in as a customer, seller, or administrator. Kept until logout.
+                  An essential HttpOnly session cookie authenticates your account. Authentication tokens are not kept in localStorage. Local development uses yaans_session; logout revokes the session.
                 </div>
               </div>
 

@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import { getStore, persistStore, withTransaction, generateId, idFilter } from '../config/db.js';
 import { httpError } from '../config/errors.js';
 import { stringField, validateNewPassword } from '../config/inputValidation.js';
-import { readCookies, setSessionCookies, newCsrfToken } from '../config/sessionCookies.js';
+import { readCookies, setSessionCookies, clearSessionCookies, newCsrfToken } from '../config/sessionCookies.js';
 import { getJwtSecret, signToken, credentialsRevoked, optionalAuthenticate } from '../middleware/auth.js';
 import { sharedRateLimit, consumeLimit } from '../middleware/sharedRateLimit.js';
 import { recordSecurityEvent } from '../config/securityEvents.js';
@@ -89,7 +89,14 @@ function establishSession(res, user) {
 export function mountGoogleLogin(router, issueSession) {
   router.get('/google/config', (_req, res) => res.json({ enabled: Boolean(googleConfiguration()) && process.env.MAINTENANCE_READ_ONLY !== 'true', origin: googleConfiguration()?.origin || null }));
 
-  router.post('/google/start', sharedRateLimit('google-start-ip', 30, 15 * 60000), optionalAuthenticate, async (req, res) => {
+  router.post('/google/start', sharedRateLimit('google-start-ip', 30, 15 * 60000), (req, res, next) => optionalAuthenticate(req, res, error => {
+    // An expired session must not prevent a fresh login. Sensitive password setup
+    // and live-session CSRF/role checks still require normal authentication.
+    if (error?.status === 401 && req.body.purpose !== 'set-password') {
+      clearSessionCookies(res); return next();
+    }
+    next(error);
+  }), async (req, res) => {
     const config = configuration(); sameOrigin(req, config);
     const purpose = req.body.purpose === 'set-password' ? 'set-password' : 'login';
     if (req.user) allowedCustomer(req.user);
@@ -113,11 +120,13 @@ export function mountGoogleLogin(router, issueSession) {
   router.get('/google/callback', sharedRateLimit('google-callback-ip', 30, 15 * 60000), async (req, res) => {
     const config = configuration();
     res.set('Referrer-Policy', 'no-referrer');
+    let returnTo = '/account';
     try {
       const proof = browserProof(req);
       const state = stringField(req.query.state, 'state', { required: true, maximum: 128 });
       const attempt = await challenges().findOneAndDelete({ _id: `google-state:${digest(state)}`, browser: proof, expiresAt: { $gt: new Date() } });
       if (!attempt) throw httpError(401, 'Google sign-in expired.');
+      returnTo = customerRedirect(attempt.returnTo);
       if (req.query.error) throw httpError(401, 'Google sign-in was cancelled.');
       const code = stringField(req.query.code, 'code', { required: true, maximum: 4096 });
       const identity = await exchangeGoogleCode(config, code, attempt);
@@ -142,11 +151,11 @@ export function mountGoogleLogin(router, issueSession) {
         passwordHash: existing?.passwordHash || null,
         returnTo: attempt.returnTo, expiresAt: new Date(Date.now() + lifetime) });
       res.cookie(cookieName(), token, cookieOptions());
-      return res.redirect(303, `${config.origin}/login?google=complete`);
+      return res.redirect(303, `${config.origin}/login?google=complete&redirect=${encodeURIComponent(returnTo)}`);
     } catch {
       clearGoogleCookie(res);
       await recordSecurityEvent('google_login_failed', { ip: req.ip, outcome: 'denied' });
-      return res.redirect(303, `${config.origin}/login?google=failed`);
+      return res.redirect(303, `${config.origin}/login?google=failed&redirect=${encodeURIComponent(returnTo)}`);
     }
   });
 

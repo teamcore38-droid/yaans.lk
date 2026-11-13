@@ -85,3 +85,30 @@ test('Google linking requires the existing password and returning login keeps th
   await expect(page).toHaveURL(/\/account$/);
   await expect(page.getByRole('heading', { name: /Existing Google Browser Customer/ })).toBeVisible();
 });
+
+test('Google sign-in resumes an unfinished guest checkout without submitting an order', async ({ page, context, request }) => {
+  await googleProvider(context, request, randomUUID());
+  let checkoutRequests = 0;
+  page.on('request', req => { if (req.url().endsWith('/api/orders/checkout') && req.method() === 'POST') checkoutRequests++; });
+  await page.goto('/product/test-ceylon-spice');
+  await page.getByRole('button', { name: 'Buy Now (Cash on Delivery)', exact: true }).click();
+  await page.getByPlaceholder('e.g., Kasun Perera').fill('Draft Recipient');
+  await page.getByPlaceholder('e.g., 077 412 3987').fill('0771234567');
+  await page.getByPlaceholder('e.g., No. 42/B, Fife Road, Thimbirigasyaya').fill('42 Draft Street');
+  await page.getByPlaceholder('e.g., Colombo 05 / Maharagama / Katugastota').fill('Galle');
+  await page.locator('main select').selectOption('Galle');
+  await page.getByRole('link', { name: 'Sign in to continue checkout' }).click();
+  await page.getByRole('button', { name: 'Continue with Google', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Use email and password instead' })).toHaveAttribute('href', '/login?redirect=%2Fcheckout');
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Create customer account', exact: true }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+  await expect(page.getByPlaceholder('e.g., Kasun Perera')).toHaveValue('Draft Recipient');
+  await expect(page.getByPlaceholder('e.g., No. 42/B, Fife Road, Thimbirigasyaya')).toHaveValue('42 Draft Street');
+  await expect(page.locator('main select')).toHaveValue('Galle');
+  expect(checkoutRequests).toBe(0);
+  await page.getByRole('button', { name: /Confirm COD Order/ }).click();
+  await expect(page.getByRole('heading', { name: /Your Order.*Confirmed/ })).toBeVisible();
+  expect(checkoutRequests).toBe(1);
+  expect(await page.evaluate(() => sessionStorage.getItem('yaans_checkout_draft_v1'))).toBeNull();
+});

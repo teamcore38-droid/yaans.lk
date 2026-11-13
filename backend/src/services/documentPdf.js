@@ -4,7 +4,11 @@ export async function documentPdf(doc) {
   const {default: PDFDocument}=await import('pdfkit');
   const pdf=new PDFDocument({size:'A4',margin:45,info:{Title:`${doc.title} ${doc.number}`,Author:'Yaans.lk'}});
   const chunks=[];const complete=new Promise((resolve,reject)=>{pdf.on('data',chunk=>chunks.push(chunk));pdf.on('end',()=>resolve(Buffer.concat(chunks)));pdf.on('error',reject);});
-  const fonts = Object.fromEntries(['NotoSans','NotoSansSinhala','NotoSansTamil'].map(name=>[name,fileURLToPath(new URL(`../assets/fonts/${name}.ttf`,import.meta.url))]));
+  const fonts = {
+    NotoSans:fileURLToPath(new URL('../assets/fonts/NotoSans.ttf',import.meta.url)),
+    NotoSansSinhala:fileURLToPath(new URL('../assets/fonts/NotoSansSinhala.ttf',import.meta.url)),
+    NotoSansTamil:fileURLToPath(new URL('../assets/fonts/NotoSansTamil.ttf',import.meta.url))
+  };
   for (const [name,path] of Object.entries(fonts)) pdf.registerFont(name,path);
   const money=n=>`LKR ${Number(n).toFixed(2)}`;
   const text=(value,size=10)=>{

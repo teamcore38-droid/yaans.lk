@@ -11,6 +11,7 @@ import { setSessionCookies, clearSessionCookies, newCsrfToken } from '../config/
 import { recordSecurityEvent } from '../config/securityEvents.js';
 import { beginMfaEnrollment, completeMfaEnrollment, createMfaChallenge, verifyMfaLogin } from '../services/adminMfa.js';
 import { httpError } from '../config/errors.js';
+import { mountGoogleLogin } from '../services/googleLogin.js';
 
 const router = createRouter();
 router.use((_req,res,next)=>{res.set('Cache-Control','private, no-store');next();});
@@ -22,6 +23,7 @@ function sanitizeUser(user, store) {
     _id: user._id,
     name: user.name,
     email: user.email,
+    ...(user.role === 'customer' ? { hasPassword: Boolean(user.passwordHash), googleLinked: Boolean(user.googleSubject) } : {}),
     phone: user.phone,
     role: user.role,
     ...(user.role === 'staff' ? { staffMustChangePassword: Boolean(user.staffMustChangePassword), canEditProducts: user.canEditProducts === true } : {}),
@@ -41,6 +43,8 @@ async function issueSession(req,res,user,store,extra={},status=200) {
   return res.status(status).json({...(req.headers['x-yaans-client']==='browser'?{}:{token}),user:sanitizeUser(user,store),...extra});
 }
 
+mountGoogleLogin(router, issueSession);
+
 // POST /api/auth/login (Customer & Seller Storefront Login ONLY)
 router.post('/login', loginIpLimit, loginAccountLimit, async (req, res) => {
   getJwtSecret();
@@ -51,7 +55,7 @@ router.post('/login', loginIpLimit, loginAccountLimit, async (req, res) => {
   const store = await getStore({ users: { email: String(email).toLowerCase().trim() } });
   const normalizedEmail = String(email).toLowerCase().trim();
   const user = store.users.find((u) => u.email.toLowerCase() === normalizedEmail);
-  if (!user || !await bcrypt.compare(String(password), user.passwordHash)) {
+  if (!user || !await bcrypt.compare(String(password), user.passwordHash || '')) {
     await recordSecurityEvent('login_failed',{identity:normalizedEmail,ip:req.ip,outcome:'denied'});
     return res.status(401).json({ message: 'Invalid email or password.' });
   }
@@ -122,7 +126,7 @@ router.post('/admin/login', loginIpLimit, adminAccountLimit, async (req, res) =>
   const store = await getStore({ users: { email: normalizedEmail }, platformConfig: true });
   const user = store.users.find((u) => u.email.toLowerCase() === normalizedEmail);
 
-  if (!user || !await bcrypt.compare(String(password), user.passwordHash)) {
+  if (!user || !await bcrypt.compare(String(password), user.passwordHash || '')) {
     await recordSecurityEvent('admin_login_failed',{identity:normalizedEmail,ip:req.ip,outcome:'denied'});
     recordAdminAuditLog(store, {
       event: 'ADMIN_LOGIN_FAILED',
@@ -382,6 +386,7 @@ router.put('/update-credentials', authenticate, async (req, res) => {
 
   // If updating password or changing email, verify current password
   if (newPassword || (newEmail && newEmail.toLowerCase().trim() !== user.email.toLowerCase())) {
+    if (!user.passwordHash) throw httpError(400, 'Verify your linked Google account from Account Security to create a password first.');
     if (!currentPassword) {
       return res.status(400).json({ message: 'Current password is required to update credentials.' });
     }

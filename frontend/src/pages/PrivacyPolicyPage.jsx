@@ -137,6 +137,16 @@ export default function PrivacyPolicyPage() {
           </div>
         </section>
 
+        <section className="space-y-3">
+          <h2 className="text-lg sm:text-xl font-bold text-slate-900">Optional Google customer sign-in</h2>
+          <p>
+            If you choose Google sign-in, Google shares your account identifier, verified email address and basic profile information with Yaans. We store your Google identifier, email and name to create or link your customer account and authenticate future sign-ins. We do not request access to your Gmail inbox, contacts, Drive files or Google password, and do not retain Google access or refresh tokens.
+          </p>
+          <p>
+            Google processes your sign-in under its own <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-sky-700 underline">Privacy Policy</a>. Short-lived, essential security cookies and server-side challenges protect the sign-in process and expire after ten minutes. Account information is retained under the account retention and deletion provisions of this policy. You can also use email and password; Google-only customers can create an optional password after verifying their linked Google account from Account Security.
+          </p>
+        </section>
+
         {/* Section 4 */}
         <section className="space-y-3">
           <h2 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2">

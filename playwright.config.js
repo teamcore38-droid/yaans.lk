@@ -28,7 +28,7 @@ export default defineConfig({
   ],
   webServer: [
     { command: 'node tests/support/start-api.js', url: 'http://127.0.0.1:5179/api/health',
-      timeout: 180000, reuseExistingServer: false },
+      timeout: 180000, reuseExistingServer: false, env: { YAANS_E2E_GOOGLE: 'true' } },
     { command: 'npm --prefix frontend run preview -- --host 127.0.0.1 --port 4173 --strictPort',
       url: 'http://127.0.0.1:4173', timeout: 60000, reuseExistingServer: false,
       env: { YAANS_TEST_API_TARGET: 'http://127.0.0.1:5179' } }

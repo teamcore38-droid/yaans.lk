@@ -90,6 +90,34 @@ test('checkout failure preserves the cart and a retry can succeed', async ({ pag
   await expect(page.getByRole('heading', { name: /Thank you! Your Order/ })).toBeVisible();
 });
 
+test('unavailable saved products stay visible and counted until removed, then a valid quote recovers', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => localStorage.setItem('yaans_cart', JSON.stringify([
+    { productId: 'removed-product', title: 'Previously saved product', quantity: '2' },
+    { productId: 'prd_test_lamp', title: 'Test Desk Lamp', quantity: 1 }
+  ])));
+  const rejected = page.waitForResponse(response => response.url().endsWith('/api/orders/quote'));
+  await page.goto('/cart');
+  expect((await rejected).status()).toBe(409);
+  await expect(page.getByRole('alert')).toContainText('currently unavailable');
+  await expect(page.getByRole('link', { name: 'Previously saved product', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Cart, 3 items' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: /Proceed to Checkout/ })).toBeDisabled();
+  await expect(page.getByText('Calculating seller shipments...')).not.toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Cart, 3 items' }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Remove Previously saved product', exact: true }).click();
+  await expect(page.getByRole('button', { name: /Proceed to Checkout/ })).toBeEnabled();
+  await expect(page.getByRole('link', { name: 'Cart, 1 item' }).first()).toBeVisible();
+  await expect(page.getByText('Shipment 1 of 1', { exact: true })).toBeVisible();
+  await expect(page.getByRole('alert')).not.toBeVisible();
+  await page.getByRole('button', { name: 'Clear Entire Cart' }).click();
+  await expect(page.getByRole('heading', { name: /Shopping Cart is Empty/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Cart, 0 items' }).first()).toBeVisible();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('yaans_cart')))).toEqual([]);
+});
+
 test('a lost success response is recovered without creating another order', async ({ page }) => {
   await page.goto('/product/test-ceylon-spice');
   await page.getByRole('button', { name: 'Buy Now (Cash on Delivery)', exact: true }).click();

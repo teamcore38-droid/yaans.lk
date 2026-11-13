@@ -14,7 +14,7 @@
     "test": "node --test frontend/tests/*.test.js backend/tests/*.test.js",
     "test:ui": "npm --prefix frontend run test:ui",
     "test:integration": "node --test backend/tests/*.integration.js",
-    "test:e2e": "playwright test",
+    "test:e2e": "node scripts/run-browser-tests.mjs",
     "test:e2e:report": "playwright show-report",
     "test:capacity": "node scripts/benchmark-capacity.mjs",
     "test:security": "node scripts/security-audit.mjs",

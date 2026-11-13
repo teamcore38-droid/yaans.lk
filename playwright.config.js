@@ -2,11 +2,13 @@ import { defineConfig, devices } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
 process.env.YAANS_TEST_RUN_ID ||= randomUUID();
+const isolatedProject = process.env.YAANS_TEST_PROJECT;
+if (isolatedProject && !['chromium', 'mobile-chromium'].includes(isolatedProject)) throw new Error('Unknown isolated browser project.');
 
 export default defineConfig({
   testDir: './tests/e2e',
   testMatch: '**/*.spec.js',
-  outputDir: 'test-results/browser',
+  outputDir: isolatedProject ? `test-results/browser/${isolatedProject}` : 'test-results/browser',
   globalTeardown: './tests/support/stop-api.js',
   fullyParallel: false,
   workers: 1,
@@ -14,7 +16,9 @@ export default defineConfig({
   retries: 0,
   timeout: 45000,
   globalTimeout: 10 * 60 * 1000,
-  reporter: [['list'], ['html', { open: 'never' }], ['junit', { outputFile: 'test-results/e2e.xml' }]],
+  reporter: isolatedProject
+    ? [['list'], ['blob', { outputDir: process.env.YAANS_TEST_BLOB_DIR, fileName: 'report.zip' }]]
+    : [['list'], ['html', { open: 'never' }], ['junit', { outputFile: 'test-results/e2e.xml' }]],
   use: {
     baseURL: 'http://127.0.0.1:4173',
     channel: process.env.YAANS_TEST_BROWSER_CHANNEL || undefined,

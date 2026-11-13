@@ -186,9 +186,9 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Mobile & Guest Sign-In Strip (Modeled directly on reference screenshot) */}
+      {/* Guest sign-in strip is only shown on larger screens. */}
       {!user && (
-        <div className="!mt-2 sm:!mt-2.5 bg-white rounded-xl border border-slate-200 py-2.5 px-3.5 sm:px-4 sm:py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 shadow-xs">
+        <div className="!mt-2 sm:!mt-2.5 bg-white rounded-xl border border-slate-200 py-2.5 px-3.5 sm:px-4 sm:py-2.5 hidden md:flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 shadow-xs">
           <div>
             <h2 className="text-sm font-bold text-slate-900 leading-snug">
               Sign in for the best Yaans.lk experience

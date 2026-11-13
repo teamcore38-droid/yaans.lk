@@ -1,3 +1,4 @@
+import { validateProductImages } from '../services/productImages.js';
 import { createRouter } from '../config/router.js';
 import { getStore, persistStore, generateId, idFilter, loadCollections, MODEL_MAP } from '../config/db.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
@@ -142,7 +143,7 @@ router.post('/products', async (req, res) => {
     priceLkr,
     compareAtPriceLkr = null,
     stock = 15,
-    images = [],
+    images,
     variants = [],
     isHomemade = seller.isHomemadeVendor,
     codEligible = true,
@@ -176,8 +177,8 @@ router.post('/products', async (req, res) => {
     compareAtPriceLkr: compareAtPriceLkr ? Number(compareAtPriceLkr) : null,
     stock: Number(stock) || 0,
     images:
-      images && images.length > 0
-        ? images
+      images !== undefined
+        ? validateProductImages(images)
         : ['https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=800&q=80'],
     variants: Array.isArray(variants) ? variants : [],
     isHomemade: Boolean(isHomemade),
@@ -252,8 +253,8 @@ router.put('/products/:productId', async (req, res) => {
     product.compareAtPriceLkr = compareAtPriceLkr ? Number(compareAtPriceLkr) : null;
   }
   if (stock !== undefined) product.stock = Math.max(0, Number(stock));
-  if (images !== undefined && Array.isArray(images) && images.length > 0) {
-    product.images = images;
+  if (images !== undefined) {
+    product.images = validateProductImages(images, product.images);
   }
   if (variants !== undefined && Array.isArray(variants)) {
     product.variants = variants;
@@ -364,10 +365,10 @@ router.post('/products/bulk-import', async (req, res) => {
       priceLkr,
       compareAtPriceLkr: item.compareAtPriceLkr ? Number(item.compareAtPriceLkr) : null,
       stock: item.stock !== undefined ? Math.max(0, Number(item.stock) || 0) : 15,
-      images: Array.isArray(item.images) && item.images.length > 0
-        ? item.images
+      images: item.images !== undefined
+        ? validateProductImages(item.images)
         : item.imageUrl
-        ? [item.imageUrl.trim()]
+        ? validateProductImages([item.imageUrl.trim()])
         : ['https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=800&q=80'],
       variants: Array.isArray(item.variants) ? item.variants : [],
       isHomemade: item.isHomemade !== undefined ? Boolean(item.isHomemade) : seller.isHomemadeVendor,

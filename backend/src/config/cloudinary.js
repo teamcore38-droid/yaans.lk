@@ -1,3 +1,4 @@
+import { prepareProductImage } from '../services/productImages.js';
 import { randomUUID } from 'node:crypto';
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
@@ -76,8 +77,8 @@ export async function uploadToCloudinary(fileBuffer, options = {}) {
           allowed_formats:['jpg','jpeg','png','webp','gif','avif'],
           transformation: [
             {
-              width: 1200,
-              height: 1200,
+              width: options.productImage ? 1600 : 1200,
+              height: options.productImage ? 1600 : 1200,
               crop: 'limit',
               quality: 'auto:good',
               fetch_format: 'auto',
@@ -115,7 +116,8 @@ export async function handleProductImageUpload(req) {
     throw httpError(400,'No image file was provided.');
   }
 
-  return await uploadToCloudinary(req.file.buffer, {
+  return await uploadToCloudinary(await prepareProductImage(req.file.buffer), {
+    productImage: true,
     folder: 'yaans_lk/products',
     originalname: req.file.originalname,
     mimetype: req.file.mimetype,

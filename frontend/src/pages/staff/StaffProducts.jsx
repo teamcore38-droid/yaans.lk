@@ -1,3 +1,4 @@
+import ProductImageGalleryEditor from '../../components/ProductImageGalleryEditor.jsx';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { apiRequest, formatLkr } from '../../utils/api.js';
 export default function StaffProducts({ expire }) {
@@ -24,12 +25,6 @@ export default function StaffProducts({ expire }) {
     catch(error){if(alive.current)fail(error);}
     finally{if(alive.current)setBusy(false);}
   }
-  async function upload(event) {
-    const file=event.target.files?.[0];if(!file||busy)return;setBusy(true);setError('');
-    const current=version.current;const body=new FormData();body.append('image',file);
-    try{const result=await apiRequest('/staff/products/upload-image',{method:'POST',body});if(alive.current&&current===version.current)setForm(previous=>({...previous,images:[...(previous.images||[]),result.url].slice(0,10)}));}
-    catch(error){if(alive.current)fail(error);}finally{if(alive.current)setBusy(false);}
-  }
   const text=(key,label,multiline=false)=><label className="block">{label}{multiline?<textarea className="block w-full border rounded p-2" required value={form[key]||''} onChange={e=>setForm({...form,[key]:e.target.value})}/>:<input className="block w-full border rounded p-2" required value={form[key]||''} onChange={e=>setForm({...form,[key]:e.target.value})}/>}</label>;
   const numeric=(key,label,nullable=false)=><label className="block">{label}<input className="block w-full border rounded p-2" type="number" min={key==='stock'?0:0.01} step={key==='stock'?1:0.01} required={!nullable} value={form[key]??''} onChange={e=>setForm({...form,[key]:nullable&&e.target.value===''?null:Number(e.target.value)})}/></label>;
   function optionChange(groupIndex,optionIndex,key,value){setForm(previous=>({...previous,variants:previous.variants.map((group,i)=>i!==groupIndex?group:{...group,values:group.values.map((option,j)=>j!==optionIndex?option:{...option,[key]:value})})}));}
@@ -45,8 +40,7 @@ export default function StaffProducts({ expire }) {
       <label className="block">Subcategory<input className="block border p-2 w-full" value={form.subCategorySlug||''} onChange={e=>setForm({...form,subCategorySlug:e.target.value})}/></label>
       <label className="block">Highlights (one per line)<textarea className="block border p-2 w-full" value={(form.highlights||[]).join('\n')} onChange={e=>setForm({...form,highlights:e.target.value.split('\n')})}/></label>
       {numeric('priceLkr','Price (LKR)')}{numeric('compareAtPriceLkr','Compare price (LKR)',true)}{numeric('stock','Stock')}
-      <label className="block">Image URLs (one per line)<textarea className="block border p-2 w-full" required value={(form.images||[]).join('\n')} onChange={e=>setForm({...form,images:e.target.value.split('\n')})}/></label>
-      <label className="block">Upload product image<input className="block" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" disabled={busy} onChange={upload}/></label>
+      <ProductImageGalleryEditor key={form._id} images={form.images} disabled={busy} onChange={images=>setForm(previous=>({...previous,images}))} endpoint="/staff/products/upload-image" onBusyChange={setBusy} onError={fail} />
       {(form.variants||[]).map((group,i)=><fieldset key={i} className="border p-3 space-y-2"><legend>Variant group {i+1}</legend><label>Group name<input className="border p-2" required value={group.name} onChange={e=>setForm({...form,variants:form.variants.map((g,j)=>j===i?{...g,name:e.target.value}:g)})}/></label>
         {group.values.map((option,j)=><div key={j} className="flex flex-wrap gap-2"><label>Option label<input className="border p-2" required value={option.label} onChange={e=>optionChange(i,j,'label',e.target.value)}/></label><label>Option price<input className="border p-2" type="number" required min="0.01" step="0.01" value={option.priceLkr} onChange={e=>optionChange(i,j,'priceLkr',Number(e.target.value))}/></label><label>Option stock<input className="border p-2" type="number" required min="0" step="1" value={option.stock} onChange={e=>optionChange(i,j,'stock',Number(e.target.value))}/></label><button type="button" onClick={()=>setForm({...form,variants:form.variants.map((g,k)=>k===i?{...g,values:g.values.filter((_,k)=>k!==j)}:g)})}>Remove option</button></div>)}
         <button type="button" onClick={()=>setForm({...form,variants:form.variants.map((g,j)=>j===i?{...g,values:[...g.values,{label:'',priceLkr:form.priceLkr,stock:0}]}:g)})}>Add option</button><button type="button" onClick={()=>setForm({...form,variants:form.variants.filter((_,j)=>j!==i)})}>Remove group</button>

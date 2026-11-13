@@ -72,7 +72,7 @@ test('permission-scoped staff product editing preserves inventory and administra
   await t.test('malformed values and audit persistence failure cannot change product records; reads are bounded and indexed',async()=>{
     const {admin,id}=await setup();await permission(admin,id,true);const editor=await login('products@test.invalid',personal,'/auth/staff/login');
     const p=(await product(editor)).data.product;
-    for(const patch of [{priceLkr:0},{stock:-1},{stock:1.5},{images:['javascript:alert(1)']},{variants:[{name:'Size',values:[{label:'x',priceLkr:10,stock:1},{label:'x',priceLkr:10,stock:2}]}]},{categorySlug:'missing'},{title:{'$ne':'x'}}]){
+    for(const patch of [{priceLkr:0},{stock:-1},{stock:1.5},{images:['javascript:alert(1)']},{images:Array.from({length:9},(_,i)=>`https://example.com/${i}.jpg`)},{variants:[{name:'Size',values:[{label:'x',priceLkr:10,stock:1},{label:'x',priceLkr:10,stock:2}]}]},{categorySlug:'missing'},{title:{'$ne':'x'}}]){
       assert.equal((await req('/staff/products/'+p._id,editor,{revision:p.revision,...patch},'PUT')).status,400);
     }
     await app.mongo.command({collMod:'securityevents',validator:{event:{$ne:'STAFF_PRODUCT_EDITED'}}});

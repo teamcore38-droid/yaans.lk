@@ -1,3 +1,4 @@
+import ProductImageGalleryEditor from '../components/ProductImageGalleryEditor.jsx';
 import OrderNotifications from '../components/OrderNotifications.jsx';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -128,12 +129,13 @@ export default function SellerDashboardPage() {
     priceLkr: '',
     compareAtPriceLkr: '',
     stock: '25',
-    imageUrl: '',
+    images: [],
     isHomemade: true
   });
   const [variantGroupName, setVariantGroupName] = useState('Set Size');
   const [variantRows, setVariantRows] = useState([]);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [savingProduct, setSavingProduct] = useState(false);
 
   const handleAddVariantRow = () => {
     setVariantRows((prev) => [
@@ -347,28 +349,10 @@ export default function SellerDashboardPage() {
   const subOrders = data?.subOrders || [];
   const settlements = data?.settlements || [];
 
-  const handleImageFileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append('image', file);
-    try {
-      setUploadingImage(true);
-      const res = await apiRequest('/seller/upload-image', {
-        method: 'POST',
-        body: formData
-      });
-      setProdForm((prev) => ({ ...prev, imageUrl: res.url }));
-      showToast(`Image uploaded (${res.provider === 'cloudinary' ? 'Cloudinary CDN' : 'Optimized Storage'})!`);
-    } catch (err) {
-      showToast(err.message, 'error');
-    } finally {
-      setUploadingImage(false);
-    }
-  };
-
   const handleSaveProduct = async (e) => {
     e.preventDefault();
+    if (uploadingImage || savingProduct) return;
+    setSavingProduct(true);
     try {
       const validVariants = variantRows
         .filter((v) => v.label && v.label.trim())
@@ -388,7 +372,7 @@ export default function SellerDashboardPage() {
         priceLkr: Number(prodForm.priceLkr),
         compareAtPriceLkr: prodForm.compareAtPriceLkr ? Number(prodForm.compareAtPriceLkr) : null,
         stock: Number(prodForm.stock),
-        images: prodForm.imageUrl ? [prodForm.imageUrl] : undefined,
+        images: prodForm.images,
         isHomemade: prodForm.isHomemade,
         variants:
           validVariants.length > 0
@@ -428,12 +412,14 @@ export default function SellerDashboardPage() {
         priceLkr: '',
         compareAtPriceLkr: '',
         stock: '25',
-        imageUrl: '',
+        images: [],
         isHomemade: seller?.isHomemadeVendor ?? true
       });
       fetchDashboard();
     } catch (err) {
       showToast(err.message, 'error');
+    } finally {
+      setSavingProduct(false);
     }
   };
 
@@ -449,7 +435,7 @@ export default function SellerDashboardPage() {
       priceLkr: String(prod.priceLkr),
       compareAtPriceLkr: prod.compareAtPriceLkr ? String(prod.compareAtPriceLkr) : '',
       stock: String(prod.stock),
-      imageUrl: prod.images?.[0] || '',
+      images: [...(prod.images || [])],
       isHomemade: Boolean(prod.isHomemade)
     });
 
@@ -988,7 +974,7 @@ export default function SellerDashboardPage() {
                       priceLkr: '',
                       compareAtPriceLkr: '',
                       stock: '25',
-                      imageUrl: '',
+                      images: [],
                       isHomemade: seller?.isHomemadeVendor ?? true
                     });
                   }}
@@ -1211,28 +1197,7 @@ export default function SellerDashboardPage() {
               )}
             </div>
 
-            {/* Cloudinary Image Upload */}
-            <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="font-bold text-slate-800 flex items-center gap-1.5">
-                  <Upload className="w-3.5 h-3.5" /> Product Image (Cloudinary Upload or URL)
-                </label>
-                {uploadingImage && <span className="text-sky-700 font-semibold">Uploading...</span>}
-              </div>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageFileUpload}
-                className="w-full text-xs"
-              />
-              <input
-                type="text"
-                value={prodForm.imageUrl}
-                onChange={(e) => setProdForm({ ...prodForm, imageUrl: e.target.value })}
-                placeholder="Or paste image URL..."
-                className="w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white"
-              />
-            </div>
+            <ProductImageGalleryEditor key={editingProductId || 'new'} images={prodForm.images} disabled={savingProduct} onChange={images => setProdForm(previous => ({ ...previous, images }))} endpoint="/seller/upload-image" onBusyChange={setUploadingImage} />
 
             <div>
               <label htmlFor="seller-product-highlights" className="block font-bold text-slate-700 mb-1">
@@ -1273,6 +1238,7 @@ export default function SellerDashboardPage() {
 
             <button
               type="submit"
+              disabled={uploadingImage || savingProduct}
               className="w-full py-2.5 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold text-xs sm:text-sm"
             >
               {editingProductId ? 'Save Product Changes' : 'Publish Product Listing'}

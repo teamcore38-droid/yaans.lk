@@ -54,7 +54,7 @@ const mockProduct = {
   priceLkr: 850,
   compareAtPriceLkr: 1000,
   stock: 30,
-  images: ['/brand/yaans-mark-dark.png'],
+  images: ['/brand/yaans-mark-dark.png', '/brand/second.png'],
   isHomemade: true,
   approvalStatus: 'approved'
 };
@@ -177,6 +177,8 @@ test('editing an existing product populates Key Highlights in textarea and updat
       })
     );
   });
+  const saved = requestSpy.mock.calls.find(([endpoint, options]) => endpoint === `/seller/products/${mockProduct._id}` && options?.method === 'PUT');
+  expect(JSON.parse(saved[1].body).images).toEqual(mockProduct.images);
   expect(showToast).toHaveBeenCalledWith('Product updated!');
 });
 

@@ -449,10 +449,10 @@ export default function CheckoutPage() {
 
             <div className="space-y-3 text-xs">
               <label
-                className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition ${
+                className={`flex items-start gap-3 p-3.5 rounded-xl cursor-pointer transition ${
                   paymentMethod === 'COD'
-                    ? 'border-slate-900 bg-slate-50'
-                    : 'border-slate-200 bg-white'
+                    ? 'payment-card-selected'
+                    : 'payment-card-unselected'
                 }`}
               >
                 <input
@@ -460,47 +460,55 @@ export default function CheckoutPage() {
                   name="paymentMethod"
                   checked={paymentMethod === 'COD'}
                   onChange={() => setPaymentMethod('COD')}
-                  className="mt-1"
+                  className="mt-1 accent-blue-600 shrink-0"
                 />
-                <div className="flex-1">
-                  <div className="font-bold text-slate-900 flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-slate-900 flex flex-wrap items-center gap-1.5 sm:gap-2">
                     <span>Cash on Delivery (COD) — Pay in LKR (Rs.)</span>
-                    <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#00985A] text-white text-[10px] font-bold whitespace-nowrap shrink-0">
                       Recommended
                     </span>
                   </div>
-                  <p className="text-slate-600 mt-0.5">
-                    Pay cash in Sri Lankan Rupees directly to the delivery rider when each seller package arrives at your doorstep.
+                  <p className="text-slate-700 mt-0.5 leading-snug">
+                    <span className="sm:hidden">Pay cash to rider.</span>
+                    <span className="hidden sm:inline">
+                      Pay cash in Sri Lankan Rupees directly to the delivery rider when each seller package arrives at your doorstep.
+                    </span>
                   </p>
 
-                  <div className="mt-2.5 pt-2.5 border-t border-slate-200 flex items-start gap-2">
+                  <div className="mt-2.5 flex items-start gap-2">
                     <input
                       type="checkbox"
                       checked={codConfirmed}
                       onChange={(e) => setCodConfirmed(e.target.checked)}
-                      className="mt-0.5 rounded border-slate-300"
+                      className="mt-0.5 rounded border-slate-300 accent-blue-600 shrink-0"
                     />
-                    <span className="text-slate-700 font-medium">
+                    <span className="text-slate-900 font-semibold leading-snug">
                       I confirm this COD order and agree to have{' '}
-                      <strong>{formatLkr(cartQuote?.grandTotalLkr || 0)}</strong> ready on delivery.
+                      <strong className="font-extrabold">{formatLkr(cartQuote?.grandTotalLkr || 0)}</strong> ready on delivery.
                     </span>
                   </div>
                 </div>
               </label>
 
               {/* Future Online Payment Integration Readiness */}
-              <div className="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 opacity-75">
-                <input type="radio" disabled className="mt-1" />
-                <div className="flex-1">
-                  <div className="font-bold text-slate-700 flex items-center gap-2">
-                    <CreditCard className="w-4 h-4" />
-                    <span>Online Card / LankaQR / PayHere (Gateway Architecture Ready)</span>
-                    <span className="px-2 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] font-bold">
+              <div className="flex items-start gap-3 p-3.5 rounded-xl payment-card-unselected">
+                <input type="radio" disabled className="mt-1 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-slate-900 flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    <span>
+                      <CreditCard className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline-block mr-1.5 align-text-bottom text-slate-700" />
+                      Online Card / LankaQR / PayHere (Gateway Architecture Ready)
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#E2DCE2] text-slate-700 text-[10px] font-bold whitespace-nowrap shrink-0">
                       Phase 2 Integration
                     </span>
                   </div>
-                  <p className="text-slate-500 mt-0.5">
-                    Visa, MasterCard, and LankaQR instant online payments are pre-architected for future activation.
+                  <p className="text-slate-600 mt-0.5 leading-snug">
+                    <span className="sm:hidden">Online payments coming soon.</span>
+                    <span className="hidden sm:inline">
+                      Visa, MasterCard, and LankaQR instant online payments are pre-architected for future activation.
+                    </span>
                   </p>
                 </div>
               </div>

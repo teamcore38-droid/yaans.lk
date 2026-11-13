@@ -155,3 +155,26 @@ test('changed details after an uncertain checkout recover the original order rat
   expect(request.mock.calls[1][0]).toBe('/orders/checkout-result');
   expect(request.mock.calls[1][1].headers['Idempotency-Key']).toBe(request.mock.calls[0][1].headers['Idempotency-Key']);
 });
+
+test('payment method options apply themed card classes and concise mobile copy', () => {
+  checkout();
+  const codRadio = screen.getByRole('radio', { checked: true });
+  const codCard = codRadio.closest('label');
+  expect(codCard).toHaveClass('payment-card-selected');
+
+  const onlineRadio = screen.getByRole('radio', { checked: false });
+  expect(onlineRadio).toBeDisabled();
+  const onlineCard = onlineRadio.closest('div');
+  expect(onlineCard).toHaveClass('payment-card-unselected');
+
+  const mobileCod = screen.getByText('Pay cash to rider.');
+  expect(mobileCod).toHaveClass('sm:hidden');
+  expect(mobileCod.textContent.trim().split(/\s+/).length).toBeLessThanOrEqual(4);
+
+  const mobileOnline = screen.getByText('Online payments coming soon.');
+  expect(mobileOnline).toHaveClass('sm:hidden');
+  expect(mobileOnline.textContent.trim().split(/\s+/).length).toBeLessThanOrEqual(4);
+
+  expect(screen.getByText(/Pay cash in Sri Lankan Rupees directly to the delivery rider/)).toHaveClass('hidden', 'sm:inline');
+  expect(screen.getByText(/Visa, MasterCard, and LankaQR instant online payments are pre-architected/)).toHaveClass('hidden', 'sm:inline');
+});

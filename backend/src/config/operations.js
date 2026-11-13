@@ -3,6 +3,8 @@ import mongoose from 'mongoose';
 const initializations = new WeakMap();
 export function ensureOperationalIndexes(db) {
   if (!initializations.has(db)) initializations.set(db, (async () => {
+    await db.collection('users').createIndex({ googleSubject: 1 }, { unique: true, partialFilterExpression: { googleSubject: { $type: 'string' } }, name: 'google_identity_unique' });
+    await db.collection('authchallenges').createIndex({ browser: 1 }, { sparse: true, name: 'google_browser_challenges' });
     await db.collection('suborders').createIndex({ 'items.productId': 1, 'items.variantLabel': 1, fulfillmentStatus: 1 }, { name: 'staff_variant_order_guard' });
     await db.collection('staffsessions').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, name: 'staff_session_expiry' });
     await db.collection('staffsessions').createIndex({ userId: 1 }, { name: 'staff_session_user' });

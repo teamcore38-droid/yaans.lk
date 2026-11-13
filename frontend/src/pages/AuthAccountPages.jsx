@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   User,
   Store,
@@ -16,10 +16,14 @@ import {
 import { apiRequest, formatLkr } from '../utils/api.js';
 import { useMarketplace, DEFAULT_SL_DISTRICTS } from '../context/MarketplaceContext.jsx';
 import ProductCard from '../components/ProductCard.jsx';
+import GoogleCustomerLogin from '../components/GoogleCustomerLogin.jsx';
+import { customerRedirect } from '../../../shared/customerRedirect.js';
 
 export function LoginPage() {
   const { login, showToast } = useMarketplace();
   const navigate = useNavigate();
+  const { search } = useLocation();
+  const completingGoogle = new URLSearchParams(search).get('google') === 'complete';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -41,8 +45,8 @@ export function LoginPage() {
       const searchParams = new URLSearchParams(window.location.search);
       const redirect = searchParams.get('redirect');
 
-      if (redirect && redirect.startsWith('/') && !redirect.startsWith('/admin')) {
-        navigate(redirect);
+      if (redirect && loggedUser.role === 'customer') {
+        navigate(customerRedirect(redirect));
       } else if (loggedUser.role === 'seller') {
         navigate('/seller/dashboard');
       } else {
@@ -64,13 +68,14 @@ export function LoginPage() {
             alt="Yaans.lk"
             className="h-10 mx-auto object-contain mb-2"
           />
-          <h1 className="text-lg font-extrabold text-slate-900">Sign In to Yaans.lk</h1>
+          <h1 className="text-lg font-extrabold text-slate-900">{completingGoogle ? 'Complete Google Sign-In' : 'Sign In to Yaans.lk'}</h1>
           <p className="text-xs text-slate-500">
-            Customer &amp; Seller Storefront Sign In
+            {completingGoogle ? 'Customer account verification' : 'Customer & Seller Storefront Sign In'}
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+        <GoogleCustomerLogin />
+        {completingGoogle ? <Link to="/login" className="block text-center text-xs font-semibold text-sky-700 hover:underline">Use email and password instead</Link> : <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
           <div>
             <label className="block font-bold text-slate-700 mb-1">Email Address / Username</label>
             <input
@@ -114,7 +119,7 @@ export function LoginPage() {
           >
             {loading ? 'Signing In...' : 'Sign In'}
           </button>
-        </form>
+        </form>}
 
         <div className="pt-4 border-t border-slate-200 flex items-center justify-between text-xs">
           <Link to="/register" className="font-bold text-sky-700 hover:underline">
@@ -178,6 +183,7 @@ export function RegisterCustomerPage() {
     <div className="max-w-md mx-auto px-4 py-8">
       <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
         <h1 className="text-lg font-extrabold text-slate-900">Create Your Yaans.lk Account</h1>
+        <GoogleCustomerLogin />
         <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
           <div>
             <label className="block font-bold text-slate-700 mb-1">Full Name *</label>
@@ -237,7 +243,7 @@ export function RegisterCustomerPage() {
                 autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Minimum 6 characters"
+                placeholder="Minimum 15 characters"
                 className="w-full pl-3.5 pr-10 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
               <button
@@ -854,7 +860,7 @@ export function CustomerAccountPage() {
             <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
               Account Security &amp; Password
             </h3>
-            <form onSubmit={handleUpdateCustPassword} className="space-y-2.5 text-xs">
+            {user.hasPassword === false ? <GoogleCustomerLogin purpose="set-password" /> : <form onSubmit={handleUpdateCustPassword} className="space-y-2.5 text-xs">
               <div className="relative">
                 <input
                   type={showCurrentPassword ? 'text' : 'password'}
@@ -932,7 +938,7 @@ export function CustomerAccountPage() {
               >
                 {savingCustPassword ? 'Updating...' : 'Change Password'}
               </button>
-            </form>
+            </form>}
           </div>
         </div>
 

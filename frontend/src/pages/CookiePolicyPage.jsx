@@ -119,6 +119,11 @@ export default function CookiePolicyPage() {
         )}
       </div>
 
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 text-sm text-slate-700 space-y-2">
+        <h2 className="font-bold text-slate-900">Google sign-in security cookie</h2>
+        <p>When you start optional Google customer sign-in, Yaans sets an essential, HttpOnly cookie named __Host-yaans_google in production (yaans_google during local development). It binds the Google response to your browser, expires after ten minutes and is cleared when sign-in completes or fails. It is not used for advertising. Google may use its own cookies when you visit Google to sign in.</p>
+      </div>
+
       {/* Main Content Sections */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-10 shadow-sm space-y-8 text-sm sm:text-base text-slate-700 leading-relaxed">
 

@@ -22,6 +22,7 @@ export async function startIsolatedApp(port = 0, { monitorCommands = false } = {
     MAINTENANCE_READ_ONLY: '',
     JWT_SECRET: 'yaans-automated-tests-only-secret-32chars',
     MFA_ENCRYPTION_KEY: Buffer.alloc(32,7).toString('base64'),
+    GOOGLE_LOGIN_ENABLED: 'false', GOOGLE_CLIENT_ID: '', GOOGLE_CLIENT_SECRET: '', GOOGLE_LOGIN_ORIGIN: '',
     MONGODB_DB_NAME: 'yaans_automated_test', USE_EXTERNAL_MONGO: 'true',
     CLOUDINARY_URL: '', CLOUDINARY_CLOUD_NAME: '', CLOUDINARY_API_KEY: '', CLOUDINARY_API_SECRET: ''
   };

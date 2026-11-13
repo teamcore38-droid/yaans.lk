@@ -1,3 +1,4 @@
+import { validateProductImages } from '../services/productImages.js';
 import { createRouter } from '../config/router.js';
 import { getStore, persistStore, generateId, idFilter } from '../config/db.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
@@ -212,8 +213,8 @@ router.put('/products/:productId', async (req, res) => {
       compareAtPriceLkr === '' || compareAtPriceLkr === null ? null : Number(compareAtPriceLkr);
   }
   if (stock !== undefined) product.stock = Math.max(0, Number(stock));
-  if (images !== undefined && Array.isArray(images) && images.length > 0) {
-    product.images = images;
+  if (images !== undefined) {
+    product.images = validateProductImages(images, product.images);
   }
   if (variants !== undefined && Array.isArray(variants)) {
     product.variants = variants;

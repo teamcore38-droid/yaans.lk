@@ -332,11 +332,21 @@ test('administrator security and staff provisioning work on desktop and mobile',
   const description = editorForm.getByRole('textbox', { name: 'Description', exact: true });
   const updatedDescription = (await description.inputValue()) + ' Staff edit verified.';
   await description.fill(updatedDescription);
+  await editorForm.getByLabel('Image URL', { exact: true }).fill('https://example.com/lamp-detail.jpg');
+  await editorForm.getByRole('button', { name: 'Add image URL' }).click();
+  await editorForm.getByRole('button', { name: 'Make image 2 main' }).click();
   await editorForm.getByRole('button', { name: 'Save product changes' }).click();
   await expect(products.getByRole('status')).toContainText('Product updated');
   const published = await request.get('/api/marketplace/products/prd_test_lamp');
-  expect((await published.json()).product.description).toBe(updatedDescription);
+  const savedProduct = (await published.json()).product;
+  expect(savedProduct.description).toBe(updatedDescription);
+  expect(savedProduct.images).toHaveLength(2);
+  expect(savedProduct.images[0]).toBe('https://example.com/lamp-detail.jpg');
   expect((await page.request.delete('/api/staff/products/prd_test_lamp')).status()).toBe(403);
+  await page.goto('/product/test-desk-lamp');
+  const secondImage = page.getByRole('button', { name: 'View product image 2' });
+  await secondImage.click();
+  await expect(secondImage).toHaveAttribute('aria-pressed', 'true');
 
 
 });

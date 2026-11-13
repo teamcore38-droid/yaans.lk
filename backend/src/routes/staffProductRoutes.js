@@ -46,7 +46,7 @@ router.put('/:id', async (req, res) => {
     if (!raw) throw httpError(404, 'Product not found.');
     if (req.body.revision !== productRevision(raw)) throw httpError(409, 'Product or inventory changed. Reload before saving.', 'WRITE_CONFLICT');
     const store = await getStore({ products: idFilter(req.params.id), categories: true }, { session });
-    const patch = productChanges(req.body, store.categories);
+    const patch = productChanges(req.body, store.categories, raw.images);
     const product = store.products[0];
     if (patch.variants) {
       const labels = patch.variants.flatMap(group => group.values.map(option => option.label));

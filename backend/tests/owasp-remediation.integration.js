@@ -1,3 +1,4 @@
+import sharp from 'sharp';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -69,7 +70,7 @@ test('OWASP remediation with actual HTTP routes and isolated MongoDB',{timeout:1
     const fake=new FormData();fake.append('image',new Blob(['<html>not an image</html>'],{type:'image/jpeg'}),'evil.html');assert.equal((await upload(fake)).status,415);
     const large=new FormData();large.append('image',new Blob([Buffer.alloc(4*1024*1024+1)],{type:'image/png'}),'large.png');assert.equal((await upload(large)).status,413);
     const deep=new FormData();deep.append('a'+'[b]'.repeat(100),'value');assert.ok([400,413].includes((await upload(deep)).status));
-    const png=new FormData();png.append('image',new Blob([Buffer.from('89504e470d0a1a0a00000000','hex')],{type:'image/png'}),'image.png');
+    const png=new FormData();png.append('image',new Blob([await sharp({create:{width:2,height:2,channels:3,background:'red'}}).png().toBuffer()],{type:'image/png'}),'image.png');
     const missing=await upload(png);assert.equal(missing.status,503);assert.equal(missing.data.url,undefined);
     await app.mongo.collection('sellers').updateOne({_id:'sel_test_pantry'},{$set:{status:'pending'}});
     assert.equal((await upload(fake)).status,403);assert.equal((await request('/health')).status,200);

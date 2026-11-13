@@ -173,11 +173,13 @@ export default function ProductDetailPage() {
                   key={idx}
                   type="button"
                   onClick={() => setActiveImage(idx)}
+                  aria-label={`View product image ${idx + 1}`}
+                  aria-pressed={activeImage === idx}
                   className={`w-16 h-16 rounded-lg overflow-hidden border-2 shrink-0 ${
                     activeImage === idx ? 'border-slate-900' : 'border-slate-200'
                   }`}
                 >
-                  <img src={imgUrl} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                  <img src={imageUrl(imgUrl, 160)} width="64" height="64" alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>

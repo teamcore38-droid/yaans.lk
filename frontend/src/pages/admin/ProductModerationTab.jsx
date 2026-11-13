@@ -1,3 +1,4 @@
+import ProductImageGalleryEditor from '../../components/ProductImageGalleryEditor.jsx';
 import React, { useState } from 'react';
 import {
   Package,
@@ -33,7 +34,7 @@ export default function ProductModerationTab({
     name: '',
     quadHeadline: '',
     description: '',
-    imageUrl: '',
+    images: [],
     subCategories: []
   });
 
@@ -111,7 +112,7 @@ export default function ProductModerationTab({
       priceLkr: prod.priceLkr !== undefined ? String(prod.priceLkr) : '',
       compareAtPriceLkr: prod.compareAtPriceLkr ? String(prod.compareAtPriceLkr) : '',
       stock: prod.stock !== undefined ? String(prod.stock) : '15',
-      imageUrl: prod.images?.[0] || '',
+      images: [...(prod.images || [])],
       isHomemade: Boolean(prod.isHomemade),
       isFeatured: Boolean(prod.isFeatured),
       isDeal: Boolean(prod.isDeal),
@@ -140,29 +141,9 @@ export default function ProductModerationTab({
     setEditingProduct(null);
   };
 
-  const handleAdminImageUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append('image', file);
-    try {
-      setUploadingAdminImage(true);
-      const res = await apiRequest('/seller/upload-image', {
-        method: 'POST',
-        body: formData
-      });
-      setAdminProdForm((prev) => ({ ...prev, imageUrl: res.url }));
-      showToast('Product image uploaded successfully!');
-    } catch (err) {
-      showToast(err.message, 'error');
-    } finally {
-      setUploadingAdminImage(false);
-    }
-  };
-
   const handleSaveAdminProduct = async (e) => {
     e.preventDefault();
-    if (!editingProduct) return;
+    if (!editingProduct || uploadingAdminImage) return;
 
     try {
       setSavingProduct(true);
@@ -184,7 +165,7 @@ export default function ProductModerationTab({
         priceLkr: Number(adminProdForm.priceLkr),
         compareAtPriceLkr: adminProdForm.compareAtPriceLkr ? Number(adminProdForm.compareAtPriceLkr) : null,
         stock: Number(adminProdForm.stock),
-        images: adminProdForm.imageUrl ? [adminProdForm.imageUrl] : editingProduct.images,
+        images: adminProdForm.images,
         variants:
           validVariants.length > 0
             ? [
@@ -932,41 +913,7 @@ export default function ProductModerationTab({
                 )}
               </div>
 
-              {/* Product Image & Upload */}
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <ImageIcon className="w-4 h-4 text-slate-600" /> Product Image (Cloudinary or Direct URL)
-                  </label>
-                  {uploadingAdminImage && (
-                    <span className="text-sky-700 font-bold animate-pulse">Uploading file to storage...</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  {adminProdForm.imageUrl && (
-                    <img
-                      src={adminProdForm.imageUrl}
-                      alt="Preview"
-                      className="w-14 h-14 rounded-lg object-cover border border-slate-300 shrink-0"
-                    />
-                  )}
-                  <div className="flex-1 space-y-1.5">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleAdminImageUpload}
-                      className="w-full text-xs file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-slate-900 file:text-white hover:file:bg-slate-800"
-                    />
-                    <input
-                      type="text"
-                      value={adminProdForm.imageUrl}
-                      onChange={(e) => setAdminProdForm({ ...adminProdForm, imageUrl: e.target.value })}
-                      placeholder="https://images.unsplash.com/... or uploaded CDN URL"
-                      className="w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white font-mono text-[11px]"
-                    />
-                  </div>
-                </div>
-              </div>
+              <ProductImageGalleryEditor key={editingProduct._id} images={adminProdForm.images} disabled={savingProduct} onChange={images => setAdminProdForm(previous => ({ ...previous, images }))} endpoint="/seller/upload-image" onBusyChange={setUploadingAdminImage} />
 
               {/* Highlights & Description */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1088,7 +1035,7 @@ export default function ProductModerationTab({
                   </button>
                   <button
                     type="submit"
-                    disabled={savingProduct}
+                    disabled={uploadingAdminImage || savingProduct}
                     className="px-5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold inline-flex items-center gap-1.5 shadow-sm transition disabled:opacity-50"
                   >
                     <Check className="w-4 h-4 text-emerald-400" />

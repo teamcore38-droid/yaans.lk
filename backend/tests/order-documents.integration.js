@@ -93,4 +93,18 @@ test('private documents and durable confirmation outbox', {timeout:180000}, asyn
     } finally {process.env.ORDER_EMAIL_ENABLED='false';process.env.RESEND_API_KEY='';}
   });
 
+  await t.test('tampered or truncated encrypted capabilities never produce an email',async()=>{
+    const placed=await place();const job=await app.mongo.collection('orderemailjobs').findOne({orderId:placed.order._id});
+    const altered=Buffer.from(job.encryptedAccess,'base64url');altered[altered.length-1]^=1;
+    Object.assign(process.env,{ORDER_EMAIL_ENABLED:'true',RESEND_API_KEY:'test-api-only',RESEND_EMAIL_DOMAIN:'example.invalid'});
+    let calls=0;
+    try {
+      for(const invalid of ['AA',altered.toString('base64url')]){
+        await app.mongo.collection('orderemailjobs').updateOne({_id:job._id},{$set:{encryptedAccess:invalid,nextAttemptAt:new Date(0),leaseUntil:new Date(0)}});
+        await processOrderEmails({fetchImpl:async()=>{calls++;return new Response(JSON.stringify({id:'never'}));}});
+        assert.equal(calls,0);assert.equal((await app.mongo.collection('orderemailjobs').findOne({_id:job._id})).lastError,'DELIVERY_RETRY');
+      }
+    }finally{process.env.ORDER_EMAIL_ENABLED='false';process.env.RESEND_API_KEY='';}
+  });
+
 });

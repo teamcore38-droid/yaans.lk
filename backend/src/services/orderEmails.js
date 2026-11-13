@@ -7,13 +7,15 @@ const escape = value => String(value ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;'
 const key = () => createHash('sha256').update(`order-email-capability-v1:${getJwtSecret()}`).digest();
 export function encryptEmailAccess(token) {
   if (!token) return null;
-  const iv=randomBytes(12), cipher=createCipheriv('aes-256-gcm',key(),iv);
+  const iv=randomBytes(12), cipher=createCipheriv('aes-256-gcm',key(),iv,{authTagLength:16});
   const data=Buffer.concat([cipher.update(token,'utf8'),cipher.final()]);
   return Buffer.concat([iv,cipher.getAuthTag(),data]).toString('base64url');
 }
 function decryptAccess(value) {
   if(!value)return '';
-  const data=Buffer.from(value,'base64url'), cipher=createDecipheriv('aes-256-gcm',key(),data.subarray(0,12));
+  const data=Buffer.from(value,'base64url');
+  if(data.length<29)throw new Error('INVALID_EMAIL_CAPABILITY');
+  const cipher=createDecipheriv('aes-256-gcm',key(),data.subarray(0,12),{authTagLength:16});
   cipher.setAuthTag(data.subarray(12,28));return Buffer.concat([cipher.update(data.subarray(28)),cipher.final()]).toString('utf8');
 }
 export function emailConfiguration() {

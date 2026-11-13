@@ -19,7 +19,6 @@ const cookieName = () => deployed() ? '__Host-yaans_google' : 'yaans_google';
 const cookieOptions = () => ({ httpOnly: true, secure: deployed(), sameSite: 'lax', path: '/', maxAge: lifetime });
 const clearGoogleCookie = res => { const { maxAge: _maxAge, ...options } = cookieOptions(); res.clearCookie(cookieName(), options); };
 const challenges = () => mongoose.connection.db.collection('authchallenges');
-const districts = new Set(['Colombo','Gampaha','Kalutara','Kandy','Matale','Nuwara Eliya','Galle','Matara','Hambantota','Jaffna','Kilinochchi','Mannar','Vavuniya','Mullaitivu','Batticaloa','Ampara','Trincomalee','Kurunegala','Puttalam','Anuradhapura','Polonnaruwa','Badulla','Monaragala','Ratnapura','Kegalle']);
 
 export function googleConfiguration() {
   if (process.env.GOOGLE_LOGIN_ENABLED !== 'true') return null;
@@ -163,7 +162,7 @@ export function mountGoogleLogin(router, issueSession) {
     if (!equal(req.headers['x-google-csrf'], record.csrf)) throw httpError(403, 'Refresh this sign-in page and try again.');
     const accountLimit = await consumeLimit('google-account', record.identity.subject, 10, 15 * 60000);
     if (!accountLimit.allowed) { res.set('Retry-After', String(accountLimit.retryAfter)); throw httpError(429, 'Too many sign-in attempts. Please try again later.'); }
-    let name, phone, district, passwordHash;
+    let name, passwordHash;
     if (record.mode === 'link') {
       if (!record.passwordHash || !req.body.currentPassword || !await bcrypt.compare(req.body.currentPassword, record.passwordHash)) {
         await recordSecurityEvent('google_link_failed', { identity: record.identity.email, ip: req.ip, outcome: 'denied' });
@@ -171,9 +170,6 @@ export function mountGoogleLogin(router, issueSession) {
       }
     } else if (record.mode === 'register') {
       name = stringField(req.body.name, 'Name', { required: true, maximum: 120 });
-      phone = stringField(req.body.phone, 'Phone', { required: true, maximum: 32 });
-      district = req.body.defaultDistrict || 'Colombo';
-      if (!/^(?:0|\+?94)7\d{8}$/.test(phone.replace(/[\s()-]/g, '')) || !districts.has(district)) throw httpError(400, 'Enter a valid Sri Lankan mobile number and district.');
       if (req.body.acceptTerms !== true) throw httpError(400, 'Accept the Terms and acknowledge the Privacy Policy to create your account.');
     } else if (record.mode === 'set-password') {
       validateNewPassword(req.body.newPassword);
@@ -186,8 +182,8 @@ export function mountGoogleLogin(router, issueSession) {
       const store = await getStore({ users: { $or: [{ googleSubject: record.identity.subject }, { email: record.identity.email }, ...(record.userId ? [idFilter(record.userId)] : [])] } }, { session });
       if (record.mode === 'register') {
         if (store.users.length) throw httpError(409, 'An account was created during sign-in. Please start again to link it securely.');
-        const created = { _id: generateId('usr_cust'), name, email: record.identity.email, phone, passwordHash: null,
-          googleSubject: record.identity.subject, googleLinkedAt: new Date(), role: 'customer', sellerId: null, defaultDistrict: district,
+        const created = { _id: generateId('usr_cust'), name, email: record.identity.email, phone: '', passwordHash: null,
+          googleSubject: record.identity.subject, googleLinkedAt: new Date(), role: 'customer', sellerId: null, defaultDistrict: null,
           addresses: [], wishlist: [], isActive: true, tokenVersion: 0, termsAcceptedAt: new Date(), createdAt: new Date().toISOString() };
         store.users.push(created); await persistStore(store); return created;
       }

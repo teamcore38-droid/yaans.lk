@@ -31,7 +31,7 @@ function sanitizeUser(user, store) {
     sellerId: user.sellerId,
     sellerStatus: seller ? seller.status : null,
     sellerStoreName: seller ? seller.storeName : null,
-    defaultDistrict: user.defaultDistrict || 'Colombo',
+    defaultDistrict: user.defaultDistrict || (user.role === 'customer' && user.googleSubject ? null : 'Colombo'),
     addresses: user.addresses || [],
     wishlist: user.wishlist || []
   };

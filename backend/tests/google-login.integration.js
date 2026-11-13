@@ -55,7 +55,7 @@ test('customer Google OAuth with real JWT verification, HTTP and isolated MongoD
     return { ...flow, cookie, pending: pending.data };
   }
   async function complete(flow, body) { return request('/auth/google/complete', { cookie: flow.cookie, headers: { 'X-Google-CSRF': flow.pending.csrf }, body }); }
-  const profile = { name: 'New Customer', phone: '0771234567', defaultDistrict: 'Kandy', acceptTerms: true };
+  const profile = { name: 'New Customer', acceptTerms: true };
   async function scenario(name, work) { await t.test(name, async () => { await app.reset(); Object.assign(process.env, config); await work(); }); }
 
   await scenario('disabled/malformed configuration and maintenance fail closed without affecting password login', async () => {
@@ -72,8 +72,7 @@ test('customer Google OAuth with real JWT verification, HTTP and isolated MongoD
   await scenario('new customers complete a validated profile, get secure cookies and can place orders', async () => {
     const flow = await prepare(); assert.equal(flow.pending.mode, 'register');
     assert.equal((await request('/auth/me', { cookie: flow.cookie })).status, 401);
-    assert.equal((await complete(flow, { ...profile, phone: '' })).status, 400);
-    assert.equal((await complete(flow, { ...profile, defaultDistrict: 'Invalid' })).status, 400);
+    assert.equal((await complete(flow, { ...profile, name: '' })).status, 400);
     assert.equal((await complete(flow, { ...profile, acceptTerms: false })).status, 400);
     const result = await complete(flow, { ...profile, role: 'admin', googleSubject: 'attacker', email: accounts.admin });
     assert.equal(result.status, 201); assert.equal(result.data.token, undefined);
@@ -85,10 +84,16 @@ test('customer Google OAuth with real JWT verification, HTTP and isolated MongoD
     const session = cookieOf(result); const csrf = /yaans_csrf=([^;]+)/.exec(session)[1];
     assert.equal((await request('/auth/me', { cookie: session })).status, 200);
     const stored = await app.mongo.collection('users').findOne({ email: 'new@gmail.com' });
-    assert.equal(stored.passwordHash, null); assert.ok(stored.termsAcceptedAt); assert.equal(stored.phone, profile.phone);
+    assert.equal(stored.passwordHash, null); assert.ok(stored.termsAcceptedAt); assert.equal(stored.phone, '');
+    assert.equal(stored.defaultDistrict, null); assert.equal(result.data.user.defaultDistrict, null);
     assert.equal((await request('/auth/login', { body: { email: stored.email, password: TEST_PASSWORD } })).status, 401);
     assert.equal((await request('/auth/admin/login', { body: { email: stored.email, password: TEST_PASSWORD } })).status, 401);
     assert.equal((await request('/auth/update-credentials', { method: 'PUT', cookie: session, headers: { 'X-CSRF-Token': csrf }, body: { newPassword: TEST_PASSWORD, currentPassword: TEST_PASSWORD } })).status, 400);
+    for (const invalid of [{ phone: '' }, { phone: '123' }, { district: '' }]) {
+      const rejected = await request('/orders/checkout', { cookie: session, headers: { 'X-CSRF-Token': csrf, 'Idempotency-Key': randomUUID() }, body: {
+        items: [{ productId: 'prd_test_spice', variantLabel: '100 g', quantity: 1 }], shippingAddress: { ...shippingAddress, ...invalid }, paymentMethod: 'COD', codConfirmedByCustomer: true
+      } }); assert.equal(rejected.status, 400);
+    }
     const order = await request('/orders/checkout', { cookie: session, headers: { 'X-CSRF-Token': csrf, 'Idempotency-Key': randomUUID() }, body: {
       items: [{ productId: 'prd_test_spice', variantLabel: '100 g', quantity: 1 }], shippingAddress, paymentMethod: 'COD', codConfirmedByCustomer: true
     } }); assert.equal(order.status, 201, JSON.stringify(order.data));
@@ -104,6 +109,7 @@ test('customer Google OAuth with real JWT verification, HTTP and isolated MongoD
     assert.equal((await complete(flow, { currentPassword: 'wrong' })).status, 401);
     const linked = await complete(flow, { currentPassword: TEST_PASSWORD }); assert.equal(linked.status, 200);
     assert.equal(linked.data.user._id, original._id); assert.deepEqual(linked.data.user.wishlist, original.wishlist);
+    assert.equal(linked.data.user.phone, original.phone); assert.equal(linked.data.user.defaultDistrict, original.defaultDistrict);
     assert.equal((await app.mongo.collection('users').findOne({ _id: original._id })).passwordHash, original.passwordHash);
     assert.equal((await request('/auth/me', { token: prior.data.token })).status, 401);
     const again = await begin({ email: 'updated-google-email@gmail.com', returnTo: '//evil.invalid' });

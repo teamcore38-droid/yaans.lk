@@ -43,7 +43,7 @@ test('search leads to a product and seller storefront without exposing pending l
   await expect(page.getByText('No products match your current filter selection')).toBeVisible();
 });
 
-test('guest multi-seller checkout creates a confirmed order that can be tracked', async ({ page }) => {
+test('guest multi-seller checkout creates a confirmed order that can be tracked', async ({ page }, testInfo) => {
   for (const slug of ['test-ceylon-spice', 'test-desk-lamp']) {
     await page.goto(`/product/${slug}`);
     await page.getByRole('button', { name: 'Add to Cart', exact: true }).click();
@@ -52,6 +52,19 @@ test('guest multi-seller checkout creates a confirmed order that can be tracked'
   await expect(page.getByRole('heading', { name: 'Multi-Seller Shopping Cart' })).toBeVisible();
   await expect(page.getByText('Shipment 2 of 2', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: /Proceed to Checkout/ }).click();
+  const codCard = page.locator('.payment-card-selected');
+  await expect(codCard).toHaveCSS('border-top-color', 'rgb(169, 37, 33)');
+  if (testInfo.project.name === 'mobile-chromium') {
+    await expect(page.getByText('Pay cash to rider.')).toBeVisible();
+    await expect(page.getByText('Online payments coming soon.')).toBeVisible();
+    await expect(page.getByText(/Pay cash in Sri Lankan Rupees directly/)).toBeHidden();
+    await expect(page.getByText(/Visa, MasterCard, and LankaQR instant online payments/)).toBeHidden();
+  } else {
+    await expect(page.getByText(/Pay cash in Sri Lankan Rupees directly/)).toBeVisible();
+    await expect(page.getByText(/Visa, MasterCard, and LankaQR instant online payments/)).toBeVisible();
+    await expect(page.getByText('Pay cash to rider.')).toBeHidden();
+    await expect(page.getByText('Online payments coming soon.')).toBeHidden();
+  }
   await fillAddress(page);
   const created = page.waitForResponse((response) => response.url().endsWith('/api/orders/checkout') && response.request().method() === 'POST');
   await page.getByRole('button', { name: /Confirm COD Order/ }).click();

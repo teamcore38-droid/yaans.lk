@@ -10,6 +10,25 @@
   }
 }
 
+@layer components {
+  .payment-card-selected {
+    background:
+      radial-gradient(110% 130% at 15% 18%, rgba(255, 245, 245, 0.9) 0%, rgba(255, 232, 232, 0.65) 56%, rgba(255, 200, 199, 0) 64%),
+      linear-gradient(135deg, #FFF1F1 0%, #FFE4E4 52%, #FFCAC9 100%);
+    border: 1.5px solid #A92521;
+    box-shadow:
+      0 4px 12px rgba(169, 37, 33, 0.16),
+      0 1px 3px rgba(169, 37, 33, 0.10),
+      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  }
+
+  .payment-card-unselected {
+    background: linear-gradient(180deg, #FEF2F3 0%, #FFF0F0 100%);
+    border: 1px solid #E5B9B8;
+    box-shadow: 0 1px 4px rgba(169, 37, 33, 0.06);
+  }
+}
+
 /* Hide scrollbars on horizontal mobile category pills while keeping smooth scroll */
 .no-scrollbar::-webkit-scrollbar {
   display: none;

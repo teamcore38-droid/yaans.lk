@@ -1,3 +1,5 @@
+import { saveCheckoutDocuments } from './orderDocuments.js';
+import { encryptEmailAccess } from './orderEmails.js';
 import { saveOrderNotifications } from './orderNotifications.js';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import mongoose from 'mongoose';
@@ -167,6 +169,7 @@ export async function checkout(body, user, key) {
       store.subOrders.push(...subOrders);
       await persistStore(store);
       await saveOrderNotifications(order, subOrders, session);
+      await saveCheckoutDocuments(order, subOrders, store.sellers, session, encryptEmailAccess(token));
       return { order: customerOrder(order), subOrders: subOrders.map(customerPackage),
         ...(token ? { guestAccessToken: token } : {}), replayed: false, message: `Order ${orderNumber} placed successfully!` };
     });

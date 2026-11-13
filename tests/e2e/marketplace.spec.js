@@ -74,6 +74,17 @@ test('guest multi-seller checkout creates a confirmed order that can be tracked'
   expect(subOrders).toHaveLength(2);
   expect(order.grandTotalLkr).toBe(4200);
   await expect(page.getByRole('heading', { name: new RegExp(order.orderNumber) })).toBeVisible();
+  const documents=page.getByRole('region',{name:'Order documents'});
+  await documents.getByRole('button',{name:'View invoices & documents'}).click();
+  await expect(documents.getByText('Commercial invoice',{exact:false}).first()).toBeVisible();
+  const invoiceNumber=`${subOrders[0].subOrderNumber}-INVOICE`;
+  await documents.getByRole('button',{name:`View ${invoiceNumber}`,exact:true}).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByRole('dialog')).toContainText('not a tax invoice');
+  await page.getByRole('button',{name:'Close document'}).click();
+  const downloaded=page.waitForEvent('download');
+  await documents.getByRole('button',{name:`Download ${invoiceNumber}`,exact:true}).click();
+  expect((await downloaded).suggestedFilename()).toBe(`${invoiceNumber}.pdf`);
   const savedCart = await page.evaluate(() => JSON.parse(localStorage.getItem('yaans_cart')));
   expect(savedCart).toEqual([]);
   await page.getByRole('link', { name: `Track Order #${order.orderNumber}` }).click();

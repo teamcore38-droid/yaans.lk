@@ -1,3 +1,4 @@
+import { capturePackageDocuments } from '../services/orderDocuments.js';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import mongoose from 'mongoose';
@@ -143,6 +144,10 @@ export async function persistStore(store) {
       if ((change.type === 'delete' ? result.deletedCount : result.matchedCount) !== 1) {
         throw httpError(409, 'This record changed during your request. Refresh and try again.', 'WRITE_CONFLICT');
       }
+    }
+    for (const change of changes) if (change.key === 'subOrders' && change.type !== 'delete') {
+      const sub = store.subOrders.find(value => value._id === (change.doc?._id || change.previous?.value._id));
+      if (sub && (sub.codCollectedAt || sub.paymentReceipt || sub.refund || sub.fulfillmentStatus === 'cancelled')) await capturePackageDocuments(sub, session);
     }
     if (store.securityAuditEvents?.length) await mongoose.connection.db.collection('securityevents').insertMany(store.securityAuditEvents, { session });
   };

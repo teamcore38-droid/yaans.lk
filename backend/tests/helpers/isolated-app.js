@@ -18,6 +18,7 @@ export async function startIsolatedApp(port = 0, { monitorCommands = false } = {
   let mongo;
   let server;
   const overrides = {
+    ORDER_EMAIL_ENABLED: 'false', RESEND_API_KEY: '', RESEND_EMAIL_DOMAIN: '', ORDER_EMAIL_FROM: '', ORDER_EMAIL_WORKER_SECRET: '',
     NODE_ENV: 'test', VERCEL: '1', VERCEL_ENV: 'test', APP_ENV: 'test', TEMP: directory, TMP: directory,
     MAINTENANCE_READ_ONLY: '',
     JWT_SECRET: 'yaans-automated-tests-only-secret-32chars',
@@ -68,7 +69,7 @@ export async function startIsolatedApp(port = 0, { monitorCommands = false } = {
           const values = key === 'platformConfig' ? [{ ...fixtures.platformConfig, key: 'main_config' }] : fixtures[key];
           if (values.length) await model.collection.insertMany(values);
         }
-        for (const name of ['staffsessions', 'ordernotifications', 'counters', 'checkoutrequests', 'cashmovements', 'ratelimits', 'operationalmetrics', 'authchallenges', 'securityevents', 'reviewclaims']) await mongoose.connection.db.collection(name).deleteMany({});
+        for (const name of ['orderdocuments', 'orderemailjobs', 'orderemailbudgets', 'staffsessions', 'ordernotifications', 'counters', 'checkoutrequests', 'cashmovements', 'ratelimits', 'operationalmetrics', 'authchallenges', 'securityevents', 'reviewclaims']) await mongoose.connection.db.collection(name).deleteMany({});
       },
       async close() {
         await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

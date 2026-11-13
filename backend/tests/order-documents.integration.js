@@ -87,6 +87,9 @@ test('private documents and durable confirmation outbox', {timeout:180000}, asyn
       await app.mongo.collection('orderemailjobs').updateOne({_id:job._id},{$set:{nextAttemptAt:new Date(0),firstAttemptAt:new Date(Date.now()-21*3600000)}});
       await processOrderEmails({fetchImpl:sender});assert.equal(calls,0);
       job=await app.mongo.collection('orderemailjobs').findOne({_id:job._id});assert.equal(job.status,'attention');assert.equal(job.encryptedAccess,undefined);
+      await app.mongo.collection('orderemailjobs').updateOne({_id:job._id},{$set:{status:'pending',createdAt:new Date(Date.now()-21*3600000),nextAttemptAt:new Date(0),leaseUntil:new Date(0)},$unset:{firstAttemptAt:1}});
+      await processOrderEmails({fetchImpl:sender});assert.equal(calls,0);
+      assert.equal((await app.mongo.collection('orderemailjobs').findOne({_id:job._id})).status,'attention');
     } finally {process.env.ORDER_EMAIL_ENABLED='false';process.env.RESEND_API_KEY='';}
   });
 

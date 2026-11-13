@@ -38,7 +38,7 @@ export async function processOrderEmails({limit=5,fetchImpl=fetch,now=()=>new Da
     if(!job)break;
     const filter={_id:job._id,lease};
     const first=job.firstAttemptAt || time;
-    if(time.getTime()-new Date(first).getTime()>20*3600000 || job.attempts>6){await jobs.updateOne(filter,{$set:{status:'attention',lastError:'RETRY_WINDOW_EXPIRED'},$unset:{encryptedAccess:1,encryptedPayload:1}});continue;}
+    if(time.getTime()-new Date(job.createdAt).getTime()>20*3600000 || time.getTime()-new Date(first).getTime()>20*3600000 || job.attempts>6){await jobs.updateOne(filter,{$set:{status:'attention',lastError:'RETRY_WINDOW_EXPIRED'},$unset:{encryptedAccess:1,encryptedPayload:1}});continue;}
     try {
       // Reserve each logical email once against conservative free-plan budgets.
       if(!job.budgetReserved) {

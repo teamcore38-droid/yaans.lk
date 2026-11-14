@@ -1,3 +1,4 @@
+import OrderDocuments from '../components/OrderDocuments.jsx';
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -972,6 +973,7 @@ export function CustomerAccountPage() {
                   >
                     Inspect Seller Packages & Tracking →
                   </Link>
+                  <OrderDocuments orderId={ord._id} />
                 </div>
               ))}
             </div>

@@ -1,0 +1,27 @@
+name: Retry order confirmation emails
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: order-email-worker
+  cancel-in-progress: false
+jobs:
+  deliver:
+    if: vars.ORDER_EMAIL_WORKER_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Process a bounded batch of queued confirmations
+        env:
+          ORDER_EMAIL_WORKER_SECRET: ${{ secrets.ORDER_EMAIL_WORKER_SECRET }}
+        shell: bash
+        run: |
+          if [ -z "$ORDER_EMAIL_WORKER_SECRET" ]; then
+            echo 'Email retry worker setup required: configure ORDER_EMAIL_WORKER_SECRET in GitHub and Vercel.'
+            exit 1
+          fi
+          curl --fail --silent --show-error --max-time 100 --request POST \
+            --header "Authorization: Bearer $ORDER_EMAIL_WORKER_SECRET" \
+            https://yaans.lk/api/documents/email-worker

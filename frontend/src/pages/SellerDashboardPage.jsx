@@ -1,3 +1,4 @@
+import OrderDocuments from '../components/OrderDocuments.jsx';
 import ProductImageGalleryEditor from '../components/ProductImageGalleryEditor.jsx';
 import OrderNotifications from '../components/OrderNotifications.jsx';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -883,6 +884,7 @@ export default function SellerDashboardPage() {
                   </div>
                 </div>
 
+                <OrderDocuments packageId={sub._id} />
                 {/* Order Items */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
                   <div className="lg:col-span-7 space-y-2">

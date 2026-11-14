@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Image as ImageIcon, Plus, Edit3, Trash2, X, Upload, Check, Copy } from 'lucide-react';
 import { apiRequest } from '../../utils/api.js';
 
@@ -12,7 +12,9 @@ export default function BannerManagementTab({
   const [savingBanner, setSavingBanner] = useState(false);
   const [uploadingDesktopBanner, setUploadingDesktopBanner] = useState(false);
   const [uploadingMobileBanner, setUploadingMobileBanner] = useState(false);
-  const [syncBothBannerImages, setSyncBothBannerImages] = useState(true);
+  const [uploadError, setUploadError] = useState('');
+  const editorVersion = useRef(0);
+  const pendingUploads = useRef(new Map());
   const [bannerModalOpen, setBannerModalOpen] = useState(false);
   const [bannerForm, setBannerForm] = useState({
     title: '',
@@ -24,9 +26,24 @@ export default function BannerManagementTab({
     displayOrder: 1
   });
 
+  useEffect(() => () => {
+    editorVersion.current++;
+    pendingUploads.current.forEach((controller) => controller.abort());
+    pendingUploads.current.clear();
+  }, []);
+
+  const resetUploads = () => {
+    editorVersion.current++;
+    pendingUploads.current.forEach((controller) => controller.abort());
+    pendingUploads.current.clear();
+    setUploadingDesktopBanner(false);
+    setUploadingMobileBanner(false);
+    setUploadError('');
+  };
+
   const openAddBannerModal = () => {
+    resetUploads();
     setEditingBanner(null);
-    setSyncBothBannerImages(true);
     setBannerForm({
       title: '',
       imageUrl: '',
@@ -40,21 +57,13 @@ export default function BannerManagementTab({
   };
 
   const openEditBannerModal = (banner) => {
+    resetUploads();
     setEditingBanner(banner);
-    const hasLegacyPinkMobile = banner.mobileImageUrl === '/mobile_hero_banner.jpg';
-    const isShared =
-      !banner.mobileImageUrl || banner.mobileImageUrl === banner.imageUrl || hasLegacyPinkMobile;
-    setSyncBothBannerImages(isShared);
-
-    const resolvedDesktop = banner.imageUrl || banner.mobileImageUrl || '';
-    const resolvedMobile = hasLegacyPinkMobile
-      ? resolvedDesktop
-      : banner.mobileImageUrl || banner.imageUrl || '';
 
     setBannerForm({
       title: banner.title || '',
-      imageUrl: resolvedDesktop,
-      mobileImageUrl: resolvedMobile,
+      imageUrl: banner.imageUrl || '',
+      mobileImageUrl: banner.mobileImageUrl || '',
       categorySlug: banner.categorySlug || '',
       ctaLink:
         banner.ctaLink ||
@@ -66,12 +75,23 @@ export default function BannerManagementTab({
   };
 
   const closeBannerModal = () => {
+    resetUploads();
     setBannerModalOpen(false);
     setEditingBanner(null);
   };
 
   const handleBannerImageUpload = async (field, file) => {
-    if (!file) return;
+    if (!file || pendingUploads.current.has(field)) return;
+    if (!/^image\/(jpeg|jpg|png|webp|gif|avif)$/i.test(file.type) || file.size > 4 * 1024 * 1024) {
+      const message = 'Choose a JPG, PNG, WebP, GIF or AVIF image up to 4 MB.';
+      setUploadError(message);
+      showToast(message, 'error');
+      return;
+    }
+    const version = editorVersion.current;
+    const controller = new AbortController();
+    pendingUploads.current.set(field, controller);
+    setUploadError('');
     const formData = new FormData();
     formData.append('image', file);
     const isMobile = field === 'mobileImageUrl';
@@ -81,30 +101,14 @@ export default function BannerManagementTab({
 
       const res = await apiRequest('/admin/upload-image', {
         method: 'POST',
-        body: formData
+        body: formData,
+        signal: controller.signal
       });
+      if (editorVersion.current !== version || controller.signal.aborted) return;
       if (res?.url) {
-        setBannerForm((prev) => {
-          if (syncBothBannerImages) {
-            return {
-              ...prev,
-              imageUrl: res.url,
-              mobileImageUrl: res.url
-            };
-          }
-          const next = { ...prev, [field]: res.url };
-          if (!isMobile && (!prev.mobileImageUrl || prev.mobileImageUrl === '/mobile_hero_banner.jpg')) {
-            next.mobileImageUrl = res.url;
-          }
-          if (isMobile && (!prev.imageUrl || prev.imageUrl === '/mobile_hero_banner.jpg')) {
-            next.imageUrl = res.url;
-          }
-          return next;
-        });
+        setBannerForm((prev) => ({ ...prev, [field]: res.url }));
         showToast(
-          syncBothBannerImages
-            ? 'Banner uploaded to Cloudinary and set for both Desktop and Mobile!'
-            : isMobile
+          isMobile
             ? 'Mobile banner image uploaded to Cloudinary CDN!'
             : 'Desktop banner image uploaded to Cloudinary CDN!'
         );
@@ -112,32 +116,31 @@ export default function BannerManagementTab({
         throw new Error('Image upload failed: no URL returned.');
       }
     } catch (err) {
-      showToast(err.message || 'Banner upload failed.', 'error');
+      if (editorVersion.current !== version || controller.signal.aborted) return;
+      const message = err.message || 'Banner upload failed.';
+      setUploadError(message);
+      showToast(message, 'error');
     } finally {
-      if (isMobile) setUploadingMobileBanner(false);
-      else setUploadingDesktopBanner(false);
+      if (pendingUploads.current.get(field) === controller) {
+        pendingUploads.current.delete(field);
+        if (isMobile) setUploadingMobileBanner(false);
+        else setUploadingDesktopBanner(false);
+      }
     }
   };
 
   const handleSaveBanner = async (e) => {
     e.preventDefault();
-    if (!bannerForm.imageUrl && !bannerForm.mobileImageUrl) {
+    const imageUrl = bannerForm.imageUrl.trim();
+    const mobileImageUrl = bannerForm.mobileImageUrl.trim();
+    if (!imageUrl && !mobileImageUrl) {
       showToast('Please upload or specify at least one banner image (desktop or mobile).', 'error');
       return;
     }
-    const resolvedDesktop = (bannerForm.imageUrl || bannerForm.mobileImageUrl || '').trim();
-    let resolvedMobile = (bannerForm.mobileImageUrl || bannerForm.imageUrl || '').trim();
-    if (
-      resolvedMobile === '/mobile_hero_banner.jpg' &&
-      resolvedDesktop &&
-      resolvedDesktop !== '/mobile_hero_banner.jpg'
-    ) {
-      resolvedMobile = resolvedDesktop;
-    }
     const payload = {
       ...bannerForm,
-      imageUrl: resolvedDesktop,
-      mobileImageUrl: resolvedMobile
+      imageUrl,
+      mobileImageUrl
     };
     try {
       setSavingBanner(true);
@@ -418,6 +421,7 @@ export default function BannerManagementTab({
               </div>
               <button
                 type="button"
+                aria-label="Close banner editor"
                 onClick={closeBannerModal}
                 className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 transition"
               >
@@ -440,32 +444,12 @@ export default function BannerManagementTab({
                 />
               </div>
 
-              <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl flex items-center justify-between gap-3">
-                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-amber-950 select-none">
-                  <input
-                    type="checkbox"
-                    checked={syncBothBannerImages}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setSyncBothBannerImages(checked);
-                      if (checked && bannerForm.imageUrl) {
-                        setBannerForm((prev) => ({ ...prev, mobileImageUrl: prev.imageUrl }));
-                      }
-                    }}
-                    className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300"
-                  />
-                  <span>Use one image for both Desktop and Mobile (Recommended)</span>
-                </label>
-                <span
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    syncBothBannerImages
-                      ? 'bg-amber-200 text-amber-900'
-                      : 'bg-slate-200 text-slate-700'
-                  }`}
-                >
-                  {syncBothBannerImages ? 'Auto-Synced' : 'Independent'}
-                </span>
-              </div>
+              <p className="p-3 bg-sky-50 border border-sky-200 rounded-xl text-sky-950">
+                Desktop and mobile images are edited separately. Use “Copy from” to share an image.
+                If one image is empty, the storefront displays the other without changing either saved field.
+                Upload JPG, PNG, WebP, GIF or AVIF images up to 4 MB. Changes apply when you save.
+              </p>
+              {uploadError && <p role="alert" className="text-red-700">{uploadError}</p>}
 
               {/* 1. Desktop Banner Image Section */}
               <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
@@ -486,6 +470,7 @@ export default function BannerManagementTab({
                       bannerForm.mobileImageUrl !== bannerForm.imageUrl && (
                         <button
                           type="button"
+                          disabled={uploadingDesktopBanner || uploadingMobileBanner || savingBanner}
                           onClick={() => {
                             setBannerForm((prev) => ({ ...prev, imageUrl: prev.mobileImageUrl }));
                             showToast('Copied mobile image to desktop banner!');
@@ -509,8 +494,9 @@ export default function BannerManagementTab({
                       {uploadingDesktopBanner ? 'Uploading...' : 'Upload Desktop'}
                       <input
                         type="file"
-                        accept="image/*"
-                        disabled={uploadingDesktopBanner}
+                        aria-label="Upload desktop banner"
+                        accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/avif"
+                        disabled={uploadingDesktopBanner || savingBanner}
                         className="hidden"
                         onChange={(e) => {
                           handleBannerImageUpload('imageUrl', e.target.files?.[0]);
@@ -522,13 +508,14 @@ export default function BannerManagementTab({
                 </div>
                 <input
                   type="text"
+                  aria-label="Desktop banner image URL"
+                  disabled={uploadingDesktopBanner || savingBanner}
                   value={bannerForm.imageUrl}
                   onChange={(e) => {
                     const val = e.target.value;
                     setBannerForm((prev) => ({
                       ...prev,
-                      imageUrl: val,
-                      ...(syncBothBannerImages ? { mobileImageUrl: val } : {})
+                      imageUrl: val
                     }));
                   }}
                   placeholder="https://res.cloudinary.com/... or /banners/yaans_electronics_tech.webp"
@@ -545,6 +532,7 @@ export default function BannerManagementTab({
                 {bannerForm.imageUrl && !uploadingDesktopBanner && (
                   <div className="rounded-lg overflow-hidden border border-slate-200 aspect-[3.6/1] max-h-[110px] bg-slate-100 relative group">
                     <img
+                      key={bannerForm.imageUrl}
                       src={bannerForm.imageUrl}
                       alt="Desktop Banner Preview"
                       className="w-full h-full object-cover"
@@ -578,6 +566,7 @@ export default function BannerManagementTab({
                       bannerForm.imageUrl !== bannerForm.mobileImageUrl && (
                         <button
                           type="button"
+                          disabled={uploadingDesktopBanner || uploadingMobileBanner || savingBanner}
                           onClick={() => {
                             setBannerForm((prev) => ({ ...prev, mobileImageUrl: prev.imageUrl }));
                             showToast('Copied desktop image to mobile banner!');
@@ -601,8 +590,9 @@ export default function BannerManagementTab({
                       {uploadingMobileBanner ? 'Uploading...' : 'Upload Mobile'}
                       <input
                         type="file"
-                        accept="image/*"
-                        disabled={uploadingMobileBanner}
+                        aria-label="Upload mobile banner"
+                        accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/avif"
+                        disabled={uploadingMobileBanner || savingBanner}
                         className="hidden"
                         onChange={(e) => {
                           handleBannerImageUpload('mobileImageUrl', e.target.files?.[0]);
@@ -614,13 +604,14 @@ export default function BannerManagementTab({
                 </div>
                 <input
                   type="text"
+                  aria-label="Mobile banner image URL"
+                  disabled={uploadingMobileBanner || savingBanner}
                   value={bannerForm.mobileImageUrl}
                   onChange={(e) => {
                     const val = e.target.value;
                     setBannerForm((prev) => ({
                       ...prev,
-                      mobileImageUrl: val,
-                      ...(syncBothBannerImages ? { imageUrl: val } : {})
+                      mobileImageUrl: val
                     }));
                   }}
                   placeholder="https://res.cloudinary.com/... or /banners/yaans_electronics_tech.webp"
@@ -637,6 +628,7 @@ export default function BannerManagementTab({
                 {bannerForm.mobileImageUrl && !uploadingMobileBanner && (
                   <div className="rounded-lg overflow-hidden border border-slate-200 aspect-[2.35/1] max-h-[110px] bg-slate-100 relative group">
                     <img
+                      key={bannerForm.mobileImageUrl}
                       src={bannerForm.mobileImageUrl}
                       alt="Mobile Banner Preview"
                       className="w-full h-full object-cover"

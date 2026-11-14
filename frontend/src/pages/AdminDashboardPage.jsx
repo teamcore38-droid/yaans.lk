@@ -1,3 +1,4 @@
+import OrderEmailStatus from './admin/OrderEmailStatus.jsx';
 import OrderNotifications from '../components/OrderNotifications.jsx';
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
@@ -332,6 +333,7 @@ export default function AdminDashboardPage() {
         }
       >
         {/* TAB 1: SELLER APPLICATIONS & MANAGEMENT */}
+        <OrderEmailStatus />
         {activeTab === 'sellers' && (
           <SellerModerationTab
             sellers={sellers}

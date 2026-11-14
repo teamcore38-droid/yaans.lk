@@ -32,6 +32,49 @@ async function fillAddress(page) {
   await page.getByPlaceholder('e.g., Colombo 05 / Maharagama / Katugastota').fill(shippingAddress.city);
 }
 
+test('admin banner uploads stay independent and the storefront selects the correct device image', async ({ page }) => {
+  await login(page, accounts.admin, true);
+  await page.getByRole('button', { name: /^Homepage Banners/ }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  const desktop = page.getByRole('textbox', { name: 'Desktop banner image URL' });
+  const mobile = page.getByRole('textbox', { name: 'Mobile banner image URL' });
+  const original = await desktop.inputValue();
+  const mobileSource = '/brand/yaans-mark-dark.png';
+  const desktopSource = '/brand/yaans-mark-white.png';
+  let uploadCount = 0;
+  // Only storage responses are simulated; authentication, CSRF, persistence and
+  // public catalog reads use the real isolated API. Multipart/CDN checks run in integration.
+  await page.route('**/api/admin/upload-image', route => {
+    uploadCount++;
+    return route.fulfill({ status: uploadCount === 1 ? 502 : 201, contentType: 'application/json',
+      body: JSON.stringify(uploadCount === 1 ? { message: 'Image storage unavailable. Try again.' } : { url: uploadCount === 2 ? mobileSource : desktopSource }) });
+  });
+  const photo = { name: 'banner.png', mimeType: 'image/png', buffer: Buffer.from('synthetic upload') };
+  await page.getByLabel('Upload mobile banner', { exact: true }).setInputFiles(photo);
+  await expect(page.getByRole('alert')).toHaveText('Image storage unavailable. Try again.');
+  await expect(desktop).toHaveValue(original);
+  await expect(mobile).toHaveValue(original);
+  await page.getByLabel('Upload mobile banner', { exact: true }).setInputFiles(photo);
+  await expect(mobile).toHaveValue(mobileSource);
+  await expect(desktop).toHaveValue(original);
+  await page.getByLabel('Upload desktop banner', { exact: true }).setInputFiles(photo);
+  await expect(desktop).toHaveValue(desktopSource);
+  await expect(mobile).toHaveValue(mobileSource);
+  const saved = page.waitForResponse(response => response.url().endsWith('/api/admin/banners/bnr_test') && response.request().method() === 'PUT');
+  await page.getByRole('button', { name: 'Save Changes', exact: true }).click();
+  expect((await saved).status()).toBe(200);
+  await expect(page.getByRole('heading', { name: 'Edit Homepage Banner Card' })).toBeHidden();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(desktop).toHaveValue(desktopSource);
+  await expect(mobile).toHaveValue(mobileSource);
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.goto('/');
+  const hero = page.getByRole('img', { name: 'Test Marketplace', exact: true });
+  await expect(hero).toBeVisible();
+  const expected = page.viewportSize().width >= 768 ? desktopSource : mobileSource;
+  await expect.poll(() => hero.evaluate(image => new URL(image.currentSrc).pathname)).toBe(expected);
+});
+
 test('search leads to a product and seller storefront without exposing pending listings', async ({ page }) => {
   await page.goto('/products?q=Test%20Ceylon%20Spice');
   await page.getByRole('link', { name: 'Test Ceylon Spice', exact: true }).last().click();
@@ -74,6 +117,17 @@ test('guest multi-seller checkout creates a confirmed order that can be tracked'
   expect(subOrders).toHaveLength(2);
   expect(order.grandTotalLkr).toBe(4200);
   await expect(page.getByRole('heading', { name: new RegExp(order.orderNumber) })).toBeVisible();
+  const documents=page.getByRole('region',{name:'Order documents'});
+  await documents.getByRole('button',{name:'View invoices & documents'}).click();
+  await expect(documents.getByText('Commercial invoice',{exact:false}).first()).toBeVisible();
+  const invoiceNumber=`${subOrders[0].subOrderNumber}-INVOICE`;
+  await documents.getByRole('button',{name:`View ${invoiceNumber}`,exact:true}).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByRole('dialog')).toContainText('not a tax invoice');
+  await page.getByRole('button',{name:'Close document'}).click();
+  const downloaded=page.waitForEvent('download');
+  await documents.getByRole('button',{name:`Download ${invoiceNumber}`,exact:true}).click();
+  expect((await downloaded).suggestedFilename()).toBe(`${invoiceNumber}.pdf`);
   const savedCart = await page.evaluate(() => JSON.parse(localStorage.getItem('yaans_cart')));
   expect(savedCart).toEqual([]);
   await page.getByRole('link', { name: `Track Order #${order.orderNumber}` }).click();

@@ -1,3 +1,4 @@
+import OrderDocuments from '../components/OrderDocuments.jsx';
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -181,6 +182,7 @@ export default function CheckoutPage() {
             </div>
           </div>
 
+          <OrderDocuments key={order._id} orderId={order._id} accessToken={placedResult.guestAccessToken || ''} />
           {placedResult.guestAccessToken && (
             <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 space-y-2 text-sm">
               <p className="font-bold">Save your guest tracking access code</p>

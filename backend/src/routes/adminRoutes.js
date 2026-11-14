@@ -606,8 +606,9 @@ router.post('/banners', async (req, res) => {
     displayOrder
   } = req.body;
 
-  const finalDesktopImg = (imageUrl || mobileImageUrl || '').trim();
-  const finalMobileImg = (mobileImageUrl || imageUrl || '').trim();
+  // Store each device independently; the public catalog handles display fallbacks.
+  const finalDesktopImg = imageUrl.trim();
+  const finalMobileImg = mobileImageUrl.trim();
 
   if (!finalDesktopImg && !finalMobileImg) {
     return res.status(400).json({ message: 'Banner image is required (desktop or mobile).' });

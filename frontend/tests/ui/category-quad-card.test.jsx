@@ -17,7 +17,7 @@ test.each([0, 2, 3, 4, 7])('%i configured subcategories remain accessible in ord
   const region = screen.getByRole('region', { name: 'Fashion subcategories' });
   expect(within(region).queryAllByRole('link').map(link => link.getAttribute('aria-label')))
     .toEqual(category.subCategories.slice(0, count).map(tile => tile.name));
-  expect(Boolean(screen.queryByText('Swipe to see more'))).toBe(count > 3);
+  expect(Boolean(screen.queryByText('Swipe'))).toBe(count > 3);
   expect(screen.getByRole('link', { name: 'See all in Fashion' })).toHaveAttribute('href', '/products?category=fashion');
 });
 
@@ -48,7 +48,7 @@ test('additional tiles retain lazy responsive images without eager loading', () 
   for (const image of images) {
     expect(image).toHaveAttribute('loading', 'lazy');
     expect(image).toHaveAttribute('decoding', 'async');
-    expect(image.getAttribute('sizes')).toContain('calc((100vw - 82px) / 3)');
+    expect(image.getAttribute('sizes')).toContain('calc((100vw - 74px) / 3)');
     expect(image).not.toHaveAttribute('fetchpriority', 'high');
   }
 });

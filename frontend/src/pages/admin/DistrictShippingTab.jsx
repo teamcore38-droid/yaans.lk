@@ -363,7 +363,7 @@ export default function DistrictShippingTab({
                       }`}
                     />
                   </td>
-                  <td className="py-2 px-2 text-slate-600">{d.estimatedDays}</td>
+                  <td className="py-2 px-2"><input aria-label={`Delivery window ${d.name}`} className="border p-1 w-36" maxLength={100} value={d.estimatedDays || ''} onChange={e => { const next = [...districtsState]; next[idx] = { ...d, estimatedDays: e.target.value }; setDistrictsState(next); }} /></td>
                   <td className="py-2 px-2">
                     <input
                       type="checkbox"

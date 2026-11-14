@@ -1,3 +1,4 @@
+import { useBusinessSettings } from '../hooks/useBusinessSettings.js';
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -13,6 +14,7 @@ import { formatLkr } from '../utils/api.js';
 import { useMarketplace, DEFAULT_SL_DISTRICTS } from '../context/MarketplaceContext.jsx';
 
 function CartItemList({ items, verified = false, updateCartQuantity, removeFromCart }) {
+  const business=useBusinessSettings();
   return (
     <div className="divide-y divide-slate-100">
       {items.map((item) => (
@@ -55,7 +57,7 @@ function CartItemList({ items, verified = false, updateCartQuantity, removeFromC
                 <button
                   type="button"
                   aria-label={`Increase quantity of ${item.title}`}
-                  disabled={item.quantity >= 99}
+                  disabled={item.quantity >= business.pricing.maxQuantityPerSelection}
                   onClick={() =>
                     updateCartQuantity(item.productId, item.variantLabel, item.quantity + 1)
                   }
@@ -88,6 +90,7 @@ function CartItemList({ items, verified = false, updateCartQuantity, removeFromC
 }
 
 export default function CartPage() {
+  const business=useBusinessSettings();
   const {
     cartItems,
     updateCartQuantity,
@@ -275,7 +278,7 @@ export default function CartPage() {
             </div>
             <div className="flex justify-between text-slate-500 text-xs">
               <span>Tax / VAT:</span>
-              <span>Rs. 0 (No tax charged)</span>
+              <span>{cartQuote?.policySnapshot?.taxMessage || business.pricing.taxMessage}</span>
             </div>
           </div>
 

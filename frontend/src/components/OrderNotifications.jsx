@@ -1,8 +1,10 @@
+import { useBusinessSettings } from '../hooks/useBusinessSettings.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { apiRequest, formatLkr } from '../utils/api.js';
 
 export default function OrderNotifications({ onViewOrders, onSessionExpired }) {
+  const business = useBusinessSettings();
   const [inbox, setInbox] = useState({ notifications: [], unreadCount: 0 });
   const [open, setOpen] = useState(false);
   const [sound, setSound] = useState(false);
@@ -77,13 +79,13 @@ export default function OrderNotifications({ onViewOrders, onSessionExpired }) {
       </button>
       <button type="button" aria-pressed={sound} onClick={toggleSound}>Sound: {sound ? 'on' : 'off'}</button>
     </div>
-    <p role="status">{inbox.unreadCount > 0 ? `New order received — ${inbox.unreadCount} unread notification${inbox.unreadCount === 1 ? '' : 's'}.` : 'No unread order notifications.'}</p>
+    <p role="status">{inbox.unreadCount > 0 ? `${business.notifications.newOrderText} — ${inbox.unreadCount} unread notification${inbox.unreadCount === 1 ? '' : 's'}.` : 'No unread order notifications.'}</p>
     {error && <p role="alert" className="text-amber-800">{error}</p>}
     {open && <ul className="space-y-3 max-h-80 overflow-y-auto">
       {inbox.notifications.map(item => <li key={item._id} className="border-t pt-3">
         <p className="font-bold">{item.orderNumber} · {formatLkr(item.totalLkr)}</p>
         <p>{item.items.map(line => `${line.title} × ${line.quantity}`).join(', ')}</p>
-        <button type="button" className="text-sky-800 underline" onClick={() => view(item)}>View orders and mark as read</button>
+        <button type="button" className="text-sky-800 underline" onClick={() => view(item)}>{business.notifications.viewOrderText}</button>
       </li>)}
       {inbox.unreadCount > 20 && <li>Showing the latest 20. Read these to see earlier notifications.</li>}
     </ul>}

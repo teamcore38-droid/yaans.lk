@@ -68,7 +68,7 @@ export async function startIsolatedApp(port = 0, { monitorCommands = false } = {
           const values = key === 'platformConfig' ? [{ ...fixtures.platformConfig, key: 'main_config' }] : fixtures[key];
           if (values.length) await model.collection.insertMany(values);
         }
-        for (const name of ['staffsessions', 'ordernotifications', 'counters', 'checkoutrequests', 'cashmovements', 'ratelimits', 'operationalmetrics', 'authchallenges', 'securityevents', 'reviewclaims']) await mongoose.connection.db.collection(name).deleteMany({});
+        for (const name of ['businesspublications', 'staffsessions', 'ordernotifications', 'counters', 'checkoutrequests', 'cashmovements', 'ratelimits', 'operationalmetrics', 'authchallenges', 'securityevents', 'reviewclaims']) await mongoose.connection.db.collection(name).deleteMany({});
       },
       async close() {
         await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

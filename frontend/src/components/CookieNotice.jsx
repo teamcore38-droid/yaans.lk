@@ -1,3 +1,4 @@
+import { useBusinessSettings } from '../hooks/useBusinessSettings.js';
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Cookie, X, ShieldCheck } from 'lucide-react';
@@ -5,6 +6,7 @@ import { Cookie, X, ShieldCheck } from 'lucide-react';
 const STORAGE_KEY = 'yaans_cookie_consent';
 
 export default function CookieNotice() {
+  const business = useBusinessSettings();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -69,7 +71,7 @@ export default function CookieNotice() {
             </span>
           </div>
           <p className="text-slate-600 text-xs mt-1 leading-relaxed">
-            We use essential local storage to calculate accurate courier fees across all 25 Sri Lankan districts and keep your cart active. We do not track you across other websites.
+            {business.legal.cookieNotice}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button

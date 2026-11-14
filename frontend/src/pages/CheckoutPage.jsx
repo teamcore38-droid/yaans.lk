@@ -1,3 +1,4 @@
+import { useBusinessSettings } from '../hooks/useBusinessSettings.js';
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -17,6 +18,7 @@ import { beforeCustomerAuth, prepareCustomerAuth, readCheckoutDraft, saveCheckou
 import { customerAuthPath } from '../../../shared/customerRedirect.js';
 
 export default function CheckoutPage() {
+  const business=useBusinessSettings();
   const {
     user,
     cartItems,
@@ -535,6 +537,7 @@ export default function CheckoutPage() {
                   </span>
                   <span className="text-slate-500 font-medium">From {grp.sellerDistrict}</span>
                 </div>
+                {grp.returnPolicies && <p>{grp.returnPolicies.every(rule=>rule.enabled)?`${Math.min(...grp.returnPolicies.map(rule=>rule.days))}-day returns for this package from delivery`:'Standard whole-package returns are unavailable because an item is excluded. Contact support for individual-item assistance.'}</p>}
                 {grp.items.map((it) => (
                   <div
                     key={`${it.productId}-${it.variantLabel}`}
@@ -573,7 +576,7 @@ export default function CheckoutPage() {
             </div>
             <div className="flex justify-between text-xs text-slate-500">
               <span>Taxes:</span>
-              <span>Rs. 0 (Exempt)</span>
+              <span>{cartQuote?.policySnapshot?.taxMessage || business.pricing.taxMessage}</span>
             </div>
             <div className="flex justify-between items-baseline pt-2 border-t border-slate-200">
               <span className="font-extrabold text-slate-900 text-sm">

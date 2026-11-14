@@ -22,6 +22,7 @@ const StaffLoginPage = lazy(pageLoaders.staffLogin);
 const AdminLoginPage = lazy(pageLoaders.adminLogin);
 const PrivacyPolicyPage = lazy(pageLoaders.privacy);
 const TermsConditionsPage = lazy(pageLoaders.terms);
+const PolicyArchivePage = lazy(() => import('./pages/PolicyArchivePage.jsx'));
 const CookiePolicyPage = lazy(pageLoaders.cookies);
 
 const LoginPage = lazy(() =>
@@ -113,6 +114,7 @@ export default function App() {
                   />
                   <Route path="/account" element={<CustomerAccountPage />} />
                   <Route path="/wishlist" element={<WishlistPage />} />
+                  <Route path="/policies/:version/:kind" element={<PolicyArchivePage />} />
                   <Route path="/privacy" element={<PrivacyPolicyPage />} />
                   <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
                   <Route path="/terms" element={<TermsConditionsPage />} />

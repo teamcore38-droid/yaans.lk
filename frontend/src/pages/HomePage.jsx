@@ -1,3 +1,4 @@
+import { useBusinessSettings } from '../hooks/useBusinessSettings.js';
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { safeInternalLink } from '../../../shared/safeLinks.js';
@@ -17,7 +18,13 @@ import CategoryQuadCard from '../components/CategoryQuadCard.jsx';
 import ProductCard from '../components/ProductCard.jsx';
 import { imageUrl, imageSrcSet } from '../utils/images.js';
 
+function HomeLayout({ sections, children }) {
+  const ordered = React.Children.toArray(children).sort((a,b)=>(sections[a.props?.['data-home-section']]?.position || 0)-(sections[b.props?.['data-home-section']]?.position || 0));
+  return <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 space-y-3 sm:space-y-5">{ordered}</div>;
+}
+
 export default function HomePage() {
+  const business = useBusinessSettings();
   const { user, selectedDistrict } = useMarketplace();
   const { data: homeData, loading } = useCatalogResource('/marketplace/home');
   const [activeBannerIdx, setActiveBannerIdx] = useState(0);
@@ -34,12 +41,12 @@ export default function HomePage() {
 
   // Auto-swipe every 4.5 seconds
   useEffect(() => {
-    if (banners.length <= 1 || isBannerPaused) return;
+    if (!business.home.autoplay || banners.length <= 1 || isBannerPaused) return;
     const interval = setInterval(() => {
       setActiveBannerIdx((prev) => (prev + 1) % banners.length);
-    }, 4500);
+    }, business.home.intervalMs);
     return () => clearInterval(interval);
-  }, [banners.length, isBannerPaused]);
+  }, [banners.length, isBannerPaused, business.home.autoplay, business.home.intervalMs]);
 
   const handlePrevBanner = (e) => {
     e?.preventDefault();
@@ -89,7 +96,7 @@ export default function HomePage() {
   const verifiedSellers = homeData?.verifiedSellers || [];
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 space-y-3 sm:space-y-5">
+    <HomeLayout sections={business.home}>
       {/* Top Practical Auto-Swipeable Hero Banner (Unified for Desktop and Mobile) */}
       {banners.length > 0 && (
         <div
@@ -215,14 +222,14 @@ export default function HomePage() {
       )}
 
       {/* 2x2 Category Quad Cards (Mobile-First Reference Layout) */}
-      <section aria-label="Shop by Category" className="!mt-2 sm:!mt-2.5">
+      <section aria-label="Shop by Category" className="!mt-2 sm:!mt-2.5" hidden={!business.home.categories.enabled} data-home-section="categories">
         <div className="flex items-center justify-between gap-2 mb-2 sm:mb-1.5">
           <div>
             <h2 className="text-base sm:text-lg font-extrabold text-slate-900 leading-tight">
-              Explore Categories
+              {business.home.categories.title}
             </h2>
             <p className="hidden sm:block text-xs text-slate-500 mt-0.5">
-              Tap any department or subcategory tile to filter products
+              {business.home.categories.subtitle}
             </p>
           </div>
           <Link
@@ -235,14 +242,14 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          {categories.map((cat) => (
+          {categories.slice(0,business.home.categories.limit).map((cat) => (
             <CategoryQuadCard key={cat._id} category={cat} />
           ))}
         </div>
       </section>
 
       {/* Authentic Sri Lankan Homemade Products Section */}
-      <section className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5 shadow-sm">
+      <section className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5 shadow-sm" hidden={!business.home.homemade.enabled} data-home-section="homemade">
         <div className="flex items-center justify-between gap-2 pb-2 mb-2 sm:pb-3 sm:mb-4 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <span className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800">
@@ -251,14 +258,14 @@ export default function HomePage() {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
-                  <span className="sm:hidden">Homemade & Cottage</span><span className="hidden sm:inline">Sri Lankan Homemade & Cottage Products</span>
+                  <span className="sm:hidden">{business.home.homemade.mobileTitle}</span><span className="hidden sm:inline">{business.home.homemade.title}</span>
                 </h2>
                 <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-800">
-                  Direct from Home Kitchens & Artisans
+                  {business.trust.localDescription}
                 </span>
               </div>
               <p className="hidden sm:block text-xs text-slate-600">
-                Fresh achcharu, pure Kotmale kithul treacle, village clay pots, handloom sarongs & herbal hair oils
+                {business.home.homemade.subtitle}
               </p>
             </div>
           </div>
@@ -274,7 +281,7 @@ export default function HomePage() {
 
         {homemadeProducts.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-            {homemadeProducts.slice(0, 8).map((product) => (
+            {homemadeProducts.slice(0, business.home.homemade.limit).map((product) => (
               <ProductCard key={product._id} product={product} />
             ))}
           </div>
@@ -293,7 +300,7 @@ export default function HomePage() {
       </section>
 
       {/* Daily Deals in LKR (Rs.) */}
-      <section className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5 shadow-sm">
+      <section className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5 shadow-sm" hidden={!business.home.deals.enabled} data-home-section="deals">
         <div className="flex items-center justify-between gap-2 pb-2 mb-2 sm:pb-3 sm:mb-4 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <span className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
@@ -301,10 +308,10 @@ export default function HomePage() {
             </span>
             <div>
               <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
-                <span className="sm:hidden">Today’s Deals</span><span className="hidden sm:inline">Today&apos;s Value Deals in LKR (Rs.)</span>
+                <span className="sm:hidden">{business.home.deals.mobileTitle}</span><span className="hidden sm:inline">{business.home.deals.title}</span>
               </h2>
               <p className="hidden sm:block text-xs text-slate-600">
-                Practical discounts on everyday tech, home essentials & pantry items — no hidden tax added at checkout
+                {business.home.deals.subtitle}
               </p>
             </div>
           </div>
@@ -319,7 +326,7 @@ export default function HomePage() {
 
         {dealProducts.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-            {dealProducts.slice(0, 4).map((product) => (
+            {dealProducts.slice(0, business.home.deals.limit).map((product) => (
               <ProductCard key={product._id} product={product} />
             ))}
           </div>
@@ -331,14 +338,14 @@ export default function HomePage() {
       </section>
 
       {/* Verified Local Sellers Showcase */}
-      <section className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5 shadow-sm">
+      <section className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5 shadow-sm" hidden={!business.home.sellers.enabled} data-home-section="sellers">
         <div className="flex items-center justify-between gap-2 mb-2 sm:mb-4">
           <div>
             <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
-              <span className="sm:hidden">Shop Local Sellers</span><span className="hidden sm:inline">Shop by Verified Sri Lankan Sellers</span>
+              <span className="sm:hidden">{business.home.sellers.mobileTitle}</span><span className="hidden sm:inline">{business.home.sellers.title}</span>
             </h2>
             <p className="hidden sm:block text-xs text-slate-600">
-              Combine items from multiple sellers in a single cart — Yaans.lk splits & tracks each shipment automatically
+              {business.home.sellers.subtitle}
             </p>
           </div>
           <Link
@@ -401,14 +408,14 @@ export default function HomePage() {
       </section>
 
       {/* Recommended Marketplace Products */}
-      <section>
+      <section hidden={!business.home.recommended.enabled} data-home-section="recommended">
         <div className="flex items-center justify-between gap-2 mb-2 sm:mb-3">
           <div>
             <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
-              Recommended For You
+              {business.home.recommended.title}
             </h2>
             <p className="hidden sm:block text-xs text-slate-500">
-              Most popular items ordered across Sri Lanka this week
+              {business.home.recommended.subtitle}
             </p>
           </div>
           <Link
@@ -432,6 +439,6 @@ export default function HomePage() {
           </div>
         )}
       </section>
-    </div>
+    </HomeLayout>
   );
 }

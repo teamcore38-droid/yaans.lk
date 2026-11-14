@@ -1,3 +1,4 @@
+import { useBusinessSettings } from '../hooks/useBusinessSettings.js';
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useLocation, Link } from 'react-router-dom';
 import {
@@ -15,6 +16,8 @@ import { guestAccess, rememberGuestAccess } from '../utils/orderAccess.js';
 import { useMarketplace } from '../context/MarketplaceContext.jsx';
 
 export default function TrackOrderPage() {
+  const business=useBusinessSettings();
+  const [actionReasons,setActionReasons]=useState({});
   const [searchParams] = useSearchParams();
   const { showToast, user } = useMarketplace();
   const location = useLocation();
@@ -61,10 +64,9 @@ export default function TrackOrderPage() {
   }, [searchParams, user?._id]);
 
   const handleCustomerPackageAction = async (subOrderId, action) => {
-    const reason =
-      action === 'cancel'
-        ? 'Customer requested COD cancellation before dispatch'
-        : 'Customer requested return after delivery';
+    const policy=result?.order?.policySnapshot;
+    const options=action==='cancel'?(policy?.cancelReasons||business.returns.cancelReasons):(policy?.returnReasons||business.returns.returnReasons);
+    const reason=actionReasons[subOrderId]||options[0];
     try {
       await apiRequest(`/orders/suborders/${subOrderId}/customer-action`, {
         method: 'POST',
@@ -214,7 +216,7 @@ export default function TrackOrderPage() {
 
                     <div className="pt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
                       <span>
-                        Courier: <strong>{sub.courierPartner}</strong> • Tracking:{' '}
+                        Courier: <strong>{sub.courierPartner}</strong> {sub.courierTrackingUrl && <a href={sub.courierTrackingUrl} target="_blank" rel="noopener noreferrer" className="underline">Courier tracking</a>} • Tracking:{' '}
                         <strong className="text-slate-900">{sub.trackingCode}</strong>
                       </span>
                       <span>
@@ -223,9 +225,11 @@ export default function TrackOrderPage() {
                       </span>
                     </div>
 
+                    {(['confirmed','packed','delivered'].includes(sub.fulfillmentStatus)) && <label className="block text-xs">Reason<select aria-label={`Reason for ${sub.subOrderNumber}`} value={actionReasons[sub._id] || ''} onChange={e=>setActionReasons({...actionReasons,[sub._id]:e.target.value})}><option value="">Choose reason (first listed is the default)</option>{(sub.fulfillmentStatus==='delivered'?(result.order.policySnapshot?.returnReasons||business.returns.returnReasons):(result.order.policySnapshot?.cancelReasons||business.returns.cancelReasons)).map(reason=><option key={reason} value={reason}>{reason}</option>)}</select></label>}
+                    {sub.returnPolicy && <p className="text-xs">{sub.returnPolicy.enabled?`${sub.returnPolicy.days}-day return eligibility from delivery`:'Standard returns not available for this package'}. Policy version {result.order.policySnapshot?.version ?? 'original'}. {result.order.policySnapshot && <Link className="underline" to={`/policies/${result.order.policySnapshot.version}/terms`}>Read checkout policy</Link>}</p>}
                     {/* Customer Cancel or Return Actions */}
                     <div className="pt-2 flex items-center gap-2">
-                      {['confirmed', 'packed'].includes(sub.fulfillmentStatus) && (
+                      {(result.order.policySnapshot?.cancelStatuses || ['confirmed','packed']).includes(sub.fulfillmentStatus) && (
                         <button
                           type="button"
                           onClick={() => handleCustomerPackageAction(sub._id, 'cancel')}
@@ -234,7 +238,7 @@ export default function TrackOrderPage() {
                           Cancel COD Package
                         </button>
                       )}
-                      {sub.fulfillmentStatus === 'delivered' && (
+                      {sub.fulfillmentStatus === 'delivered' && sub.returnPolicy?.enabled !== false && (
                         <button
                           type="button"
                           onClick={() => handleCustomerPackageAction(sub._id, 'request_return')}

@@ -10,7 +10,7 @@ const empty = { _id: { $in: [] } };
 const matchingIds = (ids) => ids.length ? { $or: [...new Set(ids)].map(idFilter) } : empty;
 
 export async function loadCartStore(items, session) {
-  const store = await getStore({ products: matchingIds(items.map((item) => item.productId)), platformConfig: true }, { session });
+  const store = await getStore({ products: matchingIds(items.map((item) => item.productId)), platformConfig: true }, { session, compactConfig: true });
   await loadCollections(store, { sellers: matchingIds(store.products.map((product) => product.sellerId)) });
   return store;
 }
@@ -150,7 +150,7 @@ export async function checkout(body, user, key) {
         return { _id: generateId('sub'), subOrderNumber: `${orderNumber}-S${index + 1}`,
           parentOrderId, parentOrderNumber: orderNumber, sellerId: group.sellerId, sellerName: group.sellerName,
           sellerDistrict: group.sellerDistrict, customerName: shippingAddress.recipientName, customerPhone: shippingAddress.phone,
-          shippingAddress, items: group.items, itemsSubtotalLkr: group.itemsSubtotalLkr, deliveryFeeLkr: group.deliveryFeeLkr,
+          shippingAddress, shippingDetails: group.shippingDetails, returnPolicy: { enabled: group.returnPolicies.every(rule => rule.enabled), days: Math.min(...group.returnPolicies.map(rule => rule.days)) }, items: group.items, itemsSubtotalLkr: group.itemsSubtotalLkr, deliveryFeeLkr: group.deliveryFeeLkr,
           grossTotalLkr: group.grossTotalLkr, commissionRatePercent: group.commissionRatePercent,
           commissionAmountLkr: group.commissionAmountLkr, netSellerEarningsLkr: group.netSellerEarningsLkr,
           paymentMethod: 'COD', codCollectionStatus: 'pending_collection', fulfillmentStatus: 'confirmed',
@@ -162,7 +162,7 @@ export async function checkout(body, user, key) {
         ...(token ? { guestAccessTokenHash: hash(token), guestAccessExpiresAt: new Date(Date.now() + 90 * 86400000).toISOString() } : {}), customerEmail, customerPhone: shippingAddress.phone,
         shippingAddress, items: breakdown.sellerGroups.flatMap((group) => group.items), subOrderIds: subOrders.map((s) => s._id),
         sellerCount: subOrders.length, itemsSubtotalLkr: breakdown.itemsSubtotalLkr, totalDeliveryFeeLkr: breakdown.totalDeliveryFeeLkr,
-        grandTotalLkr: breakdown.grandTotalLkr, paymentMethod: 'COD', codConfirmedByCustomer: true, overallStatus: 'processing', createdAt: now };
+        grandTotalLkr: breakdown.grandTotalLkr, policySnapshot: breakdown.policySnapshot, paymentMethod: 'COD', codConfirmedByCustomer: true, overallStatus: 'processing', createdAt: now };
       store.orders.push(order);
       store.subOrders.push(...subOrders);
       await persistStore(store);
@@ -208,13 +208,19 @@ export async function customerAction(subOrderId, body, user, token) {
     const target = store.subOrders.find((item) => item._id === String(sub._id));
     if (body.action === 'cancel') {
       if (target.fulfillmentStatus === 'cancelled') return { subOrder: customerPackage(target), message: 'Package already cancelled.' };
-      if (!['pending_confirmation', 'confirmed', 'packed'].includes(target.fulfillmentStatus)) throw httpError(409, 'This package can no longer be cancelled.');
+      if (!(order.policySnapshot?.cancelStatuses || ['pending_confirmation', 'confirmed', 'packed']).includes(target.fulfillmentStatus)) throw httpError(409, 'This package can no longer be cancelled.');
       await loadCollections(store, { products: matchingIds(target.items.map((item) => item.productId)), sellers: idFilter(target.sellerId) });
       releaseInventory(store, target);
       target.fulfillmentStatus = 'cancelled'; target.codCollectionStatus = 'not_applicable'; target.settlementStatus = 'voided';
     } else {
       if (target.fulfillmentStatus === 'return_requested') return { subOrder: customerPackage(target), message: 'Return already requested.' };
       if (target.fulfillmentStatus !== 'delivered') throw httpError(409, 'Only delivered packages can be returned.');
+      if (order.policySnapshot && target.returnPolicy) {
+        if (!target.returnPolicy.enabled) throw httpError(409, 'This package is not eligible for return under the policy agreed at checkout.');
+        const delivered = target.deliveredAt || [...target.statusHistory].reverse().find(event => event.status === 'delivered')?.timestamp;
+        if (!delivered || !Number.isFinite(Date.parse(delivered))) throw httpError(409, 'Delivery time requires support review.');
+        if (Date.now() > Date.parse(delivered) + target.returnPolicy.days * 86400000) throw httpError(409, 'The return period for this package has ended.');
+      }
       target.fulfillmentStatus = 'return_requested';
       target.payoutHoldReason = 'return_requested';
       if (!target.settlementId) target.settlementStatus = 'held_for_return';

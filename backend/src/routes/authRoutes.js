@@ -1,3 +1,4 @@
+import { businessSettings, sellerCommission } from '../../../shared/businessSettings.js';
 import mongoose from 'mongoose';
 import { createStaffSession, touchStaffSession } from '../services/staffSessions.js';
 import { createRouter } from '../config/router.js';
@@ -266,7 +267,10 @@ router.post('/register-seller', sharedRateLimit('registration', 10, 60 * 60000),
   }
   validateNewPassword(password);
 
-  const store = await getStore({ users: { email: String(email).toLowerCase().trim() }, sellers: { _id: { $in: [] } } });
+  const store = await getStore({ users: { email: String(email).toLowerCase().trim() }, sellers: { _id: { $in: [] } }, platformConfig: true });
+  const settings = businessSettings(store.platformConfig);
+  const selectedType = settings.references.sellerTypes.find(type => type.name === sellerType && type.active);
+  if (!selectedType || !settings.references.banks.includes(bankName)) throw httpError(400, 'Choose an available seller type and bank.');
   const exists = store.users.find((u) => u.email.toLowerCase() === String(email).toLowerCase().trim());
   if (exists) {
     return res.status(409).json({ message: 'An account with this email already exists.' });
@@ -279,7 +283,7 @@ router.post('/register-seller', sharedRateLimit('registration', 10, 60 * 60000),
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
 
-  const isHomemadeVendor = sellerType === 'Homemade & Cottage' || sellerType === 'Artisan & Craft';
+  const isHomemadeVendor = selectedType.homemade;
 
   const newSeller = {
     _id: sellerId,
@@ -301,10 +305,11 @@ router.post('/register-seller', sharedRateLimit('registration', 10, 60 * 60000),
     nicOrBrNumber: nicOrBrNumber.trim(),
     status: 'pending', // Requires Admin approval as specified
     rejectionReason: '',
-    commissionRateOverride: isHomemadeVendor ? 5 : null,
+    commissionRateOverride: null,
     shippingPolicy: {
-      freeShippingThresholdLkr: 5000,
-      flatRateIntraLkr: 280,
+      freeShippingThresholdLkr: settings.delivery.defaultFreeShippingLkr,
+      flatRateIntraLkr: settings.delivery.defaultIntraDistrictFeeLkr,
+      preparationDays: settings.delivery.defaultPreparationDays,
       dispatchTimeDays: '1-2 business days'
     },
     bankDetails: {

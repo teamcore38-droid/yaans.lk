@@ -79,8 +79,18 @@ test('homepage departments show three swipeable phone tiles and preserve the lar
     }
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await expect.poll(() => first.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+    // A touch fling keeps scrolling after touchEnd. Wait for its position to
+    // settle before testing focus; do not scroll the last tile into view here.
+    let previousScroll = -1, stableReads = 0;
+    await expect.poll(async () => {
+      const position = await first.evaluate(element => element.scrollLeft);
+      stableReads = position === previousScroll ? stableReads + 1 : 0;
+      previousScroll = position;
+      return stableReads;
+    }, { intervals: [100] }).toBeGreaterThanOrEqual(3);
     const last = first.getByRole('link', { name: 'Department 1 tile 6', exact: true });
     await last.focus();
+    await expect(last).toBeFocused();
     await expect(last).toBeInViewport();
     expect(homeRequests).toBe(1);
     await page.screenshot({ path: testInfo.outputPath('mobile-department-row.png') });

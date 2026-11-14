@@ -1,16 +1,21 @@
+import { useBusinessSettings } from '../hooks/useBusinessSettings.js';
+import PublishedPolicy, { PolicySummary } from '../components/PublishedPolicy.jsx';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, Lock, Eye, FileText, UserCheck, AlertCircle, Mail, MapPin, CheckCircle2 } from 'lucide-react';
 
 export default function PrivacyPolicyPage() {
+  const business=useBusinessSettings();
+  if (business.legal.privacy) return <PublishedPolicy kind="privacy"/>;
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8">
+      <PolicySummary kind="privacy"/>
       {/* Page Header */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm">
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200 flex items-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            PDPA No. 9 of 2022 Compliant
+            Privacy & Data Protection
           </span>
           <span className="px-2.5 py-1 rounded-full bg-sky-50 text-sky-800 text-xs font-bold border border-sky-200">
             Sri Lanka Data Protection Standard
@@ -66,9 +71,9 @@ export default function PrivacyPolicyPage() {
             Under the Personal Data Protection Act, No. 9 of 2022 (PDPA) of the Democratic Socialist Republic of Sri Lanka, <strong>Yaans.lk Multi-Vendor Marketplace Operations</strong> acts as the <strong>Data Controller</strong> for personal data collected through the Yaans.lk website, mobile interfaces, and associated services.
           </p>
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1">
-            <p><strong>Designated Data Protection Officer (DPO):</strong> Compliance & Legal Operations</p>
-            <p><strong>Physical Operating Presence:</strong> Colombo, Western Province, Sri Lanka</p>
-            <p><strong>Grievance & Privacy Email:</strong> <a href="mailto:privacy@yaans.lk" className="text-sky-700 underline font-semibold">privacy@yaans.lk</a></p>
+            <p><strong>Designated Data Protection Officer (DPO):</strong> {business.identity.privacyOfficer}</p>
+            <p><strong>Physical Operating Presence:</strong> {business.identity.operatingAddress}</p>
+            <p><strong>Grievance & Privacy Email:</strong> <a href={`mailto:${business.identity.privacyEmail}`} className="text-sky-700 underline font-semibold">{business.identity.privacyEmail}</a></p>
           </div>
         </section>
 
@@ -248,14 +253,14 @@ export default function PrivacyPolicyPage() {
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
             <div>
               <div className="font-bold text-slate-900">Yaans.lk Privacy & Compliance Team</div>
-              <div className="text-slate-600">Response turnaround: Within 14 working days as per Sri Lankan statutory guidelines</div>
+              <div className="text-slate-600">Response target: Within {business.legal.privacyResponseDays} working days</div>
             </div>
             <a
-              href="mailto:privacy@yaans.lk"
+              href={`mailto:${business.identity.privacyEmail}`}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg shrink-0 transition"
             >
               <Mail className="w-4 h-4" />
-              Email privacy@yaans.lk
+              Email {business.identity.privacyEmail}
             </a>
           </div>
         </section>

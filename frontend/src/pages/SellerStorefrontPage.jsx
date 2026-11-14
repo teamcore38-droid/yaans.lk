@@ -1,3 +1,4 @@
+import { useBusinessSettings } from '../hooks/useBusinessSettings.js';
 import React from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { Store, MapPin, Star, Truck, Sparkles, CheckCircle2 } from 'lucide-react';
@@ -6,6 +7,7 @@ import ProductCard from '../components/ProductCard.jsx';
 import { useCatalogResource } from '../hooks/useCatalogResource.js';
 
 export default function SellerStorefrontPage() {
+  const business = useBusinessSettings();
   const { slugOrId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Math.max(1, parseInt(searchParams.get('page'), 10) || 1);
@@ -90,8 +92,8 @@ export default function SellerStorefrontPage() {
             <div className="px-3.5 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 flex items-center gap-2">
               <Truck className="w-4 h-4 text-emerald-700" />
               <span>
-                Free delivery from this seller on orders over{' '}
-                <strong>{formatLkr(seller.shippingPolicy.freeShippingThresholdLkr)}</strong>
+                Free delivery from this seller on orders of{' '}
+                <strong>{formatLkr(seller.shippingPolicy.freeShippingThresholdLkr)}</strong> or more
               </span>
             </div>
           )}
@@ -114,8 +116,7 @@ export default function SellerStorefrontPage() {
               </span>
             </div>
             <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
-              {seller.vacationNotice ||
-                'This seller is taking a temporary break. You can still explore the catalog, and new orders will be processed when the seller returns.'}
+              {seller.vacationNotice || business.delivery.vacationMessage}
             </p>
           </div>
         </div>

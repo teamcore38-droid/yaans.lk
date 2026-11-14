@@ -91,6 +91,7 @@ export default function SettlementsTab({
             className="w-full px-3 py-2 rounded-lg border border-slate-300"
           />
         </div>
+<label className="block font-bold">Global free shipping minimum (LKR; 0 disables)<input className="block border p-2 w-full" type="number" min="0" value={generalCfg.globalFreeShippingMinLkr} onChange={e=>setGeneralCfg({...generalCfg,globalFreeShippingMinLkr:Number(e.target.value)})}/></label>
         <label className="flex items-center gap-2 font-bold text-slate-800 cursor-pointer">
           <input
             type="checkbox"

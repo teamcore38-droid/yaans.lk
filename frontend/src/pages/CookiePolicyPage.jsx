@@ -1,3 +1,5 @@
+import { useBusinessSettings } from '../hooks/useBusinessSettings.js';
+import PublishedPolicy, { PolicySummary } from '../components/PublishedPolicy.jsx';
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Cookie, ShieldCheck, CheckCircle2, RotateCcw, AlertCircle, Info, Settings } from 'lucide-react';
@@ -5,6 +7,7 @@ import { Cookie, ShieldCheck, CheckCircle2, RotateCcw, AlertCircle, Info, Settin
 const STORAGE_KEY = 'yaans_cookie_consent';
 
 export default function CookiePolicyPage() {
+  const business=useBusinessSettings();
   const [currentStatus, setCurrentStatus] = useState('Checking...');
   const [resetMessage, setResetMessage] = useState('');
 
@@ -34,8 +37,10 @@ export default function CookiePolicyPage() {
     }
   };
 
+  if (business.legal.cookies) return <PublishedPolicy kind="cookies"/>;
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8">
+      <PolicySummary kind="cookies"/>
       {/* Page Header */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm">
         <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -48,7 +53,7 @@ export default function CookiePolicyPage() {
             Zero Cross-Site Ad Tracking
           </span>
           <span className="text-xs text-slate-500 font-medium ml-auto">
-            Last Updated: January 2026
+            Current published policy - see version above
           </span>
         </div>
 
@@ -264,7 +269,7 @@ export default function CookiePolicyPage() {
               Privacy Policy
             </Link>{' '}
             or contact us at{' '}
-            <a href="mailto:privacy@yaans.lk" className="text-sky-700 underline font-semibold">
+            <a href={`mailto:${business.identity.privacyEmail}`} className="text-sky-700 underline font-semibold">
               privacy@yaans.lk
             </a>.
           </p>

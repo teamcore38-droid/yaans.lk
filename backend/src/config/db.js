@@ -54,11 +54,11 @@ export async function withTransaction(work) {
 }
 
 // Request-local units of work contain only explicitly selected collections/IDs.
-export async function getStore(selection, { session } = {}) {
+export async function getStore(selection, { session, compactConfig = false } = {}) {
   if (!selection || typeof selection !== 'object') throw new Error('Explicit database selection is required');
   await connectDatabase();
   const store = Object.fromEntries(Object.keys(MODEL_MAP).map((key) => [key, key === 'platformConfig' ? null : []]));
-  Object.defineProperty(store, snapshot, { value: { records: new Map(), session } });
+  Object.defineProperty(store, snapshot, { value: { records: new Map(), session, compactConfig } });
   return loadCollections(store, selection);
 }
 
@@ -69,7 +69,7 @@ export async function loadCollections(store, selection) {
     if (!MODEL_MAP[key] || !filter) throw new Error(`Invalid database selection: ${key}`);
     if (state.records.has(key)) throw new Error(`Collection already loaded: ${key}`);
     const query = key === 'platformConfig' ? { key: 'main_config' } : filter === true ? {} : filter;
-    const docs = await MODEL_MAP[key].collection.find(query, { session: state.session }).toArray();
+    const docs = await MODEL_MAP[key].collection.find(query, { session: state.session, ...(key === 'platformConfig' && state.compactConfig ? {projection:{businessDraft:0,businessHistory:0,adminAuditLogs:0}} : {}) }).toArray();
     const before = new Map();
     const values = docs.map((doc) => {
       const { _writeVersion, ...value } = doc;

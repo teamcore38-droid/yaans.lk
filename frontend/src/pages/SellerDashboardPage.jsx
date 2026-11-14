@@ -1,3 +1,4 @@
+import { useBusinessSettings } from '../hooks/useBusinessSettings.js';
 import ProductImageGalleryEditor from '../components/ProductImageGalleryEditor.jsx';
 import OrderNotifications from '../components/OrderNotifications.jsx';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -111,6 +112,7 @@ function parseCsv(text) {
 }
 
 export default function SellerDashboardPage() {
+  const business = useBusinessSettings();
   const { user, login, showToast, categories = [] } = useMarketplace();
   const [activeTab, setActiveTab] = useState('orders');
   const [data, setData] = useState(null);
@@ -221,6 +223,7 @@ export default function SellerDashboardPage() {
           district: res.seller.district,
           city: res.seller.city,
           businessAddress: res.seller.businessAddress,
+          preparationDays: res.seller.shippingPolicy?.preparationDays || 0,
           freeShippingThresholdLkr: res.seller.shippingPolicy?.freeShippingThresholdLkr || 0,
           flatRateIntraLkr: res.seller.shippingPolicy?.flatRateIntraLkr || 280,
           bankName: res.seller.bankDetails?.bankName || 'Sampath Bank',
@@ -466,11 +469,11 @@ export default function SellerDashboardPage() {
     }
   };
 
-  const handleSubOrderStatusChange = async (subOrderId, fulfillmentStatus, trackingCode) => {
+  const handleSubOrderStatusChange = async (subOrderId, fulfillmentStatus, trackingCode, courierPartner) => {
     try {
       await apiRequest(`/seller/suborders/${subOrderId}/status`, {
         method: 'PUT',
-        body: JSON.stringify({ fulfillmentStatus, trackingCode })
+        body: JSON.stringify({ fulfillmentStatus, trackingCode, ...(courierPartner ? {courierPartner} : {}) })
       });
       showToast(`Order updated to ${fulfillmentStatus.replace(/_/g, ' ')}`);
       fetchDashboard();
@@ -495,6 +498,7 @@ export default function SellerDashboardPage() {
           isVacationMode: Boolean(storeForm.isVacationMode),
           vacationNotice: storeForm.vacationNotice || '',
           shippingPolicy: {
+            preparationDays: Number(storeForm.preparationDays) || 0,
             freeShippingThresholdLkr: Number(storeForm.freeShippingThresholdLkr) || 0,
             flatRateIntraLkr: Number(storeForm.flatRateIntraLkr) || 280
           },
@@ -885,7 +889,7 @@ export default function SellerDashboardPage() {
 
                 {/* Order Items */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-                  <div className="lg:col-span-7 space-y-2">
+                  <div className="flex flex-wrap gap-3 my-3 text-xs"><label>Courier<select aria-label={`Courier for ${sub.subOrderNumber}`} value={sub.courierPartner || ''} onChange={e=>setData(previous=>({...previous,subOrders:previous.subOrders.map(item=>item._id===sub._id?{...item,courierPartner:e.target.value}:item)}))}><option value={sub.courierPartner||''}>{sub.courierPartner||'Choose courier'}</option>{business.references.couriers.filter(courier=>courier.active&&courier.name!==sub.courierPartner).map(courier=><option key={courier.name} value={courier.name}>{courier.name}</option>)}</select></label><label>Tracking code<input aria-label={`Tracking code for ${sub.subOrderNumber}`} className="border p-1" maxLength={120} value={sub.trackingCode||''} onChange={e=>setData(previous=>({...previous,subOrders:previous.subOrders.map(item=>item._id===sub._id?{...item,trackingCode:e.target.value}:item)}))}/></label></div><div className="lg:col-span-7 space-y-2">
                     {sub.items.map((item, idx) => (
                       <div key={idx} className="flex items-center gap-3 text-xs">
                         <img
@@ -925,7 +929,7 @@ export default function SellerDashboardPage() {
                           key={btn.status}
                           type="button"
                           onClick={() =>
-                            handleSubOrderStatusChange(sub._id, btn.status, sub.trackingCode)
+                            handleSubOrderStatusChange(sub._id, btn.status, sub.trackingCode, sub.courierPartner)
                           }
                           className={`px-2.5 py-1.5 rounded-lg font-bold transition ${
                             sub.fulfillmentStatus === btn.status
@@ -1567,6 +1571,7 @@ export default function SellerDashboardPage() {
           onSubmit={handleSaveStoreSettings}
           className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4 max-w-3xl text-xs"
         >
+          <label className="block font-bold">Preparation time (business days)<input className="block border p-2" type="number" min="0" max={business.delivery.maxPreparationDays} value={storeForm.preparationDays || 0} onChange={e=>setStoreForm({...storeForm,preparationDays:Number(e.target.value)})}/></label>
           <h2 className="text-sm font-extrabold text-slate-900 border-b border-slate-200 pb-2.5">
             Storefront Profile, Origin District & Bank Settlement Details
           </h2>

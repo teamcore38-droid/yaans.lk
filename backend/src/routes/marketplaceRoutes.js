@@ -1,3 +1,4 @@
+import { DEFAULT_BUSINESS_SETTINGS } from '../../../shared/businessSettings.js';
 import { createRouter } from '../config/router.js';
 import { getStore, persistStore, generateId, idFilter, withTransaction, MODEL_MAP } from '../config/db.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
@@ -17,12 +18,21 @@ router.get('/home', async (_req, res) => {
 
 router.get('/districts', async (_req, res) => {
   const config = await catalogSettings();
-  res.json({ districts: config.districts, codEnabledGlobally: config.codEnabledGlobally,
+  res.json({ businessSettings: config.businessSettings, districts: config.districts, codEnabledGlobally: config.codEnabledGlobally,
     globalFreeShippingMinLkr: config.globalFreeShippingMinLkr,
     shippingMode: config.shippingMode || 'custom', flatShippingRateLkr: config.flatShippingRateLkr ?? 350 });
 });
 
-router.get('/categories', async (_req, res) => res.json({ categories: await catalogCategories() }));
+router.get('/policies/:version', async(req,res)=>{
+  if(!/^(0|[1-9][0-9]{0,8})$/.test(req.params.version))throw httpError(400,'Invalid policy version.');
+  const version=Number(req.params.version);
+  const document=await mongoose.connection.db.collection('businesspublications').findOne({_id:version},{projection:{settings:1,effectiveAt:1},maxTimeMS:3000});
+  if(!document&&version!==0)throw httpError(404,'Published policy not found.');
+  res.set('Cache-Control','public, max-age=60');
+  res.json({version,settings:document?.settings||DEFAULT_BUSINESS_SETTINGS,effectiveAt:document?.effectiveAt||null});
+});
+
+router.get('/categories', async (_req, res) => { const [categories,config] = await Promise.all([catalogCategories(),catalogSettings()]); res.json({ categories, businessSettings: config.businessSettings, businessVersion: config.businessVersion || 0, businessEffectiveAt: config.businessEffectiveAt || null, codEnabledGlobally: config.codEnabledGlobally !== false, commissionRates: {standard:config.defaultCommissionPercent ?? 8,homemade:config.homemadeCommissionPercent ?? 5} }); });
 router.get('/products', async (req, res) => res.json(await catalogProducts(req.query)));
 router.get('/products/:idOrSlug', async (req, res) => res.json(await catalogProduct(req.params.idOrSlug, req.query)));
 

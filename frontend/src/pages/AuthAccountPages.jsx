@@ -1,3 +1,4 @@
+import { useBusinessSettings } from '../hooks/useBusinessSettings.js';
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -283,6 +284,8 @@ export function RegisterCustomerPage() {
 }
 
 export function SellerRegisterPage() {
+  const business=useBusinessSettings();
+  const rates=useMarketplace().businessConfig?.commissionRates||{standard:8,homemade:5};
   const { registerSeller, showToast } = useMarketplace();
   const navigate = useNavigate();
 
@@ -306,6 +309,7 @@ export function SellerRegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(()=>{setForm(previous=>({...previous,sellerType:business.references.sellerTypes.some(type=>type.active&&type.name===previous.sellerType)?previous.sellerType:business.references.sellerTypes.find(type=>type.active)?.name||'',bankName:business.references.banks.includes(previous.bankName)?previous.bankName:business.references.banks[0]||''}));},[JSON.stringify(business.references)]);
   const handleSubmit = async (e) => {
     e.preventDefault();
     const cleanForm = {
@@ -446,10 +450,7 @@ export function SellerRegisterPage() {
                 onChange={(e) => setForm({ ...form, sellerType: e.target.value })}
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-semibold focus:outline-none focus:ring-2 focus:ring-slate-900"
               >
-                <option value="Homemade & Cottage">Homemade & Cottage Producer (5% Commission)</option>
-                <option value="Artisan & Craft">Artisan, Pottery & Handloom (6% Commission)</option>
-                <option value="Small Business">Small Business (8% Standard Commission)</option>
-                <option value="Verified Retail Vendor">Verified Retail / Electronics Vendor (8% Commission)</option>
+                {business.references.sellerTypes.filter(type=>type.active).map(type=><option key={type.name} value={type.name}>{type.name} ({type.commissionPercent ?? (type.homemade?rates.homemade:rates.standard)}% Commission)</option>)}
               </select>
             </div>
 
@@ -529,12 +530,7 @@ export function SellerRegisterPage() {
                 onChange={(e) => setForm({ ...form, bankName: e.target.value })}
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-900"
               >
-                <option value="Bank of Ceylon (BOC)">Bank of Ceylon (BOC)</option>
-                <option value="Sampath Bank">Sampath Bank</option>
-                <option value="Commercial Bank of Ceylon">Commercial Bank of Ceylon</option>
-                <option value="Hatton National Bank (HNB)">Hatton National Bank (HNB)</option>
-                <option value="Peoples Bank">People&apos;s Bank</option>
-                <option value="Nations Trust Bank">Nations Trust Bank</option>
+                {business.references.banks.map(bank=><option key={bank} value={bank}>{bank}</option>)}
               </select>
             </div>
 

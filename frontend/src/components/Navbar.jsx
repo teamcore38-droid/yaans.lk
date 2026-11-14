@@ -1,3 +1,5 @@
+import { useBusinessConfiguration } from '../context/MarketplaceContext.jsx';
+import { useBusinessSettings, useAnnouncementVisibility } from '../hooks/useBusinessSettings.js';
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -23,6 +25,9 @@ import { customerAuthPath, customerReturnFromLocation } from '../../../shared/cu
 import { prepareCustomerAuth } from '../utils/checkoutDraft.js';
 
 export default function Navbar() {
+  const business = useBusinessSettings();
+  const announcementVisible = useAnnouncementVisibility(business.announcements);
+  const runtime = useBusinessConfiguration();
   const {
     user,
     logout,
@@ -58,13 +63,13 @@ export default function Navbar() {
       <div className="bg-[#6b0f16] text-[#fce4e7] text-xs border-b border-[#520a10]">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 h-8 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 overflow-x-auto no-scrollbar whitespace-nowrap">
-            <span className="inline-flex items-center gap-1 font-medium text-white">
+            <span className={`${announcementVisible ? 'inline-flex' : 'hidden'} items-center gap-1 font-medium text-white`}>
               <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              Islandwide Delivery (25 Districts)
+              <Link to={business.announcements.href}>{business.announcements.text}</Link>
             </span>
             <span className="text-[#8f1e26] hidden sm:inline">|</span>
             <span className="hidden sm:inline text-[#fcd2d7]">
-              Cash on Delivery (COD) Available • Prices in LKR (Rs.)
+              {runtime.codEnabledGlobally === false ? 'Cash on Delivery temporarily unavailable' : 'Cash on Delivery (COD) Available'} - Prices in LKR (Rs.)
             </span>
           </div>
 
@@ -97,7 +102,7 @@ export default function Navbar() {
 
               <Link to="/" className="flex items-center gap-1.5 group focus:outline-none">
                 <img
-                  src="/brand/yaans-logo-horizontal-dark.png"
+                  src={business.identity.logo}
                   alt="Yaans.lk Marketplace"
                   className="h-9 sm:h-10 w-auto object-contain"
                 />
@@ -418,17 +423,10 @@ export default function Navbar() {
               <div className="text-xs font-bold uppercase tracking-wider text-slate-400 px-2 py-1">
                 Shop By Department
               </div>
-              {[
-                { label: 'Sri Lankan Homemade & Spices', to: '/products?category=homemade-pantry' },
-                { label: 'Electronics & Tech Accessories', to: '/products?category=electronics' },
-                { label: 'Home, Kitchen & Clay Cookware', to: '/products?category=home-kitchen' },
-                { label: 'Fashion, Batik & Handloom', to: '/products?category=fashion-handloom' },
-                { label: 'Ayurveda, Hair & Skincare', to: '/products?category=ayurveda-beauty' },
-                { label: 'Fitness & Everyday Value Deals', to: '/products?category=fitness-daily-deals' }
-              ].map((item) => (
+              {business.navigation.mobileLinks.map((item) => (
                 <Link
-                  key={item.to}
-                  to={item.to}
+                  key={item.href}
+                  to={item.href}
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-slate-800 hover:bg-slate-100"
                 >

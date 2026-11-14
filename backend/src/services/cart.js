@@ -1,3 +1,4 @@
+import { businessSettings, returnPolicy, sellerCommission } from '../../../shared/businessSettings.js';
 import { calculateSellerDeliveryFee } from '../config/sriLankaDistricts.js';
 import { httpError } from '../config/errors.js';
 
@@ -33,6 +34,9 @@ export function findVariant(product, label) {
 
 export function buildMultiSellerCartBreakdown(items, destinationDistrict, store) {
   const cart = normalizeCartItems(items);
+  const settings = businessSettings(store.platformConfig);
+  const commissionConfig = { ...store.platformConfig, businessSettings: settings };
+  if (cart.length > settings.pricing.maxCartSelections || cart.some(item => item.quantity > settings.pricing.maxQuantityPerSelection)) throw httpError(400, 'Cart exceeds the configured purchase limits.');
   if (!store.platformConfig?.districts?.some((district) => district.name === destinationDistrict)) {
     throw httpError(400, 'Please select a supported delivery district.');
   }
@@ -68,17 +72,17 @@ export function buildMultiSellerCartBreakdown(items, destinationDistrict, store)
     const shipping = calculateSellerDeliveryFee({ sellerDistrict: seller.district, destinationDistrict,
       sellerSubtotalLkr: itemsSubtotalLkr, totalItemCount: totalQuantity, sellerShippingPolicy: seller.shippingPolicy || {},
       districtConfigs: store.platformConfig.districts, globalFreeShippingMinLkr: store.platformConfig.globalFreeShippingMinLkr,
-      shippingMode: store.platformConfig.shippingMode || 'custom', flatShippingRateLkr: store.platformConfig.flatShippingRateLkr ?? 350 });
+      shippingMode: store.platformConfig.shippingMode || 'custom', flatShippingRateLkr: store.platformConfig.flatShippingRateLkr ?? 350, deliveryRules: settings.delivery });
     codAvailable &&= Boolean(shipping.codAvailable);
     const commissionRatePercent = Number(seller.commissionRateOverride ??
-      (seller.isHomemadeVendor ? store.platformConfig.homemadeCommissionPercent ?? 5 : store.platformConfig.defaultCommissionPercent ?? 8));
+      sellerCommission(commissionConfig, seller.sellerType));
     if (!Number.isFinite(commissionRatePercent) || commissionRatePercent < 0 || commissionRatePercent > 100) {
       throw httpError(503, 'Seller commission settings require attention.');
     }
     const commissionAmountLkr = Math.round(itemsSubtotalLkr * commissionRatePercent) / 100;
     sellerGroups.push({ sellerId: seller._id, sellerName: seller.storeName, sellerSlug: seller.slug,
       sellerDistrict: seller.district, sellerType: seller.sellerType, items: groupItems, totalQuantity,
-      itemsSubtotalLkr, deliveryFeeLkr: shipping.deliveryFeeLkr, shippingDetails: shipping,
+      itemsSubtotalLkr, deliveryFeeLkr: shipping.deliveryFeeLkr, shippingDetails: shipping, returnPolicies: groupItems.map(item => returnPolicy(settings, store.products.find(p => p._id === item.productId))),
       grossTotalLkr: itemsSubtotalLkr + shipping.deliveryFeeLkr, commissionRatePercent,
       commissionAmountLkr, netSellerEarningsLkr: itemsSubtotalLkr - commissionAmountLkr });
   }
@@ -88,5 +92,5 @@ export function buildMultiSellerCartBreakdown(items, destinationDistrict, store)
   const codMaxOrderLimitLkr = store.platformConfig.codMaxOrderLimitLkr ?? 75000;
   return { destinationDistrict, sellerCount: sellerGroups.length, sellerGroups, itemsSubtotalLkr,
     totalDeliveryFeeLkr, grandTotalLkr, codAvailable: codAvailable && grandTotalLkr <= codMaxOrderLimitLkr,
-    codMaxOrderLimitLkr };
+    codMaxOrderLimitLkr, policySnapshot: { version: store.platformConfig.businessVersion || 0, effectiveAt: store.platformConfig.businessEffectiveAt || null, cancelStatuses: settings.returns.cancelStatuses, cancelReasons: settings.returns.cancelReasons, returnReasons: settings.returns.returnReasons, refundMinDays: settings.returns.refundMinDays, refundMaxDays: settings.returns.refundMaxDays, taxMessage: settings.pricing.taxMessage } };
 }

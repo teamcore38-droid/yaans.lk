@@ -54,6 +54,7 @@ export function MarketplaceProvider({ children }) {
   const quoteLoading = cartItems.length > 0 && (!quoteMatches || quoteState.loading);
   const retryCartQuote = useCallback(() => setQuoteVersion((version) => version + 1), []);
   const [toast, setToast] = useState(null);
+  const [businessConfig, setBusinessConfig] = useState({});
   const [categories, setCategories] = useState(() =>
     getCachedApiResponse('/marketplace/categories')?.categories ||
     getCachedApiResponse('/marketplace/home')?.categories || []
@@ -63,6 +64,7 @@ export function MarketplaceProvider({ children }) {
     try {
       const endpoint = !force && window.location.pathname === '/' ? '/marketplace/home' : '/marketplace/categories';
       const res = await apiRequest(endpoint, force ? { cache: 'reload' } : {});
+      if (res.businessSettings) setBusinessConfig({ businessSettings: res.businessSettings, businessVersion: res.businessVersion || 0, businessEffectiveAt: res.businessEffectiveAt, codEnabledGlobally: res.codEnabledGlobally, commissionRates: res.commissionRates });
       if (res.categories) {
         setCategories(res.categories);
       }
@@ -369,6 +371,7 @@ export function MarketplaceProvider({ children }) {
     <MarketplaceContext.Provider
       value={{
         user,
+        businessConfig,
         login,
         adminLogin,
         staffLogin,
@@ -407,3 +410,6 @@ export function useMarketplace() {
   if (!ctx) throw new Error('useMarketplace must be used inside MarketplaceProvider');
   return ctx;
 }
+
+// Public presentation widgets can render with defaults outside an authenticated workspace.
+export function useBusinessConfiguration() { return useContext(MarketplaceContext)?.businessConfig || {}; }

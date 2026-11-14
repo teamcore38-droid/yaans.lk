@@ -73,7 +73,7 @@ export default function HomePage() {
     return (
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-6 space-y-6">
         <div className="h-48 sm:h-64 bg-white rounded-xl border border-slate-200 animate-pulse" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {[1, 2, 3, 4, 5, 6].map((n) => (
             <div key={n} className="h-80 bg-white rounded-xl border border-slate-200 animate-pulse" />
           ))}
@@ -89,7 +89,7 @@ export default function HomePage() {
   const verifiedSellers = homeData?.verifiedSellers || [];
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 space-y-4 sm:space-y-5">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 space-y-3 sm:space-y-5">
       {/* Top Practical Auto-Swipeable Hero Banner (Unified for Desktop and Mobile) */}
       {banners.length > 0 && (
         <div
@@ -216,24 +216,25 @@ export default function HomePage() {
 
       {/* 2x2 Category Quad Cards (Mobile-First Reference Layout) */}
       <section aria-label="Shop by Category" className="!mt-2 sm:!mt-2.5">
-        <div className="flex items-center justify-between mb-1 sm:mb-1.5">
+        <div className="flex items-center justify-between gap-2 mb-2 sm:mb-1.5">
           <div>
             <h2 className="text-base sm:text-lg font-extrabold text-slate-900 leading-tight">
               Explore Categories
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="hidden sm:block text-xs text-slate-500 mt-0.5">
               Tap any department or subcategory tile to filter products
             </p>
           </div>
           <Link
             to="/products"
-            className="text-xs font-semibold text-sky-700 hover:text-sky-800 inline-flex items-center gap-0.5"
+            aria-label="View All Departments"
+            className="shrink-0 whitespace-nowrap text-xs font-semibold text-sky-700 hover:text-sky-800 inline-flex items-center gap-0.5"
           >
-            View All Departments <ChevronRight className="w-4 h-4" />
+            <span className="sm:hidden">View all</span><span className="hidden sm:inline">View All Departments</span> <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {categories.map((cat) => (
             <CategoryQuadCard key={cat._id} category={cat} />
           ))}
@@ -241,8 +242,8 @@ export default function HomePage() {
       </section>
 
       {/* Authentic Sri Lankan Homemade Products Section */}
-      <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 mb-4 border-b border-slate-100">
+      <section className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-2 pb-2 mb-2 sm:pb-3 sm:mb-4 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <span className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800">
               <Sparkles className="w-5 h-5" />
@@ -250,13 +251,13 @@ export default function HomePage() {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
-                  Sri Lankan Homemade & Cottage Products
+                  <span className="sm:hidden">Homemade & Cottage</span><span className="hidden sm:inline">Sri Lankan Homemade & Cottage Products</span>
                 </h2>
                 <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-800">
                   Direct from Home Kitchens & Artisans
                 </span>
               </div>
-              <p className="text-xs text-slate-600">
+              <p className="hidden sm:block text-xs text-slate-600">
                 Fresh achcharu, pure Kotmale kithul treacle, village clay pots, handloom sarongs & herbal hair oils
               </p>
             </div>
@@ -264,9 +265,10 @@ export default function HomePage() {
 
           <Link
             to="/products?homemade=true"
+            aria-label="See all homemade finds"
             className="text-xs font-bold text-sky-700 hover:text-sky-800 inline-flex items-center gap-1 shrink-0"
           >
-            See all homemade finds <ChevronRight className="w-4 h-4" />
+            <span className="sm:hidden">See all</span><span className="hidden sm:inline">See all homemade finds</span> <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
 
@@ -291,17 +293,17 @@ export default function HomePage() {
       </section>
 
       {/* Daily Deals in LKR (Rs.) */}
-      <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-sm">
-        <div className="flex items-center justify-between gap-2 pb-3 mb-4 border-b border-slate-100">
+      <section className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-2 pb-2 mb-2 sm:pb-3 sm:mb-4 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <span className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
               <Tag className="w-5 h-5" />
             </span>
             <div>
               <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
-                Today&apos;s Value Deals in LKR (Rs.)
+                <span className="sm:hidden">Today’s Deals</span><span className="hidden sm:inline">Today&apos;s Value Deals in LKR (Rs.)</span>
               </h2>
-              <p className="text-xs text-slate-600">
+              <p className="hidden sm:block text-xs text-slate-600">
                 Practical discounts on everyday tech, home essentials & pantry items — no hidden tax added at checkout
               </p>
             </div>
@@ -329,21 +331,22 @@ export default function HomePage() {
       </section>
 
       {/* Verified Local Sellers Showcase */}
-      <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-sm">
-        <div className="flex items-center justify-between gap-2 mb-4">
+      <section className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-2 mb-2 sm:mb-4">
           <div>
             <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
-              Shop by Verified Sri Lankan Sellers
+              <span className="sm:hidden">Shop Local Sellers</span><span className="hidden sm:inline">Shop by Verified Sri Lankan Sellers</span>
             </h2>
-            <p className="text-xs text-slate-600">
+            <p className="hidden sm:block text-xs text-slate-600">
               Combine items from multiple sellers in a single cart — Yaans.lk splits & tracks each shipment automatically
             </p>
           </div>
           <Link
             to="/seller/register"
-            className="text-xs font-bold text-sky-700 hover:text-sky-800 inline-flex items-center gap-1"
+            aria-label="Open Your Store"
+            className="shrink-0 whitespace-nowrap text-xs font-bold text-sky-700 hover:text-sky-800 inline-flex items-center gap-1"
           >
-            Open Your Store <ChevronRight className="w-4 h-4" />
+            <span className="sm:hidden">Open store</span><span className="hidden sm:inline">Open Your Store</span> <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
 
@@ -399,20 +402,21 @@ export default function HomePage() {
 
       {/* Recommended Marketplace Products */}
       <section>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between gap-2 mb-2 sm:mb-3">
           <div>
             <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
               Recommended For You
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="hidden sm:block text-xs text-slate-500">
               Most popular items ordered across Sri Lanka this week
             </p>
           </div>
           <Link
             to="/products"
-            className="text-xs font-bold text-sky-700 hover:text-sky-800 inline-flex items-center gap-0.5"
+            aria-label="Browse All Products"
+            className="shrink-0 whitespace-nowrap text-xs font-bold text-sky-700 hover:text-sky-800 inline-flex items-center gap-0.5"
           >
-            Browse All Products <ChevronRight className="w-4 h-4" />
+            <span className="sm:hidden">View all</span><span className="hidden sm:inline">Browse All Products</span> <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
 

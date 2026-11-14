@@ -1,5 +1,7 @@
 # Mobile homepage subcategories
 
+Mobile spacing uses 12 px department padding and gaps, with an 8 px title-to-tiles gap. The department link and conditional swipe hint share one compact footer row. Long department links truncate visually but retain their full accessible name and title. Desktop padding and spacing remain unchanged. The category section has a single-line mobile heading/action and no redundant instruction paragraph. Other mobile homepage section headers use shorter visible titles/actions, retain full accessible action names, and hide promotional descriptions; empty-state messages and product details remain visible. Native scrolling, image optimization, caching and all security controls are unchanged.
+
 Below the existing 640 px homepage breakpoint, each department shows three subcategory tiles in one row. Further configured tiles are available through native horizontal touch scrolling with scroll snapping. A short swipe hint appears when there are more than three tiles. Each department scrolls independently without widening the page.
 
 At 640 px and above, the existing two-column, two-row card and first-four-tile limit remain. The same tile elements are used across breakpoints; extra desktop tiles are hidden. Department and “See all” links are retained. Subcategory links encode their parent and subcategory query values, and React continues to render labels as text. Keyboard users can focus the scrolling region or its links, with visible focus indicators.

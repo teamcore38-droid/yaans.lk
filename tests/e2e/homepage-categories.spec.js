@@ -36,8 +36,19 @@ test('homepage departments show three swipeable phone tiles and preserve the lar
     for (const department of [1, 2]) {
       const region = page.getByRole('region', { name: `Test department ${department} subcategories`, exact: true });
       const layout = await readLayout(region);
+      const card = region.locator('../..');
+      const footerLink = card.getByRole('link', { name: `See all in Test department ${department}`, exact: true });
+      const swipeHint = card.getByText(/^Swipe/);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       if (mobile) {
+        const linkBox = await footerLink.boundingBox(), hintBox = await swipeHint.boundingBox();
+        expect(Math.abs((linkBox.y + linkBox.height / 2) - (hintBox.y + hintBox.height / 2))).toBeLessThan(2);
+        expect(linkBox.x + linkBox.width).toBeLessThan(hintBox.x);
+        await expect(card).toHaveCSS('padding-top', '12px');
+        await expect(page.getByText('Tap any department or subcategory tile to filter products')).toBeHidden();
+        const heading = await page.getByRole('heading', { name: 'Explore Categories' }).boundingBox();
+        const viewAll = await page.getByRole('link', { name: 'View All Departments', exact: true }).boundingBox();
+        expect(Math.abs((heading.y + heading.height / 2) - (viewAll.y + viewAll.height / 2))).toBeLessThan(2);
         expect(layout.tiles).toHaveLength(department === 1 ? 6 : 4);
         expect(layout.tiles.every(tile => Math.abs(tile.y - layout.tiles[0].y) < 1)).toBe(true);
         expect(layout.tiles[0].x).toBeCloseTo(layout.left, 0);
@@ -45,6 +56,9 @@ test('homepage departments show three swipeable phone tiles and preserve the lar
         expect(layout.tiles[3].x).toBeGreaterThanOrEqual(layout.right);
         expect(layout.scrollWidth).toBeGreaterThan(layout.width);
       } else {
+        await expect(swipeHint).toBeHidden();
+        await expect(card).toHaveCSS('padding-top', '16px');
+        await expect(page.getByText('Tap any department or subcategory tile to filter products')).toBeVisible();
         expect(layout.tiles).toHaveLength(4);
         expect(layout.tiles[0].y).toBeCloseTo(layout.tiles[1].y, 0);
         expect(layout.tiles[2].y).toBeCloseTo(layout.tiles[3].y, 0);

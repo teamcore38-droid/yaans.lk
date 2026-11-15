@@ -1,3 +1,4 @@
+import OrderDocuments from '../components/OrderDocuments.jsx';
 import { useBusinessSettings } from '../hooks/useBusinessSettings.js';
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useLocation, Link } from 'react-router-dom';
@@ -165,6 +166,7 @@ export default function TrackOrderPage() {
 
           {/* Individual Seller Packages (SubOrders) */}
           <div className="space-y-4">
+            <OrderDocuments key={result.order._id} orderId={result.order._id} accessToken={accessCode} />
             {(result.subOrders || []).map((sub, idx) => (
               <div
                 key={sub._id}

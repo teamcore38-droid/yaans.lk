@@ -1,3 +1,4 @@
+import OrderDocuments from '../../components/OrderDocuments.jsx';
 import React from 'react';
 import { formatLkr } from '../../utils/api.js';
 
@@ -33,6 +34,7 @@ export default function OrdersTab({ orders, subOrders }) {
                 </div>
               </div>
 
+              <OrderDocuments orderId={ord._id} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                 {subs.map((sub) => (
                   <div

@@ -1,3 +1,4 @@
+import { scheduleOrderEmails } from '../services/orderEmails.js';
 import { createRouter } from '../config/router.js';
 import { getStore, idFilter } from '../config/db.js';
 import { authenticate, optionalAuthenticate } from '../middleware/auth.js';
@@ -20,6 +21,7 @@ router.post('/checkout', sharedRateLimit('checkout', 30, 5 * 60000), optionalAut
   try {
     const result = await checkout(req.body, req.user, req.headers['idempotency-key']);
     if (!result.replayed) await recordOperationalEvent('checkout_success');
+    scheduleOrderEmails();
     return res.status(result.replayed ? 200 : 201).json(result);
   } catch (error) {
     await recordOperationalEvent(error.status && error.status < 500 ? 'checkout_rejected' : 'checkout_failure');

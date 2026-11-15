@@ -1,3 +1,4 @@
+import OrderDocuments from '../components/OrderDocuments.jsx';
 import { useBusinessSettings } from '../hooks/useBusinessSettings.js';
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -968,6 +969,7 @@ export function CustomerAccountPage() {
                   >
                     Inspect Seller Packages & Tracking →
                   </Link>
+                  <OrderDocuments orderId={ord._id} />
                 </div>
               ))}
             </div>

@@ -1,3 +1,4 @@
+import documentRoutes from './routes/documentRoutes.js';
 import businessSettingsRoutes from './routes/businessSettingsRoutes.js';
 import staffProductRoutes from './routes/staffProductRoutes.js';
 import staffRoutes from './routes/staffRoutes.js';
@@ -118,6 +119,7 @@ app.get('/api/operations/status', async (req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/documents', documentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/seller', sellerRoutes);
 app.use('/api/admin/staff', staffAdminRoutes);

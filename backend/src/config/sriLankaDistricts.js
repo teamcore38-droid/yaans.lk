@@ -1,3 +1,4 @@
+import { DEFAULT_BUSINESS_SETTINGS } from '../../../shared/businessSettings.js';
 /**
  * All 25 Administrative Districts of Sri Lanka with default delivery fee configuration in LKR (Rs.)
  * - intraDistrictFee: Delivery fee when Seller District === Customer District
@@ -50,6 +51,7 @@ export function calculateSellerDeliveryFee({
   districtConfigs = SRI_LANKA_DISTRICTS,
   globalFreeShippingMinLkr = 0,
   shippingMode = 'custom',
+  deliveryRules = DEFAULT_BUSINESS_SETTINGS.delivery,
   flatShippingRateLkr = 350
 }) {
   const destConfig =
@@ -59,6 +61,9 @@ export function calculateSellerDeliveryFee({
     districtConfigs.find((d) => d.name.toLowerCase() === String(sellerDistrict).toLowerCase()) ||
     districtConfigs[0];
 
+  const transit = originConfig.name === destConfig.name && deliveryRules.sameDistrictDays ? deliveryRules.sameDistrictDays : destConfig.estimatedDays;
+  const preparationDays = Math.min(30, Math.max(0, Number(sellerShippingPolicy.preparationDays || 0)));
+  const estimate = preparationDays ? `${preparationDays} business day(s) preparation + ${transit} transit` : transit;
   // Check seller-level free shipping threshold first
   if (
     sellerShippingPolicy?.freeShippingThresholdLkr > 0 &&
@@ -70,7 +75,7 @@ export function calculateSellerDeliveryFee({
       freeShippingReason: `Free delivery from seller on orders over Rs. ${sellerShippingPolicy.freeShippingThresholdLkr.toLocaleString()}`,
       originDistrict: originConfig.name,
       destinationDistrict: destConfig.name,
-      estimatedDays: originConfig.name === destConfig.name ? '1-2 business days' : destConfig.estimatedDays,
+      estimatedDays: estimate,
       codAvailable: destConfig.codAvailable !== false
     };
   }
@@ -83,7 +88,7 @@ export function calculateSellerDeliveryFee({
       freeShippingReason: `Platform free delivery promo over Rs. ${globalFreeShippingMinLkr.toLocaleString()}`,
       originDistrict: originConfig.name,
       destinationDistrict: destConfig.name,
-      estimatedDays: destConfig.estimatedDays,
+      estimatedDays: estimate,
       codAvailable: destConfig.codAvailable !== false
     };
   }
@@ -100,7 +105,7 @@ export function calculateSellerDeliveryFee({
       isFreeShipping: flatRate === 0,
       originDistrict: originConfig.name,
       destinationDistrict: destConfig.name,
-      estimatedDays: originConfig.name === destConfig.name ? '1-2 business days' : destConfig.estimatedDays,
+      estimatedDays: estimate,
       codAvailable: destConfig.codAvailable !== false
     };
   }
@@ -129,8 +134,8 @@ export function calculateSellerDeliveryFee({
   }
 
   // Additional item weight step: +Rs. 40 per extra item beyond 3 items from the same seller
-  const extraUnits = Math.max(0, totalItemCount - 3);
-  const weightSurcharge = extraUnits * 40;
+  const extraUnits = Math.max(0, totalItemCount - deliveryRules.surchargeAfterItems);
+  const weightSurcharge = extraUnits * deliveryRules.surchargePerItemLkr;
   const finalFee = Math.round(baseFee + weightSurcharge);
 
   return {
@@ -141,7 +146,7 @@ export function calculateSellerDeliveryFee({
     isFreeShipping: false,
     originDistrict: originConfig.name,
     destinationDistrict: destConfig.name,
-    estimatedDays: originConfig.name === destConfig.name ? '1-2 business days' : destConfig.estimatedDays,
+    estimatedDays: estimate,
     codAvailable: destConfig.codAvailable !== false
   };
 }

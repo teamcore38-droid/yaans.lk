@@ -289,6 +289,14 @@ router.put('/config/districts', async (req, res) => {
   const store = await getStore({ platformConfig: true });
 
   if (Array.isArray(districts)) {
+    if(districts.length!==store.platformConfig.districts.length||new Set(districts.map(d=>d?.name)).size!==districts.length)throw httpError(400,'Provide the existing district matrix.');
+    for(const district of districts){
+      const previous=store.platformConfig.districts.find(d=>d.name===district.name);
+      if(!previous||previous.code!==district.code||previous.province!==district.province)throw httpError(400,'District identity cannot be changed here.');
+      for(const key of ['intraDistrictFee','standardFee','outstationFee'])if(typeof district[key]!=='number'||!Number.isFinite(district[key])||district[key]<0||district[key]>10000)throw httpError(400,'Invalid district fee.');
+      stringField(district.estimatedDays,'Delivery window',{required:true,maximum:100});
+      if(district.codAvailable!==undefined&&typeof district.codAvailable!=='boolean')throw httpError(400,'Invalid district COD setting.');
+    }
     store.platformConfig.districts = districts.map((d) => ({
       code: d.code,
       name: d.name,
@@ -379,6 +387,8 @@ router.put('/config/general', async (req, res) => {
 
   const store = await getStore({ platformConfig: true });
   const cfg = store.platformConfig;
+  for(const [key,value] of Object.entries({defaultCommissionPercent,homemadeCommissionPercent,codMaxOrderLimitLkr,globalFreeShippingMinLkr})){if(value!==undefined&&(typeof value!=='number'||!Number.isFinite(value)||value<0||value>(key.includes('Commission')?100:10000000)))throw httpError(400,'Invalid '+key);}
+  if(codEnabledGlobally!==undefined&&typeof codEnabledGlobally!=='boolean')throw httpError(400,'Invalid COD setting.');
 
   if (defaultCommissionPercent !== undefined) {
     cfg.defaultCommissionPercent = Number(defaultCommissionPercent);

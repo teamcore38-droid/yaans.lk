@@ -1,3 +1,4 @@
+import { useBusinessSettings } from '../hooks/useBusinessSettings.js';
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -18,6 +19,7 @@ import { useCatalogResource } from '../hooks/useCatalogResource.js';
 import { imageUrl, imageSrcSet } from '../utils/images.js';
 
 export default function ProductDetailPage() {
+  const business = useBusinessSettings();
   const { idOrSlug } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -191,7 +193,7 @@ export default function ProductDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             {product.isHomemade && (
               <span className="px-2.5 py-0.5 rounded text-xs font-bold bg-emerald-700 text-white">
-                Authentic Sri Lankan Homemade
+                {business.trust.homemadeLabel}
               </span>
             )}
             <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
@@ -230,7 +232,7 @@ export default function ProductDetailPage() {
               )}
             </div>
             <div className="text-[11px] text-slate-500 mt-1">
-              Final price in LKR (Rs.) • No VAT/Tax surcharge added at checkout
+              {business.pricing.taxMessage}
             </div>
           </div>
 
@@ -337,8 +339,8 @@ export default function ProductDetailPage() {
                   </div>
                   {seller?.shippingPolicy?.freeShippingThresholdLkr > 0 && (
                     <div className="text-[11px] text-emerald-700 font-medium pt-1">
-                      Free delivery from this seller on orders over{' '}
-                      {formatLkr(seller.shippingPolicy.freeShippingThresholdLkr)}
+                      Free delivery from this seller on orders of{' '}
+                      {formatLkr(seller.shippingPolicy.freeShippingThresholdLkr)} or more
                     </div>
                   )}
                 </div>
@@ -359,7 +361,7 @@ export default function ProductDetailPage() {
                 <span className="px-3 py-1 font-bold text-slate-900">{quantity}</span>
                 <button
                   type="button"
-                  onClick={() => setQuantity((q) => Math.min(product.stock || 20, q + 1))}
+                  onClick={() => setQuantity((q) => Math.min(product.stock || 0, business.pricing.maxQuantityPerSelection, q + 1))}
                   className="px-3 py-1 font-bold hover:bg-slate-100"
                 >
                   +
@@ -374,7 +376,7 @@ export default function ProductDetailPage() {
                 <div className="leading-snug">
                   <strong className="text-amber-950 font-bold">Seller is on Vacation:</strong>{' '}
                   <span className="text-amber-900">
-                    {seller.vacationNotice || 'Orders will be fulfilled once the seller returns.'}
+                    {seller.vacationNotice || business.delivery.vacationMessage}
                   </span>
                 </div>
               </div>
@@ -394,7 +396,7 @@ export default function ProductDetailPage() {
 
               <button
                 type="button"
-                disabled={product.stock <= 0}
+                disabled={product.stock <= 0 || data.codAvailable === false}
                 onClick={handleBuyNow}
                 className="w-full py-2.5 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition"
               >
@@ -420,11 +422,11 @@ export default function ProductDetailPage() {
             <div className="pt-3 border-t border-slate-200 space-y-2 text-xs text-slate-600">
               <div className="flex items-center gap-2">
                 <Banknote className="w-4 h-4 text-emerald-700 shrink-0" />
-                <span>Cash on Delivery (COD) supported</span>
+                <span>{data.codAvailable === false ? 'Cash on Delivery unavailable for this selection' : 'Cash on Delivery (COD) supported'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-slate-700 shrink-0" />
-                <span>7-Day Return & Replacement Protection</span>
+                <span>{data.returnPolicy?.enabled === false ? 'This item is not eligible for standard returns' : `${data.returnPolicy?.days ?? business.returns.days}-Day Returns on Eligible Items`}</span>
               </div>
             </div>
           </div>

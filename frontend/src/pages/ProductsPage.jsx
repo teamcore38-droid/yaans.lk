@@ -1,3 +1,4 @@
+import { useBusinessSettings } from '../hooks/useBusinessSettings.js';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
@@ -27,6 +28,7 @@ const CATEGORIES_LIST = [
 const SELLER_ORIGIN_DISTRICTS = ['All Districts', 'Colombo', 'Kandy', 'Galle', 'Gampaha', 'Jaffna'];
 
 export default function ProductsPage() {
+  const business = useBusinessSettings();
   const { categories = [] } = useMarketplace();
   const [searchParams, setSearchParams] = useSearchParams();
   const firstPageEndpoint = productsEndpoint(searchParams);
@@ -219,10 +221,7 @@ export default function ProductsPage() {
         <div className="space-y-1">
           {[
             { label: 'Any Price', val: '' },
-            { label: 'Under Rs. 1,500', val: '1500' },
-            { label: 'Under Rs. 2,500', val: '2500' },
-            { label: 'Under Rs. 5,000', val: '5000' },
-            { label: 'Under Rs. 10,000', val: '10000' }
+            ...business.catalog.priceBands.map(value => ({ label: `Under Rs. ${value.toLocaleString()}`, val: String(value) }))
           ].map((p) => (
             <button
               key={p.label}

@@ -1,3 +1,4 @@
+import { businessSettings, returnPolicy, sellerCommission } from '../../../shared/businessSettings.js';
 import { connectDatabase, idFilter, MODEL_MAP } from '../config/db.js';
 import { httpError } from '../config/errors.js';
 import { calculateSellerDeliveryFee } from '../config/sriLankaDistricts.js';
@@ -8,7 +9,7 @@ const clean = (doc) => { if (!doc) return null; const { _writeVersion, _catalogD
 const escaped = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const deals = { $or: [{ isDeal: true }, { $expr: { $gt: ['$compareAtPriceLkr', '$priceLkr'] } }] };
 const dateSort = { $set: { _catalogDate: { $convert: { input: '$createdAt', to: 'date', onError: new Date(0), onNull: new Date(0) } } } };
-const settingsProjection = { key: 1, districts: 1, codEnabledGlobally: 1, globalFreeShippingMinLkr: 1, shippingMode: 1, flatShippingRateLkr: 1, banners: 1 };
+const settingsProjection = { key: 1, districts: 1, codEnabledGlobally: 1, codMaxOrderLimitLkr: 1, globalFreeShippingMinLkr: 1, shippingMode: 1, flatShippingRateLkr: 1, banners: 1, businessSettings: 1, businessVersion: 1, businessEffectiveAt: 1, defaultCommissionPercent: 1, homemadeCommissionPercent: 1 };
 const sellerFields = ['_id', 'storeName', 'slug', 'sellerType', 'isHomemadeVendor', 'description', 'logoUrl', 'bannerUrl', 'district', 'city', 'rating', 'reviewCount', 'totalSalesCount', 'shippingPolicy', 'isVacationMode', 'vacationNotice', 'createdAt'];
 const sellerProjection = Object.fromEntries(sellerFields.map((field) => [field, 1]));
 const publicReview = doc => {
@@ -39,7 +40,7 @@ export async function catalogSettings() {
   await connectDatabase();
   const config = await MODEL_MAP.platformConfig.collection.findOne({ key: 'main_config' }, { ...readOptions, projection: settingsProjection });
   if (!config) throw httpError(503, 'Marketplace settings are not configured.');
-  return config;
+  return { ...config, businessSettings: businessSettings(config) };
 }
 
 export async function catalogCategories() {
@@ -52,21 +53,26 @@ export async function catalogHome() {
   const [categories, sellers, config] = await Promise.all([
     catalogCategories(), MODEL_MAP.sellers.collection.find({ status: 'approved' }, { ...readOptions, projection: sellerProjection }).toArray(), catalogSettings()
   ]);
+  const home = config.businessSettings.home;
+  const collectionPipeline = section => {
+    const filter = section.source === 'homemade' ? {isHomemade:true} : section.source === 'deals' ? deals : section.source === 'featured' ? {isFeatured:true} : {};
+    return [{ $match: section.enabled ? filter : {_id:{$exists:false}} }, ...(section.source === 'popular' ? [{$sort:{soldCount:-1,_id:1}}] : []), {$limit:section.limit}];
+  };
   const [groups] = await MODEL_MAP.products.collection.aggregate([
     { $match: { approvalStatus: 'approved', sellerId: { $in: sellers.map(({ _id }) => String(_id)) } } },
     { $project: projection },
     { $facet: {
-      homemadeProducts: [{ $match: { isHomemade: true } }, { $limit: 8 }],
-      dealProducts: [{ $match: deals }, { $limit: 8 }],
+      homemadeProducts: collectionPipeline(home.homemade),
+      dealProducts: collectionPipeline(home.deals),
       featuredProducts: [{ $match: { isFeatured: true } }, { $limit: 8 }],
-      recommendedProducts: [{ $sort: { soldCount: -1, _id: 1 } }, { $limit: 10 }]
+      recommendedProducts: collectionPipeline(home.recommended)
     } }
   ], readOptions).toArray();
-  return { categories, banners: (config.banners || []).map((banner, i) => ({ ...banner,
+  return { businessSettings: config.businessSettings, businessVersion: config.businessVersion || 0, businessEffectiveAt: config.businessEffectiveAt || null, codEnabledGlobally: config.codEnabledGlobally !== false, commissionRates: { standard: config.defaultCommissionPercent ?? 8, homemade: config.homemadeCommissionPercent ?? 5 }, categories, banners: (config.banners || []).map((banner, i) => ({ ...banner,
     id: banner.id || (banner._id ? String(banner._id) : `bnr_${i + 1}`), imageUrl: banner.imageUrl || banner.mobileImageUrl || '', mobileImageUrl: banner.mobileImageUrl || banner.imageUrl || ''
   })).filter((banner) => banner.active !== false).sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)),
   ...Object.fromEntries(['homemadeProducts', 'dealProducts', 'featuredProducts', 'recommendedProducts'].map((key) => [key, (groups?.[key] || []).map(clean)])),
-  verifiedSellers: sellers.map((seller) => {
+  verifiedSellers: sellers.slice(0,home.sellers.limit).map((seller) => {
     const view = sellerView(seller);
     return Object.fromEntries(['_id', 'storeName', 'slug', 'sellerType', 'isHomemadeVendor', 'district', 'city', 'logoUrl', 'rating', 'reviewCount'].map((field) => [field, view[field]]));
   }), districts: config.districts, codEnabledGlobally: config.codEnabledGlobally, shippingMode: config.shippingMode || 'custom', flatShippingRateLkr: config.flatShippingRateLkr ?? 350 };
@@ -123,11 +129,11 @@ export async function catalogProduct(idOrSlug, query = {}) {
     $or: [{ categorySlug: product.categorySlug }, { sellerId: product.sellerId }]
   }, { ...readOptions, projection }).limit(6).toArray();
   const reviews = reviewResult[0] || { rows: [], count: [] };
-  return { product, seller: sellerView(seller), reviews: reviews.rows.map(publicReview), relatedProducts: relatedProducts.map(clean),
+  return { returnPolicy: returnPolicy(config.businessSettings, product), codAvailable: config.codEnabledGlobally !== false && product.codEligible !== false && !seller.isVacationMode && product.priceLkr <= (config.codMaxOrderLimitLkr ?? 75000) && config.districts.find(d => d.name === text(query, 'destinationDistrict', 'Colombo', 80))?.codAvailable !== false, product, seller: sellerView(seller), reviews: reviews.rows.map(publicReview), relatedProducts: relatedProducts.map(clean),
     reviewPagination: paginationView(page, reviews.count[0]?.total || 0),
     shippingEstimate: calculateSellerDeliveryFee({ sellerDistrict: seller.district, destinationDistrict: text(query, 'destinationDistrict', 'Colombo', 80),
       sellerSubtotalLkr: product.priceLkr, totalItemCount: 1, sellerShippingPolicy: seller.shippingPolicy || {}, districtConfigs: config.districts,
-      globalFreeShippingMinLkr: config.globalFreeShippingMinLkr, shippingMode: config.shippingMode || 'custom', flatShippingRateLkr: config.flatShippingRateLkr ?? 350 }) };
+      globalFreeShippingMinLkr: config.globalFreeShippingMinLkr, shippingMode: config.shippingMode || 'custom', flatShippingRateLkr: config.flatShippingRateLkr ?? 350, deliveryRules: config.businessSettings.delivery }) };
 }
 
 export async function catalogSeller(slugOrId, query = {}) {

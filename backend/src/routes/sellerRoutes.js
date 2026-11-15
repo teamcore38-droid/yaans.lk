@@ -1,3 +1,5 @@
+import { sellerCommission } from '../../../shared/businessSettings.js';
+import { businessSettings, validateSellerShipping } from '../services/businessSettings.js';
 import { validateProductImages } from '../services/productImages.js';
 import { createRouter } from '../config/router.js';
 import { getStore, persistStore, generateId, idFilter, loadCollections, MODEL_MAP } from '../config/db.js';
@@ -7,7 +9,7 @@ import { fulfillmentTransitions } from '../../../shared/orderStatus.js';
 import { releaseInventory } from '../services/orders.js';
 import { uploadLimit } from '../middleware/sharedRateLimit.js';
 import { httpError } from '../config/errors.js';
-import { sanitizeHighlights, sanitizeSlug } from '../config/inputValidation.js';
+import { sanitizeHighlights, sanitizeSlug, stringField } from '../config/inputValidation.js';
 
 const router = createRouter();
 
@@ -81,9 +83,7 @@ router.get('/dashboard', async (req, res) => {
   const effectiveCommissionRate =
     seller.commissionRateOverride !== null && seller.commissionRateOverride !== undefined
       ? seller.commissionRateOverride
-      : seller.isHomemadeVendor
-      ? store.platformConfig.homemadeCommissionPercent
-      : store.platformConfig.defaultCommissionPercent;
+      : sellerCommission(store.platformConfig, seller.sellerType);
 
   return res.json({
     seller,
@@ -435,13 +435,19 @@ router.put('/suborders/:subOrderId/status', async (req, res) => {
   }
   if (fulfillmentStatus === 'cancelled' && subOrder.fulfillmentStatus !== 'cancelled') releaseInventory(store, subOrder);
 
-  if (trackingCode !== undefined) subOrder.trackingCode = trackingCode.trim();
-  if (courierPartner !== undefined) subOrder.courierPartner = courierPartner.trim();
+  if (trackingCode !== undefined) subOrder.trackingCode = stringField(trackingCode, 'Tracking code', { maximum: 120 });
+  if (courierPartner !== undefined) {
+    subOrder.courierPartner = stringField(courierPartner, 'Courier partner', { maximum: 120 });
+    await loadCollections(store, { platformConfig: true });
+    const courier = businessSettings(store.platformConfig).references.couriers.find(item => item.name === subOrder.courierPartner);
+    subOrder.courierTrackingUrl = courier?.trackingUrl ? courier.trackingUrl.replace('{tracking}', encodeURIComponent(subOrder.trackingCode || '')) : '';
+  }
 
   if (fulfillmentStatus) {
     subOrder.fulfillmentStatus = fulfillmentStatus;
 
     if (fulfillmentStatus === 'delivered') {
+      subOrder.deliveredAt ||= new Date().toISOString();
       // Delivery alone is no proof of courier remittance or platform receipt.
       if (!subOrder.paymentReceipt && !subOrder.settlementId) subOrder.settlementStatus = 'unsettled';
     } else if (fulfillmentStatus === 'cancelled') {
@@ -522,6 +528,8 @@ router.put('/profile', async (req, res) => {
     return res.status(404).json({ message: 'Seller profile not found.' });
   }
 
+  await loadCollections(store, { platformConfig: true });
+  const settings = businessSettings(store.platformConfig);
   const {
     storeName,
     sellerType,
@@ -540,8 +548,10 @@ router.put('/profile', async (req, res) => {
 
   if (storeName) seller.storeName = storeName.trim();
   if (sellerType) {
+    const type=settings.references.sellerTypes.find(type=>type.name===sellerType);
+    if(sellerType!==seller.sellerType&&!type?.active)throw httpError(400,'Choose an available seller type.');
     seller.sellerType = sellerType;
-    seller.isHomemadeVendor = sellerType === 'Homemade & Cottage' || sellerType === 'Artisan & Craft';
+    seller.isHomemadeVendor = type?.homemade ?? seller.isHomemadeVendor;
   }
   if (description) seller.description = description.trim();
   if (contactPhone) seller.contactPhone = contactPhone.trim();
@@ -553,12 +563,14 @@ router.put('/profile', async (req, res) => {
   if (isVacationMode !== undefined) seller.isVacationMode = Boolean(isVacationMode);
   if (vacationNotice !== undefined) seller.vacationNotice = vacationNotice.trim();
   if (shippingPolicy) {
+    validateSellerShipping(shippingPolicy, settings);
     seller.shippingPolicy = {
       ...seller.shippingPolicy,
       ...shippingPolicy
     };
   }
   if (bankDetails) {
+    if(bankDetails.bankName && bankDetails.bankName !== seller.bankDetails?.bankName && !settings.references.banks.includes(bankDetails.bankName))throw httpError(400,'Choose an available bank.');
     seller.bankDetails = {
       ...seller.bankDetails,
       ...bankDetails

@@ -1,4 +1,5 @@
 import documentRoutes from './routes/documentRoutes.js';
+import businessSettingsRoutes from './routes/businessSettingsRoutes.js';
 import staffProductRoutes from './routes/staffProductRoutes.js';
 import staffRoutes from './routes/staffRoutes.js';
 import staffAdminRoutes from './routes/staffAdminRoutes.js';
@@ -122,6 +123,7 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/seller', sellerRoutes);
 app.use('/api/admin/staff', staffAdminRoutes);
+app.use('/api/admin/business-settings', businessSettingsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/staff/products', staffProductRoutes);
 app.use('/api/staff', staffRoutes);

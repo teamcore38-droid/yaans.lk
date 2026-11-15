@@ -1,8 +1,12 @@
+import { useBusinessConfiguration } from '../context/MarketplaceContext.jsx';
+import { useBusinessSettings } from '../hooks/useBusinessSettings.js';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, Truck, Banknote, Store, Scale, Cookie } from 'lucide-react';
 
 export default function Footer() {
+  const business = useBusinessSettings();
+  const runtime = useBusinessConfiguration();
   return (
     <footer className="bg-white border-t border-slate-200 mt-12 pb-16 md:pb-0">
       {/* Practical Marketplace Value Strip */}
@@ -23,7 +27,7 @@ export default function Footer() {
               <Banknote className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-xs sm:text-sm font-bold text-slate-900">Cash on Delivery (COD)</div>
+              <div className="text-xs sm:text-sm font-bold text-slate-900">{runtime.codEnabledGlobally === false ? 'COD temporarily unavailable' : 'Cash on Delivery (COD)'}</div>
               <div className="text-xs text-slate-600">Pay in LKR (Rs.) when package arrives</div>
             </div>
           </div>
@@ -33,8 +37,8 @@ export default function Footer() {
               <Store className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-xs sm:text-sm font-bold text-slate-900">Direct from Local Sellers</div>
-              <div className="text-xs text-slate-600">Home kitchens, artisans & retail stores</div>
+              <div className="text-xs sm:text-sm font-bold text-slate-900">{business.trust.localTitle}</div>
+              <div className="text-xs text-slate-600">{business.trust.localDescription}</div>
             </div>
           </div>
 
@@ -43,8 +47,8 @@ export default function Footer() {
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-xs sm:text-sm font-bold text-slate-900">Verified Marketplace</div>
-              <div className="text-xs text-slate-600">Moderated sellers & easy order tracking</div>
+              <div className="text-xs sm:text-sm font-bold text-slate-900">{business.trust.marketplaceTitle}</div>
+              <div className="text-xs text-slate-600">{business.trust.marketplaceDescription}</div>
             </div>
           </div>
         </div>
@@ -54,12 +58,12 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 text-sm">
         <div>
           <img
-            src="/brand/yaans-logo-horizontal-dark.png"
+            src={business.identity.logo}
             alt="Yaans.lk"
             className="h-9 w-auto object-contain mb-3"
           />
           <p className="text-xs text-slate-600 leading-relaxed">
-            Yaans.lk is Sri Lanka&apos;s practical multi-vendor online marketplace connecting home-based producers, small businesses, and retail vendors with shoppers across all 25 districts.
+            {business.identity.description}
           </p>
         </div>
 
@@ -68,11 +72,7 @@ export default function Footer() {
             Shop Marketplace
           </h4>
           <ul className="space-y-2 text-xs text-slate-600">
-            <li><Link to="/products?homemade=true" className="hover:text-slate-900">Sri Lankan Homemade Products</Link></li>
-            <li><Link to="/products?deals=true" className="hover:text-slate-900">Today&apos;s Value Deals in LKR</Link></li>
-            <li><Link to="/products?category=electronics" className="hover:text-slate-900">Electronics & Accessories</Link></li>
-            <li><Link to="/products?category=home-kitchen" className="hover:text-slate-900">Clay Cookware & Home</Link></li>
-            <li><Link to="/products?category=ayurveda-beauty" className="hover:text-slate-900">Ayurveda & Herbal Care</Link></li>
+            {business.navigation.footerLinks.map(item=><li key={item.href}><Link to={item.href} className="hover:text-slate-900">{item.label}</Link></li>)}
           </ul>
         </div>
 
@@ -83,7 +83,7 @@ export default function Footer() {
           <ul className="space-y-2 text-xs text-slate-600">
             <li><Link to="/seller/register" className="hover:text-slate-900 font-semibold text-sky-700">Register as a Seller</Link></li>
             <li><Link to="/seller/dashboard" className="hover:text-slate-900">Seller Portal Dashboard</Link></li>
-            <li><span className="text-slate-500">5% Low Commission for Homemade Sellers</span></li>
+            <li><span className="text-slate-500">Commission rates depend on seller type and approved terms</span></li>
             <li><span className="text-slate-500">Automated District Courier Fee Calculation</span></li>
           </ul>
         </div>
@@ -135,7 +135,7 @@ export default function Footer() {
       <div className="border-t border-slate-200 bg-slate-50 py-4 text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-3 text-center md:text-left">
           <div>
-            © {new Date().getFullYear()} Yaans.lk Multi-Vendor Marketplace • Built for Sri Lanka • All prices in LKR (Rs.) with No Tax Surcharge.
+            © {new Date().getFullYear()} {business.identity.name} Multi-Vendor Marketplace • Built for Sri Lanka • {business.pricing.taxMessage}
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-slate-600 font-medium">
             <Link to="/terms" className="hover:text-slate-900 hover:underline">
@@ -152,6 +152,7 @@ export default function Footer() {
           </div>
         </div>
       </div>
+    <div className="max-w-7xl mx-auto p-4 text-xs flex flex-wrap gap-4"><a href={`mailto:${business.identity.supportEmail}`}>Support: {business.identity.supportEmail}</a>{business.identity.supportPhone && <a href={`tel:${business.identity.supportPhone}`}>{business.identity.supportPhone}</a>}{business.identity.whatsapp && <a href={`https://wa.me/${business.identity.whatsapp.replace(/[^0-9]/g,'')}`}>WhatsApp support</a>}</div>
     </footer>
   );
 }

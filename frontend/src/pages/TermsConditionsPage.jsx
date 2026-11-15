@@ -1,10 +1,15 @@
+import { useBusinessSettings } from '../hooks/useBusinessSettings.js';
+import PublishedPolicy, { PolicySummary } from '../components/PublishedPolicy.jsx';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Scale, ShieldCheck, Truck, Banknote, ShoppingBag, AlertTriangle, CheckCircle2, Store } from 'lucide-react';
 
 export default function TermsConditionsPage() {
+  const business=useBusinessSettings();
+  if (business.legal.terms) return <PublishedPolicy kind="terms"/>;
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8">
+      <PolicySummary kind="terms"/>
       {/* Page Header */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm">
         <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -16,7 +21,7 @@ export default function TermsConditionsPage() {
             Consumer Affairs Authority Act No. 9 of 2003
           </span>
           <span className="text-xs text-slate-500 font-medium ml-auto">
-            Last Updated: January 2026
+            Current published policy - see version above
           </span>
         </div>
 
@@ -40,7 +45,7 @@ export default function TermsConditionsPage() {
             <Banknote className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
             <div>
               <strong className="block text-slate-900">Cash on Delivery (LKR)</strong>
-              Pay in Sri Lankan Rupees upon parcel arrival. No surprise tax surcharge.
+              Pay in Sri Lankan Rupees upon parcel arrival. {business.pricing.taxMessage}
             </div>
           </div>
           <div className="flex items-start gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
@@ -106,7 +111,7 @@ export default function TermsConditionsPage() {
               <strong>Exclusively in LKR:</strong> All prices displayed on Yaans.lk are in Sri Lankan Rupees (Rs. / LKR).
             </li>
             <li>
-              <strong>Transparent Pricing:</strong> There are no surprise service fees or hidden checkout markups. Taxes are explicitly listed as Rs. 0 (Exempt) on consumer retail purchases where applicable.
+              <strong>Transparent Pricing:</strong> There are no surprise service fees or hidden checkout markups. {business.pricing.taxMessage}
             </li>
             <li>
               <strong>Item Subtotal vs Delivery Fees:</strong> Delivery fees for each seller are itemized transparently in your multi-seller cart prior to checkout confirmation based on your destination district.
@@ -148,8 +153,8 @@ export default function TermsConditionsPage() {
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm space-y-2">
             <div className="font-bold text-slate-900">Estimated Delivery Timelines:</div>
             <ul className="list-disc pl-5 space-y-1 text-slate-600">
-              <li><strong>Western Province (Colombo, Gampaha, Kalutara):</strong> 2 to 4 working days from seller dispatch.</li>
-              <li><strong>Other Outstation Districts (Kandy, Galle, Jaffna, Kurunegala, etc.):</strong> 3 to 7 working days depending on distance and local courier routing.</li>
+              <li><strong>Western Province (Colombo, Gampaha, Kalutara):</strong> See the configured delivery estimate for your destination and seller preparation time.</li>
+              <li><strong>Other Outstation Districts (Kandy, Galle, Jaffna, Kurunegala, etc.):</strong> See the configured destination delivery window at checkout.</li>
             </ul>
             <p className="text-slate-500 text-xs pt-1">
               Note: Unforeseen severe weather, public holidays, or logistics disruptions may occasionally impact courier transit times. You can track real-time parcel dispatch status via our <Link to="/track-order" className="text-sky-700 underline font-semibold">Track Order</Link> page.
@@ -196,13 +201,13 @@ export default function TermsConditionsPage() {
               <strong>Inspection upon Receipt:</strong> When the courier hands over the parcel, the customer is encouraged to examine the external packaging for any visible damage or tampering before payment.
             </li>
             <li>
-              <strong>Reporting Defective or Incorrect Goods:</strong> If an item is delivered broken, expired, defective, or significantly different from the listing, the customer must report it within <strong>48 to 72 hours</strong> of receipt by contacting support or submitting photos via the <Link to="/track-order" className="text-sky-700 underline font-semibold">Track Order</Link> portal.
+              <strong>Reporting Defective or Incorrect Goods:</strong> If an item is delivered broken, expired, defective, or significantly different from the listing, the customer must report it within <strong>the eligible return period shown on the order</strong> of receipt by contacting support or requesting a return via the <Link to="/track-order" className="text-sky-700 underline font-semibold">Track Order</Link> portal.
             </li>
             <li>
               <strong>Perishable Items Exception:</strong> Fresh or perishable homemade foods cannot be returned once opened, unless delivered spoiled or damaged.
             </li>
             <li>
-              <strong>Refund Settlements:</strong> Approved refunds are credited via direct Sri Lankan bank transfer or original payment method within 3 to 7 working days.
+              <strong>Refund Settlements:</strong> Approved refunds are credited via direct Sri Lankan bank transfer or original payment method within {business.returns.refundMinDays} to {business.returns.refundMaxDays} working days after approval.
             </li>
           </ul>
         </section>
@@ -242,7 +247,7 @@ export default function TermsConditionsPage() {
             For inquiries regarding our terms, order issues, or seller policies, please contact our support desk:
           </p>
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1">
-            <p><strong>Support Email:</strong> <a href="mailto:support@yaans.lk" className="text-sky-700 underline font-semibold">support@yaans.lk</a></p>
+            <p><strong>Support Email:</strong> <a href={`mailto:${business.identity.supportEmail}`} className="text-sky-700 underline font-semibold">{business.identity.supportEmail}</a></p>
             <p><strong>Marketplace Address:</strong> Colombo, Western Province, Sri Lanka</p>
             <p><strong>Operating Hours:</strong> Monday – Saturday, 9:00 AM – 6:00 PM (Sri Lanka Time)</p>
           </div>

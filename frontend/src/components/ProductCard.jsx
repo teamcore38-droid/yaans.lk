@@ -90,7 +90,7 @@ export default function ProductCard({ product, compact = false, priority = false
               <span className="text-[11px] text-slate-500">({product.reviewCount || 0})</span>
             </div>
             {product.isHomemade && (
-              <span className="ml-auto shrink-0 whitespace-nowrap px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-700 text-white">
+              <span className="ml-auto shrink-0 whitespace-nowrap px-1 sm:px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-bold bg-emerald-700 text-white">
                 Homemade SL
               </span>
             )}

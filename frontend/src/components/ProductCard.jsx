@@ -34,11 +34,6 @@ export default function ProductCard({ product, compact = false, priority = false
 
           {/* Top Left Badges */}
           <div className="absolute top-2 left-2 flex flex-col gap-1">
-            {product.isHomemade && (
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-700 text-white shadow-sm">
-                Homemade SL
-              </span>
-            )}
             {discountPercent > 0 && (
               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 text-amber-300 shadow-sm">
                 -{discountPercent}% OFF
@@ -85,15 +80,22 @@ export default function ProductCard({ product, compact = false, priority = false
             {product.title}
           </Link>
 
-          {/* Rating */}
-          <div className="flex items-center gap-1 mt-1.5">
-            <div className="flex items-center text-amber-500">
-              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
-              <span className="text-xs font-bold text-slate-800 ml-1">{product.rating || '4.8'}</span>
+          {/* Rating and product origin */}
+          <div className="flex flex-wrap items-center gap-x-1 gap-y-1 mt-1.5">
+            <div role="group" aria-label="Product rating" className="flex items-center gap-1 shrink-0">
+              <div className="flex items-center text-amber-500">
+                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                <span className="text-xs font-bold text-slate-800 ml-1">{product.rating || '4.8'}</span>
+              </div>
+              <span className="text-[11px] text-slate-500">({product.reviewCount || 0})</span>
             </div>
-            <span className="text-[11px] text-slate-500">({product.reviewCount || 0})</span>
+            {product.isHomemade && (
+              <span className="ml-auto shrink-0 whitespace-nowrap px-1 sm:px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-bold bg-emerald-700 text-white">
+                Homemade SL
+              </span>
+            )}
             {product.soldCount > 0 && (
-              <span className="text-[11px] text-slate-400 ml-auto">{product.soldCount} sold</span>
+              <span className="text-[11px] text-slate-400 ml-auto whitespace-nowrap">{product.soldCount} sold</span>
             )}
           </div>
 

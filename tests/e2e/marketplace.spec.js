@@ -86,6 +86,31 @@ test('search leads to a product and seller storefront without exposing pending l
   await expect(page.getByText('No products match your current filter selection')).toBeVisible();
 });
 
+test('homemade card badge sits beside the rating and stays inside narrow cards', async ({page}, testInfo) => {
+  const initial=page.viewportSize();
+  await page.goto('/products?q=Test%20Ceylon%20Spice');
+  const rating=page.getByRole('group',{name:'Product rating'}).first();
+  const row=rating.locator('..');
+  const badge=row.getByText('Homemade SL',{exact:true});
+  await expect(badge).toBeVisible();
+  for(const width of [initial.width,360,320]){
+    await page.setViewportSize({width,height:initial.height});
+    const ratingBox=await rating.boundingBox(), badgeBox=await badge.boundingBox(), rowBox=await row.boundingBox();
+    expect(badgeBox.x).toBeGreaterThanOrEqual(rowBox.x);
+    expect(badgeBox.x+badgeBox.width).toBeLessThanOrEqual(rowBox.x+rowBox.width+1);
+    // At very narrow widths wrapping is preferable to obscuring ratings or overflowing.
+    if(width>=360){
+      expect(badgeBox.x).toBeGreaterThanOrEqual(ratingBox.x+ratingBox.width);
+      expect(Math.abs((badgeBox.y+badgeBox.height/2)-(ratingBox.y+ratingBox.height/2))).toBeLessThan(2);
+    }
+  }
+  await page.setViewportSize(initial);
+  await page.screenshot({path:testInfo.outputPath('homemade-rating-card.png')});
+  await page.goto('/products?q=Test%20Desk%20Lamp');
+  await expect(page.getByRole('group',{name:'Product rating'})).toBeVisible();
+  await expect(page.getByText('Homemade SL',{exact:true})).toHaveCount(0);
+});
+
 test('guest multi-seller checkout creates a confirmed order that can be tracked', async ({ page }, testInfo) => {
   for (const slug of ['test-ceylon-spice', 'test-desk-lamp']) {
     await page.goto(`/product/${slug}`);

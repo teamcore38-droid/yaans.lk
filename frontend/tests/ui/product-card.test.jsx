@@ -39,3 +39,21 @@ test('only priority product images request eager loading', () => {
   rerender(<MemoryRouter><ProductCard product={product} priority /></MemoryRouter>);
   expect(screen.getByAltText('Ceylon Spice')).toHaveAttribute('loading', 'eager');
 });
+
+test.each([false, true])('homemade tag accompanies the rating in compact=%s cards', compact => {
+  render(<MemoryRouter><ProductCard product={{...product,isHomemade:true,rating:5,reviewCount:0,soldCount:25}} compact={compact}/></MemoryRouter>);
+  const rating=screen.getByRole('group',{name:'Product rating'});
+  const badge=screen.getByText('Homemade SL');
+  expect(rating).toHaveTextContent('5');
+  expect(rating).toHaveTextContent('(0)');
+  expect(rating.parentElement).toContainElement(badge);
+  expect(screen.getAllByText('Homemade SL')).toHaveLength(1);
+  expect(screen.getByText('25 sold')).toBeVisible();
+  expect(screen.getByText('-50% OFF')).toBeVisible();
+});
+
+test('regular products do not display the homemade tag',()=>{
+  render(<MemoryRouter><ProductCard product={{...product,isHomemade:false}}/></MemoryRouter>);
+  expect(screen.queryByText('Homemade SL')).not.toBeInTheDocument();
+  expect(screen.getByRole('group',{name:'Product rating'})).toBeVisible();
+});

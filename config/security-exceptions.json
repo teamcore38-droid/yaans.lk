@@ -1,0 +1,11 @@
+{
+  "advisory": "GHSA-fc5q-39xc-vjpf",
+  "package": "picomatch",
+  "versions": ["2.3.2", "4.0.7"],
+  "directory": "frontend",
+  "developmentOnly": true,
+  "approvedOn": "2026-11-18",
+  "reviewDate": "2026-12-18",
+  "expiresAt": "2026-12-18T00:00:00+05:30",
+  "justification": "Temporary owner-authorized acceptance for build/test-only dependencies; no production dependency occurrence or production runtime import is permitted. Full npm and OSV findings remain visible."
+}

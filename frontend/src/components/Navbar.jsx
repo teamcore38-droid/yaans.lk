@@ -1,3 +1,4 @@
+import '../styles/header-theme.css';
 import { useBusinessConfiguration } from '../context/MarketplaceContext.jsx';
 import { useBusinessSettings, useAnnouncementVisibility } from '../hooks/useBusinessSettings.js';
 import React, { useState } from 'react';
@@ -26,6 +27,8 @@ import { prepareCustomerAuth } from '../utils/checkoutDraft.js';
 
 export default function Navbar() {
   const business = useBusinessSettings();
+  const headerLogo = business.identity.logo === '/brand/yaans-logo-horizontal-dark.png'
+    ? '/brand/yaans-logo-horizontal-white.png' : business.identity.logo;
   const announcementVisible = useAnnouncementVisibility(business.announcements);
   const runtime = useBusinessConfiguration();
   const {
@@ -60,14 +63,14 @@ export default function Navbar() {
   return (
     <>
       {/* Top Utility Bar: Practical Sri Lankan Marketplace Info & Quick Role Access */}
-      <div className="bg-[#6b0f16] text-[#fce4e7] text-xs border-b border-[#520a10]">
+      <div className="header-red-utility text-[#fce4e7] text-xs border-b">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 h-8 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 overflow-x-auto no-scrollbar whitespace-nowrap">
             <span className={`${announcementVisible ? 'inline-flex' : 'hidden'} items-center gap-1 font-medium text-white`}>
               <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
               <Link to={business.announcements.href}>{business.announcements.text}</Link>
             </span>
-            <span className="text-[#8f1e26] hidden sm:inline">|</span>
+            <span className="text-white/25 hidden sm:inline">|</span>
             <span className="hidden sm:inline text-[#fcd2d7]">
               {runtime.codEnabledGlobally === false ? 'Cash on Delivery temporarily unavailable' : 'Cash on Delivery (COD) Available'} - Prices in LKR (Rs.)
             </span>
@@ -77,7 +80,7 @@ export default function Navbar() {
             <Link to="/track-order" className="text-[#fce4e7] hover:text-white transition-colors font-medium">
               Track Order
             </Link>
-            <span className="text-[#8f1e26]">|</span>
+            <span className="text-white/25">|</span>
             <Link to="/seller/register" className="hover:text-amber-200 text-amber-300 font-medium">
               Sell on Yaans.lk
             </Link>
@@ -85,218 +88,220 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Main White Header with Adapted Transparent Yaans.lk Logo */}
-      <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5">
-          <div className="flex items-center justify-between gap-2 sm:gap-4">
-            {/* Left: Mobile Drawer Button + Adapted Yaans.lk Logo on White Interface */}
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen(true)}
-                aria-label="Open categories menu"
-                className="p-2 -ml-1 rounded-lg text-slate-700 hover:bg-slate-100 lg:hidden"
-              >
-                <Menu className="w-6 h-6" />
-              </button>
+      {/* Shared crimson header; decoration stays outside the layout flow. */}
+      <header className="header-red sticky top-0 z-40 border-b shadow-sm">
+        <div className="header-red-main">
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5">
+            <div className="header-red-main-row flex items-center justify-between gap-2 sm:gap-4">
+              {/* Mobile drawer and the original logo in its white variant. */}
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(true)}
+                  aria-label="Open categories menu"
+                  className="p-2 -ml-1 rounded-lg text-white hover:bg-white/10 lg:hidden"
+                >
+                  <Menu className="w-6 h-6" />
+                </button>
 
-              <Link to="/" className="flex items-center gap-1.5 group focus:outline-none">
-                <img
-                  src={business.identity.logo}
-                  alt="Yaans.lk Marketplace"
-                  className="h-9 sm:h-10 w-auto object-contain"
-                />
-              </Link>
+                <Link to="/" className="flex items-center gap-1.5 group focus:outline-none">
+                  <img
+                    src={headerLogo}
+                    alt="Yaans.lk Marketplace"
+                    className="header-red-logo h-9 sm:h-10 w-auto object-contain"
+                  />
+                </Link>
 
-              {/* Desktop District Delivery Selector */}
-              <button
-                type="button"
-                onClick={() => setDistrictModalOpen(true)}
-                className="hidden lg:flex items-center gap-1.5 ml-2 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-slate-50 text-left transition"
-              >
-                <MapPin className="w-4 h-4 text-slate-700 shrink-0" />
-                <div className="leading-tight">
-                  <div className="text-[10px] text-slate-500 font-medium">Deliver to Sri Lanka</div>
-                  <div className="text-xs font-bold text-slate-900 flex items-center gap-0.5">
-                    {selectedDistrict} District
+                {/* Desktop District Delivery Selector */}
+                <button
+                  type="button"
+                  onClick={() => setDistrictModalOpen(true)}
+                  className="hidden lg:flex items-center gap-1.5 ml-2 px-2.5 py-1.5 rounded-lg header-red-glass border border-transparent text-left transition"
+                >
+                  <MapPin className="w-4 h-4 text-white shrink-0" />
+                  <div className="leading-tight">
+                    <div className="text-[10px] text-white/80 font-medium">Deliver to Sri Lanka</div>
+                    <div className="text-xs font-bold text-white flex items-center gap-0.5">
+                      {selectedDistrict} District
+                    </div>
                   </div>
-                </div>
-              </button>
-            </div>
+                </button>
+              </div>
 
-            {/* Center: Desktop Amazon-Style Search Bar */}
-            <form
-              onSubmit={handleSearchSubmit}
-              className="hidden md:flex flex-1 max-w-2xl items-center bg-slate-50 border border-slate-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-slate-900 focus-within:border-slate-900 focus-within:bg-white transition"
-            >
-              <select
-                aria-label="Filter search by category"
-                value={searchCat}
-                onChange={(e) => setSearchCat(e.target.value)}
-                className="bg-slate-100 text-slate-700 text-xs font-medium px-3 py-2.5 border-r border-slate-300 focus:outline-none cursor-pointer"
+              {/* Center: Desktop Amazon-Style Search Bar */}
+              <form
+                onSubmit={handleSearchSubmit}
+                className="hidden md:flex flex-1 min-w-0 max-w-2xl items-center bg-slate-50 border border-slate-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-amber-300 focus-within:border-amber-300 focus-within:bg-white transition"
               >
-                <option value="">All Categories</option>
-                {categories.map((c) => (
-                  <option key={c.slug} value={c.slug}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search Yaans.lk for homemade achcharu, clay pots, headphones, spices..."
-                className="w-full px-3.5 py-2 text-sm text-slate-900 bg-transparent focus:outline-none"
-              />
-              <button
-                type="submit"
-                aria-label="Search products"
-                className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold px-4 py-2.5 flex items-center justify-center transition"
-              >
-                <Search className="w-4 h-4" />
-              </button>
-            </form>
-
-            {/* Right: Portal Links, Account, Wishlist, Cart */}
-            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-              {user?.role === 'seller' && (
-                <Link
-                  to="/seller/dashboard"
-                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
+                <select
+                  aria-label="Filter search by category"
+                  value={searchCat}
+                  onChange={(e) => setSearchCat(e.target.value)}
+                  className="bg-slate-100 text-slate-700 text-xs font-medium px-3 py-2.5 border-r border-slate-300 focus:outline-none cursor-pointer"
                 >
-                  <Store className="w-3.5 h-3.5 text-amber-400" />
-                  Seller Portal
-                </Link>
-              )}
-
-              {user?.role === 'admin' && (
-                <Link
-                  to="/admin"
-                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
+                  <option value="">All Categories</option>
+                  {categories.map((c) => (
+                    <option key={c.slug} value={c.slug}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search Yaans.lk for homemade achcharu, clay pots, headphones, spices..."
+                  className="w-full min-w-0 px-3.5 py-2 text-sm text-slate-900 bg-transparent focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  aria-label="Search products"
+                  className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold px-4 py-2.5 flex items-center justify-center transition"
                 >
-                  <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
-                  Admin Dashboard
-                </Link>
-              )}
+                  <Search className="w-4 h-4" />
+                </button>
+              </form>
 
-              {user ? (
-                <div className="flex items-center gap-1">
+              {/* Right: Portal Links, Account, Wishlist, Cart */}
+              <div className="header-red-actions flex items-center gap-1 sm:gap-2 shrink-0">
+                {user?.role === 'seller' && (
                   <Link
-                    to={
-                      user.role === 'staff' ? '/staff' : user.role === 'admin'
-                        ? '/admin'
-                        : user.role === 'seller'
-                        ? '/seller/dashboard'
-                        : '/account'
-                    }
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-800"
+                    to="/seller/dashboard"
+                    className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg header-red-glass text-xs font-semibold"
                   >
-                    <User className="w-5 h-5 text-slate-700" />
-                    <div className="hidden xl:block text-left leading-tight">
-                      <div className="text-[10px] text-slate-500">
-                        {user.role === 'staff' ? 'Order Staff' : user.role === 'admin'
-                          ? 'Super Admin'
+                    <Store className="w-3.5 h-3.5 text-amber-400" />
+                    Seller Portal
+                  </Link>
+                )}
+
+                {user?.role === 'admin' && (
+                  <Link
+                    to="/admin"
+                    className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg header-red-glass text-xs font-semibold"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
+                    Admin Dashboard
+                  </Link>
+                )}
+
+                {user ? (
+                  <div className="flex items-center gap-1">
+                    <Link
+                      to={
+                        user.role === 'staff' ? '/staff' : user.role === 'admin'
+                          ? '/admin'
                           : user.role === 'seller'
-                          ? 'Verified Seller'
-                          : `Hello, ${user.name.split(' ')[0]}`}
+                          ? '/seller/dashboard'
+                          : '/account'
+                      }
+                      className="header-red-account flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-white"
+                    >
+                      <User className="w-5 h-5 text-white" />
+                      <div className="hidden xl:block text-left leading-tight">
+                        <div className="text-[10px] text-white/80">
+                          {user.role === 'staff' ? 'Order Staff' : user.role === 'admin'
+                            ? 'Super Admin'
+                            : user.role === 'seller'
+                            ? 'Verified Seller'
+                            : `Hello, ${user.name.split(' ')[0]}`}
+                        </div>
+                        <div className="text-xs font-bold text-white">
+                          {user.role === 'staff' ? 'Staff Dashboard' : user.role === 'admin'
+                            ? 'Admin Console'
+                            : user.role === 'seller'
+                            ? (user.sellerStoreName || 'Seller Portal')
+                            : 'Account & Orders'}
+                        </div>
                       </div>
-                      <div className="text-xs font-bold text-slate-900">
-                        {user.role === 'staff' ? 'Staff Dashboard' : user.role === 'admin'
-                          ? 'Admin Console'
-                          : user.role === 'seller'
-                          ? (user.sellerStoreName || 'Seller Portal')
-                          : 'Account & Orders'}
-                      </div>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={logout}
+                      title="Sign Out"
+                      className="p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 hidden sm:inline-flex"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <Link
+                    to={customerAuthPath('login', returnTo)}
+                    onClick={prepareCustomerAuth}
+                    className="header-red-account flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-white"
+                  >
+                    <User className="w-5 h-5 text-white" />
+                    <div className="text-left leading-tight">
+                      <div className="text-[10px] text-white/80 hidden sm:block">Sign in</div>
+                      <div className="text-xs font-bold text-white">Account</div>
                     </div>
                   </Link>
-                  <button
-                    type="button"
-                    onClick={logout}
-                    title="Sign Out"
-                    className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 hidden sm:inline-flex"
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <Link
-                  to={customerAuthPath('login', returnTo)}
-                  onClick={prepareCustomerAuth}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-800"
-                >
-                  <User className="w-5 h-5 text-slate-700" />
-                  <div className="text-left leading-tight">
-                    <div className="text-[10px] text-slate-500 hidden sm:block">Sign in</div>
-                    <div className="text-xs font-bold text-slate-900">Account</div>
-                  </div>
-                </Link>
-              )}
-
-              <Link
-                to="/wishlist"
-                aria-label="Wishlist"
-                className="relative p-2 rounded-lg hover:bg-slate-100 text-slate-800"
-              >
-                <Heart className="w-5 h-5 text-slate-700" />
-                {wishlistIds.length > 0 && (
-                  <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-slate-800 text-white text-[10px] font-bold flex items-center justify-center">
-                    {wishlistIds.length}
-                  </span>
                 )}
-              </Link>
 
-              <Link
-                to="/cart"
-                aria-label={`Cart, ${totalCartItems} ${totalCartItems === 1 ? 'item' : 'items'}`}
-                className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-900 font-semibold transition"
-              >
-                <div className="relative">
-                  <ShoppingCart className="w-5 h-5 text-slate-900" />
-                  {totalCartItems > 0 && <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-slate-950 text-[11px] font-extrabold flex items-center justify-center">
-                    {totalCartItems}
-                  </span>}
-                </div>
-                <span className="hidden sm:inline text-xs font-bold ml-1">Cart</span>
-              </Link>
+                <Link
+                  to="/wishlist"
+                  aria-label="Wishlist"
+                  className="header-red-wishlist relative p-2 rounded-lg hover:bg-white/10 text-white"
+                >
+                  <Heart className="w-5 h-5 text-white" />
+                  {wishlistIds.length > 0 && (
+                    <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-white text-[#760810] text-[10px] font-bold flex items-center justify-center">
+                      {wishlistIds.length}
+                    </span>
+                  )}
+                </Link>
+
+                <Link
+                  to="/cart"
+                  aria-label={`Cart, ${totalCartItems} ${totalCartItems === 1 ? 'item' : 'items'}`}
+                  className="header-red-cart relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg header-red-glass font-semibold transition"
+                >
+                  <div className="relative">
+                    <ShoppingCart className="w-5 h-5 text-white" />
+                    {totalCartItems > 0 && <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-slate-950 text-[11px] font-extrabold flex items-center justify-center">
+                      {totalCartItems}
+                    </span>}
+                  </div>
+                  <span className="hidden sm:inline text-xs font-bold ml-1">Cart</span>
+                </Link>
+              </div>
             </div>
+
+            {/* Mobile Full-Width Search Input (Modeled on Reference Image) */}
+            <form onSubmit={handleSearchSubmit} className="mt-2 flex md:hidden items-center">
+              <div className="flex w-full items-center bg-slate-50 border border-slate-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-amber-300 focus-within:bg-white">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search Yaans.lk (spices, electronics, clay pots...)"
+                  className="w-full px-3 py-2 text-sm text-slate-900 bg-transparent focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  aria-label="Search"
+                  className="bg-amber-500 hover:bg-amber-600 text-slate-950 px-3.5 py-2.5 font-semibold"
+                >
+                  <Search className="w-4 h-4" />
+                </button>
+              </div>
+            </form>
           </div>
-
-          {/* Mobile Full-Width Search Input (Modeled on Reference Image) */}
-          <form onSubmit={handleSearchSubmit} className="mt-2 flex md:hidden items-center">
-            <div className="flex w-full items-center bg-slate-50 border border-slate-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-slate-900 focus-within:bg-white">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search Yaans.lk (spices, electronics, clay pots...)"
-                className="w-full px-3 py-2 text-sm text-slate-900 bg-transparent focus:outline-none"
-              />
-              <button
-                type="submit"
-                aria-label="Search"
-                className="bg-amber-500 hover:bg-amber-600 text-slate-950 px-3.5 py-2.5 font-semibold"
-              >
-                <Search className="w-4 h-4" />
-              </button>
-            </div>
-          </form>
         </div>
 
         {/* Sub-Header Quick Navigation Links + Mobile Location Bar */}
-        <div className="bg-[#8b141d] border-t border-[#730f17] border-b border-[#730f17]">
+        <div className="header-red-navigation border-t border-b">
           <div className="max-w-7xl mx-auto px-3 sm:px-6 flex items-center justify-between gap-3 py-1.5 overflow-x-auto no-scrollbar text-xs font-medium text-[#fff0f2] whitespace-nowrap">
             <div className="flex items-center gap-4">
               <button
                 type="button"
                 onClick={() => setDistrictModalOpen(true)}
-                className="inline-flex lg:hidden items-center gap-1 text-white font-semibold bg-[#730f17] px-2 py-1 rounded border border-[#9b1d26]"
+                className="inline-flex lg:hidden items-center gap-1 text-white font-semibold header-red-glass px-2 py-1 rounded border border-transparent"
               >
                 <MapPin className="w-3.5 h-3.5 text-white" />
                 Deliver to {selectedDistrict} ▾
               </button>
 
-              <Link to="/products" className="hover:text-white font-semibold flex items-center gap-1 bg-[#730f17] hover:bg-[#5e0a10] text-white px-2.5 py-1 rounded-md transition-colors">
+              <Link to="/products" className="hover:text-white font-semibold flex items-center gap-1 header-red-glass text-white px-2.5 py-1 rounded-md transition-colors">
                 All Products
               </Link>
               <Link

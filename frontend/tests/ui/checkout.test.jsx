@@ -7,6 +7,7 @@ import CheckoutPage from '../../src/pages/CheckoutPage.jsx';
 import { useMarketplace } from '../../src/context/MarketplaceContext.jsx';
 import * as api from '../../src/utils/api.js';
 import { prepareCustomerAuth, readCheckoutDraft, saveCheckoutDraft } from '../../src/utils/checkoutDraft.js';
+import { checkoutKey, clearCheckoutKey } from '../../src/utils/orderAccess.js';
 
 vi.mock('../../src/context/MarketplaceContext.jsx', async (importOriginal) => ({
   ...await importOriginal(), useMarketplace: vi.fn()
@@ -23,9 +24,56 @@ beforeEach(() => {
   useMarketplace.mockReturnValue(marketplace);
 });
 
-function checkout() {
-  return render(<MemoryRouter><CheckoutPage /></MemoryRouter>);
+function checkout(path = '/checkout') {
+  return render(<MemoryRouter initialEntries={[path]}><CheckoutPage /></MemoryRouter>);
 }
+
+test('direct checkout quotes and orders only the selected option while preserving the saved cart', async () => {
+  marketplace.cartItems = [{ productId: 'lamp', variantLabel: 'Standard', quantity: 3 }];
+  const request = vi.spyOn(api, 'apiRequest').mockImplementation(async (endpoint) => endpoint === '/orders/quote'
+    ? { codAvailable: true, sellerGroups: [], grandTotalLkr: 2000 }
+    : { order: { orderNumber: 'YLK-DIRECT-1', grandTotalLkr: 2000, shippingAddress: { city: 'Colombo', district: 'Colombo' } }, subOrders: [] });
+  const { container } = checkout('/checkout?buyNow=spice&variant=250+g&quantity=2');
+  await screen.findByRole('button', { name: 'Confirm COD Order (Rs. 2,000)' });
+  await fillAddress();
+  fireEvent.submit(container.querySelector('form'));
+  await screen.findByRole('heading', { name: /YLK-DIRECT-1/ });
+  const quote = JSON.parse(request.mock.calls.find(([endpoint]) => endpoint === '/orders/quote')[1].body);
+  const order = JSON.parse(request.mock.calls.find(([endpoint]) => endpoint === '/orders/checkout')[1].body);
+  expect(quote.items).toEqual([{ productId: 'spice', variantLabel: '250 g', quantity: 2 }]);
+  expect(order.items).toEqual(quote.items);
+  expect(marketplace.clearCart).not.toHaveBeenCalled();
+  expect(marketplace.cartItems).toEqual([{ productId: 'lamp', variantLabel: 'Standard', quantity: 3 }]);
+});
+
+test('invalid direct selection cannot submit the saved cart', () => {
+  const request = vi.spyOn(api, 'apiRequest');
+  checkout('/checkout?buyNow=spice&variant=250+g&quantity=100');
+  expect(screen.getByRole('heading', { name: 'No items to checkout' })).toBeVisible();
+  expect(request).not.toHaveBeenCalled();
+});
+
+test('direct quote failure blocks submission and can be retried without changing the cart', async () => {
+  const request = vi.spyOn(api, 'apiRequest')
+    .mockRejectedValueOnce(new Error('Quote unavailable'))
+    .mockResolvedValueOnce({ codAvailable: true, sellerGroups: [], grandTotalLkr: 1200 });
+  checkout('/checkout?buyNow=spice&variant=100+g&quantity=1');
+  await screen.findByRole('alert');
+  expect(screen.getByRole('button', { name: /Confirm COD Order/ })).toBeDisabled();
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Retry product check' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm COD Order (Rs. 1,200)' })).toBeEnabled());
+  expect(request.mock.calls.filter(([endpoint]) => endpoint === '/orders/quote')).toHaveLength(2);
+  expect(marketplace.clearCart).not.toHaveBeenCalled();
+});
+
+test('direct checkout retry key survives guest sign-in and stays separate from the cart', () => {
+  const selection = JSON.stringify([{ productId: 'spice', variantLabel: '100 g', quantity: 1 }]);
+  const guestKey = checkoutKey('guest', selection);
+  expect(checkoutKey('customer', selection)).toBe(guestKey);
+  expect(checkoutKey('guest')).not.toBe(guestKey);
+  clearCheckoutKey('customer', selection);
+  clearCheckoutKey('guest');
+});
 
 async function fillAddress() {
   const user = userEvent.setup();

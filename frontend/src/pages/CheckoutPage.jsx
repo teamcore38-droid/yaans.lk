@@ -1,7 +1,7 @@
 import OrderDocuments from '../components/OrderDocuments.jsx';
 import { useBusinessSettings } from '../hooks/useBusinessSettings.js';
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   CheckCircle2,
   MapPin,
@@ -17,6 +17,7 @@ import { checkoutKey, clearCheckoutKey, rememberGuestAccess } from '../utils/ord
 import { useMarketplace, DEFAULT_SL_DISTRICTS } from '../context/MarketplaceContext.jsx';
 import { beforeCustomerAuth, prepareCustomerAuth, readCheckoutDraft, saveCheckoutDraft, clearCheckoutDraft } from '../utils/checkoutDraft.js';
 import { customerAuthPath } from '../../../shared/customerRedirect.js';
+import { readBuyNowSelection } from '../utils/buyNow.js';
 
 export default function CheckoutPage() {
   const business=useBusinessSettings();
@@ -30,8 +31,34 @@ export default function CheckoutPage() {
     showToast
   } = useMarketplace();
   const navigate = useNavigate();
+  const { search } = useLocation();
+  const buyNowItems = useMemo(() => readBuyNowSelection(search), [search]);
+  const checkoutItems = buyNowItems ?? cartItems;
+  const directKey = buyNowItems ? JSON.stringify(buyNowItems) : null;
+  const [directQuoteState, setDirectQuoteState] = useState(null);
+  const [directQuoteVersion, setDirectQuoteVersion] = useState(0);
+  const directQuoteKey = buyNowItems ? JSON.stringify([buyNowItems, selectedDistrict]) : null;
+  const directQuote = directQuoteState?.key === directQuoteKey ? directQuoteState.quote : null;
+  const directQuoteError = directQuoteState?.key === directQuoteKey ? directQuoteState.error : null;
+  const checkoutQuote = buyNowItems ? directQuote : cartQuote;
 
-  const [draft] = useState(() => readCheckoutDraft(cartItems, user));
+  useEffect(() => {
+    if (!buyNowItems?.length) return;
+    let active = true;
+    const controller = new AbortController();
+    setDirectQuoteState(null);
+    apiRequest('/orders/quote', {
+      method: 'POST', signal: controller.signal,
+      body: JSON.stringify({ items: buyNowItems, destinationDistrict: selectedDistrict })
+    }).then((quote) => {
+      if (active) setDirectQuoteState({ key: directQuoteKey, quote, error: null });
+    }).catch((error) => {
+      if (active) setDirectQuoteState({ key: directQuoteKey, quote: null, error: error.message || 'Unable to check this product.' });
+    });
+    return () => { active = false; controller.abort(); };
+  }, [buyNowItems, selectedDistrict, directQuoteKey, directQuoteVersion]);
+
+  const [draft] = useState(() => readCheckoutDraft(checkoutItems, user));
   const [recipientName, setRecipientName] = useState(draft?.recipientName || user?.name || '');
   const [phone, setPhone] = useState(draft?.phone || user?.phone || '');
   const [customerEmail, setCustomerEmail] = useState(draft?.customerEmail || user?.email || '');
@@ -55,13 +82,13 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     const save = () => {
-      if (!placedResult && !submissionLock.current) saveCheckoutDraft(cartItems, user, {
+      if (!placedResult && !submissionLock.current) saveCheckoutDraft(checkoutItems, user, {
         recipientName, phone, customerEmail, addressLine1, addressLine2, city, postalCode, deliveryNotes, district: selectedDistrict
       });
     };
     window.addEventListener(beforeCustomerAuth, save);
     return () => window.removeEventListener(beforeCustomerAuth, save);
-  }, [cartItems, user, recipientName, phone, customerEmail, addressLine1, addressLine2, city, postalCode, deliveryNotes, selectedDistrict, placedResult]);
+  }, [checkoutItems, user, recipientName, phone, customerEmail, addressLine1, addressLine2, city, postalCode, deliveryNotes, selectedDistrict, placedResult]);
 
   // Pre-fill default saved address when user is signed in
   useEffect(() => {
@@ -101,6 +128,10 @@ export default function CheckoutPage() {
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
     if (submissionLock.current) return;
+    if (buyNowItems && !directQuote) {
+      showToast(directQuoteError || 'Checking this product. Please try again.', 'error');
+      return;
+    }
     if (!codConfirmed && paymentMethod === 'COD') {
       showToast('Please confirm the Cash on Delivery (COD) agreement.', 'error');
       return;
@@ -109,19 +140,19 @@ export default function CheckoutPage() {
     const scope = user?._id || 'guest';
     const complete = (result) => {
       rememberGuestAccess(result.order.orderNumber, result.guestAccessToken);
-      clearCheckoutKey(scope);
+      clearCheckoutKey(scope, directKey);
       clearCheckoutDraft();
       setPlacedResult(result);
-      clearCart();
+      if (!buyNowItems) clearCart();
       showToast(`Order ${result.order.orderNumber} placed successfully!`);
     };
     try {
       setSubmitting(true);
       const res = await apiRequest('/orders/checkout', {
         method: 'POST',
-        headers: { 'Idempotency-Key': checkoutKey(scope) },
+        headers: { 'Idempotency-Key': checkoutKey(scope, directKey) },
         body: JSON.stringify({
-          items: cartItems.map((c) => ({
+          items: checkoutItems.map((c) => ({
             productId: c.productId,
             variantLabel: c.variantLabel,
             quantity: c.quantity
@@ -145,7 +176,7 @@ export default function CheckoutPage() {
     } catch (err) {
       if (err.code === 'IDEMPOTENCY_CONFLICT') {
         try {
-          const previous = await apiRequest('/orders/checkout-result', { method: 'POST', headers: { 'Idempotency-Key': checkoutKey(scope) } });
+          const previous = await apiRequest('/orders/checkout-result', { method: 'POST', headers: { 'Idempotency-Key': checkoutKey(scope, directKey) } });
           complete(previous);
           showToast('Your earlier checkout was completed. Please review the confirmed order.');
         } catch (recoveryError) { showToast(recoveryError.message, 'error'); }
@@ -251,11 +282,11 @@ export default function CheckoutPage() {
     );
   }
 
-  if (cartItems.length === 0) {
+  if (checkoutItems.length === 0) {
     return (
       <div className="max-w-xl mx-auto px-4 py-12 text-center">
         <div className="bg-white p-8 rounded-xl border border-slate-200 space-y-3">
-          <h1 className="text-lg font-bold text-slate-900">No items in cart to checkout</h1>
+          <h1 className="text-lg font-bold text-slate-900">No items to checkout</h1>
           <Link
             to="/products"
             className="inline-block px-4 py-2 rounded-lg bg-amber-400 text-slate-950 font-bold text-xs"
@@ -277,7 +308,7 @@ export default function CheckoutPage() {
         {(!user || signInRequired) && <div className="mt-3 rounded-lg border border-slate-200 bg-white p-4 text-sm space-y-2">
           <p role={signInRequired ? 'alert' : undefined}>{signInRequired ? 'Your session has expired. Sign in again to continue safely; your order has not been resubmitted.' : 'You can purchase as a guest, or sign in to use saved addresses and keep this order in your account.'}</p>
           <div className="flex flex-wrap items-center gap-4">
-            <Link to={customerAuthPath('login', '/checkout')} onClick={event => { if (submissionLock.current) event.preventDefault(); else prepareCustomerAuth(); }} className="font-bold text-sky-700 hover:underline">{signInRequired ? 'Sign in again' : 'Sign in to continue checkout'}</Link>
+            <Link to={customerAuthPath('login', `/checkout${search}`)} onClick={event => { if (submissionLock.current) event.preventDefault(); else prepareCustomerAuth(); }} className="font-bold text-sky-700 hover:underline">{signInRequired ? 'Sign in again' : 'Sign in to continue checkout'}</Link>
             {!signInRequired && <a href="#delivery-details" className="font-semibold text-slate-700 hover:underline">Continue as guest</a>}
           </div>
         </div>}
@@ -489,7 +520,7 @@ export default function CheckoutPage() {
                     />
                     <span className="text-slate-900 font-semibold leading-snug">
                       I confirm this COD order and agree to have{' '}
-                      <strong className="font-extrabold">{formatLkr(cartQuote?.grandTotalLkr || 0)}</strong> ready on delivery.
+                      <strong className="font-extrabold">{formatLkr(checkoutQuote?.grandTotalLkr || 0)}</strong> ready on delivery.
                     </span>
                   </div>
                 </div>
@@ -527,7 +558,7 @@ export default function CheckoutPage() {
           </h2>
 
           <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-            {(cartQuote?.sellerGroups || []).map((grp, i) => (
+            {(checkoutQuote?.sellerGroups || []).map((grp, i) => (
               <div
                 key={grp.sellerId}
                 className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-1.5"
@@ -567,37 +598,41 @@ export default function CheckoutPage() {
             <div className="flex justify-between text-slate-600">
               <span>Items Subtotal:</span>
               <span className="font-semibold text-slate-900">
-                {formatLkr(cartQuote?.itemsSubtotalLkr || 0)}
+                {formatLkr(checkoutQuote?.itemsSubtotalLkr || 0)}
               </span>
             </div>
             <div className="flex justify-between text-slate-600">
               <span>Combined Delivery Fees ({selectedDistrict}):</span>
               <span className="font-semibold text-slate-900">
-                {formatLkr(cartQuote?.totalDeliveryFeeLkr || 0)}
+                {formatLkr(checkoutQuote?.totalDeliveryFeeLkr || 0)}
               </span>
             </div>
             <div className="flex justify-between text-xs text-slate-500">
               <span>Taxes:</span>
-              <span>{cartQuote?.policySnapshot?.taxMessage || business.pricing.taxMessage}</span>
+              <span>{checkoutQuote?.policySnapshot?.taxMessage || business.pricing.taxMessage}</span>
             </div>
             <div className="flex justify-between items-baseline pt-2 border-t border-slate-200">
               <span className="font-extrabold text-slate-900 text-sm">
                 Total Payable on Delivery:
               </span>
               <span className="text-xl font-extrabold text-slate-900">
-                {formatLkr(cartQuote?.grandTotalLkr || 0)}
+                {formatLkr(checkoutQuote?.grandTotalLkr || 0)}
               </span>
             </div>
           </div>
 
+          {directQuoteError && <div role="alert" className="text-xs text-red-700">
+            <p>{directQuoteError}</p>
+            <button type="button" onClick={() => setDirectQuoteVersion(version => version + 1)} className="font-bold underline">Retry product check</button>
+          </div>}
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || (buyNowItems && !directQuote)}
             className="w-full py-3.5 px-4 rounded-lg bg-amber-400 hover:bg-amber-500 disabled:bg-slate-300 text-slate-950 font-extrabold text-sm shadow-sm transition"
           >
             {submitting
               ? 'Splitting & Confirming Order...'
-              : `Confirm COD Order (${formatLkr(cartQuote?.grandTotalLkr || 0)})`}
+              : `Confirm COD Order (${formatLkr(checkoutQuote?.grandTotalLkr || 0)})`}
           </button>
 
           <p className="text-[11px] text-slate-500 text-center leading-relaxed">

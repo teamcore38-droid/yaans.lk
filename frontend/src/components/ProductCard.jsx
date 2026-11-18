@@ -1,12 +1,14 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Star, Heart, ShoppingCart, MapPin, Check } from 'lucide-react';
 import { formatLkr } from '../utils/api.js';
 import { useMarketplace } from '../context/MarketplaceContext.jsx';
 import { imageUrl, imageSrcSet } from '../utils/images.js';
+import { buyNowPath } from '../utils/buyNow.js';
 
 export default function ProductCard({ product, compact = false, priority = false }) {
   const { addToCart, wishlistIds, toggleWishlist } = useMarketplace();
+  const navigate = useNavigate();
   const isWishlisted = wishlistIds.includes(product._id);
 
   const discountPercent =
@@ -120,16 +122,23 @@ export default function ProductCard({ product, compact = false, priority = false
         </div>
       </div>
 
-      {/* Practical Add to Cart Button */}
-      <div className="px-3 pb-3">
+      <div className="px-3 pb-3 flex items-stretch gap-1.5">
+        <button
+          type="button"
+          disabled={product.stock <= 0}
+          onClick={() => navigate(buyNowPath(product))}
+          className="min-w-0 flex-1 h-9 rounded-lg bg-gradient-to-r from-[#A11620] to-[#D82432] text-white font-semibold text-xs sm:text-sm text-center hover:brightness-110 disabled:bg-none disabled:bg-slate-200 disabled:text-slate-500 transition shadow-sm"
+        >
+          Buy Now
+        </button>
         <button
           type="button"
           disabled={product.stock <= 0}
           onClick={() => addToCart(product)}
-          className="w-full py-2 px-3 rounded-lg bg-amber-400 hover:bg-amber-500 disabled:bg-slate-200 text-slate-950 font-semibold text-xs flex items-center justify-center gap-1.5 transition shadow-sm"
+          aria-label="Add to Cart"
+          className="w-9 h-9 shrink-0 rounded-lg bg-[#FFC447] hover:brightness-95 disabled:bg-slate-200 text-slate-950 flex items-center justify-center transition shadow-sm"
         >
-          <ShoppingCart className="w-3.5 h-3.5" />
-          {product.stock > 0 ? 'Add to Cart' : 'Out of Stock'}
+          <ShoppingCart aria-hidden="true" className="w-4 h-4" />
         </button>
       </div>
     </div>

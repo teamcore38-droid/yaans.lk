@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, expect, test, vi } from 'vitest';
 import ProductCard from '../../src/components/ProductCard.jsx';
 import { useMarketplace } from '../../src/context/MarketplaceContext.jsx';
@@ -19,8 +19,20 @@ beforeEach(() => {
 
 test('out-of-stock products cannot be added to the cart', () => {
   render(<MemoryRouter><ProductCard product={{ ...product, stock: 0 }} /></MemoryRouter>);
-  expect(screen.getByRole('button', { name: 'Out of Stock' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Buy Now' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Add to Cart' })).toBeDisabled();
   expect(addToCart).not.toHaveBeenCalled();
+});
+
+test('Buy Now opens checkout for the default option without adding to the cart', async () => {
+  function Location() { return <output>{useLocation().pathname + useLocation().search}</output>; }
+  render(<MemoryRouter><ProductCard product={{ ...product, variants: [{ values: [{ label: '250 g' }] }] }} /><Location /></MemoryRouter>);
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Buy Now' }));
+  expect(screen.getByRole('status').textContent).toBe('/checkout?buyNow=spice&variant=250+g&quantity=1');
+  expect(addToCart).not.toHaveBeenCalled();
+  const cartButton = screen.getByRole('button', { name: 'Add to Cart' });
+  expect(cartButton).toHaveTextContent('');
+  expect(cartButton.querySelector('svg')).toBeInTheDocument();
 });
 
 test('cart and wishlist actions identify the selected product', async () => {

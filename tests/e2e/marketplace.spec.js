@@ -111,6 +111,44 @@ test('homemade card badge sits beside the rating and stays inside narrow cards',
   await expect(page.getByText('Homemade SL',{exact:true})).toHaveCount(0);
 });
 
+test('product card actions stay aligned and direct checkout preserves the cart', async ({ page }) => {
+  await page.goto('/product/test-desk-lamp');
+  await page.getByRole('button', { name: 'Add to Cart', exact: true }).click();
+  await page.goto('/products?q=Test%20Ceylon%20Spice');
+  const buy = page.getByRole('button', { name: 'Buy Now', exact: true }).first();
+  const row = buy.locator('..');
+  const cart = row.getByRole('button', { name: 'Add to Cart', exact: true });
+  await expect(buy).toBeVisible();
+  await expect(cart).toBeVisible();
+  await expect(cart).toHaveCSS('background-color', 'rgb(255, 196, 71)');
+  const gradient = await buy.evaluate(element => getComputedStyle(element).backgroundImage);
+  expect(gradient).toContain('rgb(161, 22, 32)');
+  expect(gradient).toContain('rgb(216, 36, 50)');
+  expect((await cart.textContent()).trim()).toBe('');
+  for (const width of [1280, 390, 320]) {
+    await page.setViewportSize({ width, height: 850 });
+    const [buyBox, cartBox, rowBox] = await Promise.all([buy.boundingBox(), cart.boundingBox(), row.boundingBox()]);
+    expect(Math.abs(buyBox.y - cartBox.y)).toBeLessThan(1);
+    expect(Math.abs(buyBox.height - cartBox.height)).toBeLessThan(1);
+    expect(buyBox.x + buyBox.width).toBeLessThan(cartBox.x);
+    expect(cartBox.x + cartBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width + 1);
+  }
+  await cart.click();
+  const savedCart = await page.evaluate(() => JSON.parse(localStorage.getItem('yaans_cart')));
+  expect(savedCart.map(item => item.productId).sort()).toEqual(['prd_test_lamp', 'prd_test_spice']);
+  await buy.click();
+  await expect(page).toHaveURL(/\/checkout\?buyNow=prd_test_spice/);
+  await expect(page.getByRole('button', { name: /Confirm COD Order/ })).toBeEnabled();
+  await fillAddress(page);
+  const created = page.waitForResponse(response => response.url().endsWith('/api/orders/checkout') && response.request().method() === 'POST');
+  await page.getByRole('button', { name: /Confirm COD Order/ }).click();
+  const response = await created;
+  expect(response.status()).toBe(201);
+  expect(response.request().postDataJSON().items).toEqual([{ productId: 'prd_test_spice', variantLabel: '100 g', quantity: 1 }]);
+  await expect(page.getByRole('heading', { name: /Thank you! Your Order/ })).toBeVisible();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('yaans_cart')))).toEqual(savedCart);
+});
+
 test('guest multi-seller checkout creates a confirmed order that can be tracked', async ({ page }, testInfo) => {
   for (const slug of ['test-ceylon-spice', 'test-desk-lamp']) {
     await page.goto(`/product/${slug}`);

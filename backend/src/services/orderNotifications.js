@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 // Stored in the checkout transaction: failed checkouts and retries never emit alerts.
 export async function saveOrderNotifications(order, subOrders, session) {
   const db = mongoose.connection.db;
-  const admins = await db.collection('users').find({ role: { $in: ['admin', 'staff'] }, isActive: { $ne: false } },
+  const admins = await db.collection('users').find({ role: { $in: ['admin', 'staff'] }, adminAccess: { $ne: 'coadmin' }, isActive: { $ne: false } },
     { session, projection: { _id: 1, role: 1 } }).toArray();
   const summary = (items) => items.map(({ title, quantity }) => ({ title, quantity }));
   const entries = [

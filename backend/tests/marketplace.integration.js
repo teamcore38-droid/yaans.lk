@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { startIsolatedApp } from './helpers/isolated-app.js';
-import { accounts, TEST_PASSWORD, shippingAddress } from '../../tests/support/fixtures.js';
+import { adminLoginBody, accounts, TEST_PASSWORD, shippingAddress } from '../../tests/support/fixtures.js';
 
 test('marketplace API with disposable MongoDB', { timeout: 600000 }, async (t) => {
   const app = await startIsolatedApp();
@@ -18,7 +18,7 @@ test('marketplace API with disposable MongoDB', { timeout: 600000 }, async (t) =
   };
   const login = async (email, admin = false) => {
     const result = await request(admin ? '/auth/admin/login' : '/auth/login', {
-      method: 'POST', body: { email, password: TEST_PASSWORD }
+      method: 'POST', body: admin ? adminLoginBody(email) : { email, password: TEST_PASSWORD }
     });
     assert.equal(result.status, 200);
     assert.ok(result.data.token);

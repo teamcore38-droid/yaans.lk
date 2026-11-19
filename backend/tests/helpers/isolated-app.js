@@ -50,10 +50,21 @@ export async function startIsolatedApp(port = 0, { monitorCommands = false } = {
       if (docs.length) await model.collection.insertMany(docs);
     }
     for (const model of Object.values(db.MODEL_MAP)) await model.createIndexes();
+    // Port 0 can rarely select a Fetch-standard forbidden port on Windows.
+    // Retry that allocation only; never mask application/network failures.
+    for (let attempt = 0; attempt < 5; attempt++) {
     server = await new Promise((resolve, reject) => {
       const listener = app.listen(port, '127.0.0.1', () => resolve(listener));
       listener.once('error', reject);
     });
+    // A non-API 404 probe validates Fetch compatibility without spending any
+    // production API rate-limit budget or touching business data.
+    try { const probe = await fetch(`http://127.0.0.1:${server.address().port}/__test/port-probe`); await probe.arrayBuffer(); break; }
+    catch (error) {
+      if (port !== 0 || error.cause?.message !== 'bad port' || attempt === 4) throw error;
+      await new Promise(resolve => server.close(resolve)); server = undefined;
+    }
+    }
     return {
       url: `http://127.0.0.1:${server.address().port}`,
       app,
@@ -69,7 +80,7 @@ export async function startIsolatedApp(port = 0, { monitorCommands = false } = {
           const values = key === 'platformConfig' ? [{ ...fixtures.platformConfig, key: 'main_config' }] : fixtures[key];
           if (values.length) await model.collection.insertMany(values);
         }
-        for (const name of ['orderdocuments', 'orderemailjobs', 'orderemailbudgets', 'businesspublications', 'staffsessions', 'ordernotifications', 'counters', 'checkoutrequests', 'cashmovements', 'ratelimits', 'operationalmetrics', 'authchallenges', 'securityevents', 'reviewclaims']) await mongoose.connection.db.collection(name).deleteMany({});
+        for (const name of ['operationrequests', 'orderdocuments', 'orderemailjobs', 'orderemailbudgets', 'businesspublications', 'staffsessions', 'ordernotifications', 'counters', 'checkoutrequests', 'cashmovements', 'ratelimits', 'operationalmetrics', 'authchallenges', 'securityevents', 'reviewclaims']) await mongoose.connection.db.collection(name).deleteMany({});
       },
       async close() {
         await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

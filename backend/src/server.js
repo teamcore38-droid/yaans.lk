@@ -1,3 +1,4 @@
+import coAdminRoutes from './routes/coAdminRoutes.js';
 import documentRoutes from './routes/documentRoutes.js';
 import businessSettingsRoutes from './routes/businessSettingsRoutes.js';
 import staffProductRoutes from './routes/staffProductRoutes.js';
@@ -124,6 +125,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/seller', sellerRoutes);
 app.use('/api/admin/staff', staffAdminRoutes);
 app.use('/api/admin/business-settings', businessSettingsRoutes);
+app.use('/api/admin/coadmins', coAdminRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/staff/products', staffProductRoutes);
 app.use('/api/staff', staffRoutes);

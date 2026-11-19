@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { accounts, TEST_PASSWORD, shippingAddress } from '../support/fixtures.js';
+import { nextAdminRecoveryCode, accounts, TEST_PASSWORD, shippingAddress } from '../support/fixtures.js';
 
 let browserErrors;
 test.beforeEach(async ({ context, page }) => {
@@ -22,6 +22,7 @@ async function login(page, email, admin = false) {
   await page.getByPlaceholder(admin ? 'admin@yaans.lk' : 'name@example.lk').fill(email);
   await page.getByPlaceholder(admin ? '••••••••••••' : '••••••••', { exact: true }).fill(TEST_PASSWORD);
   await page.getByRole('button', { name: admin ? 'Sign In to Admin Console' : 'Sign In', exact: true }).click();
+  if (admin) { await page.getByLabel('Authenticator or recovery code').fill(nextAdminRecoveryCode()); await page.getByRole('button', { name: 'Sign In to Admin Console', exact: true }).click(); }
 }
 
 async function fillAddress(page) {

@@ -1,0 +1,63 @@
+import { test, expect } from '@playwright/test';
+import * as OTPAuth from 'otpauth';
+import { accounts, TEST_PASSWORD, nextAdminRecoveryCode } from '../support/fixtures.js';
+
+test('owner provisions co-admin and individual enrollment unlocks assigned operations only', async ({ page, context }, testInfo) => {
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await context.addInitScript(() => localStorage.setItem('yaans_cookie_consent', JSON.stringify({ status: 'accepted' })));
+  await context.route('**/*', route => ['localhost', '127.0.0.1'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
+  await page.goto('/admin/login');
+  await page.getByPlaceholder('admin@yaans.lk').fill(accounts.admin);
+  await page.getByPlaceholder('••••••••••••', { exact: true }).fill(TEST_PASSWORD);
+  await page.getByRole('button', { name: 'Sign In to Admin Console', exact: true }).click();
+  await page.getByLabel('Authenticator or recovery code').fill(nextAdminRecoveryCode());
+  await page.getByRole('button', { name: 'Sign In to Admin Console', exact: true }).click();
+  await page.getByRole('button', { name: 'Co-admin Access', exact: true }).click();
+  await page.getByRole('button', { name: 'Create co-admin', exact: true }).click();
+  const email = `ops-${testInfo.project.name}@test.invalid`, personal = 'Personal-operations-passphrase!123';
+  await page.getByLabel('name', { exact: true }).fill('Browser Operations');
+  await page.getByLabel('email', { exact: true }).fill(email);
+  await page.getByLabel('phone', { exact: true }).fill('0771234567');
+  await page.getByLabel('Temporary co-admin password', { exact: true }).fill(TEST_PASSWORD);
+  await page.getByLabel('Your owner password', { exact: true }).fill(TEST_PASSWORD);
+  await page.getByLabel('Your authenticator or unused recovery code', { exact: true }).fill(nextAdminRecoveryCode());
+  await page.getByRole('button', { name: 'Confirm co-admin change' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Co-admin created' })).toBeVisible();
+  // A separate browser session proves no owner cookie or authenticator is reused.
+  const coContext = await context.browser().newContext({ viewport: page.viewportSize() });
+  try {
+    await coContext.addInitScript(() => localStorage.setItem('yaans_cookie_consent', JSON.stringify({ status: 'accepted' })));
+    await coContext.route('**/*', route => ['localhost', '127.0.0.1'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
+    const co = await coContext.newPage(); co.on('pageerror', e => errors.push(e.message));
+    await co.goto('http://127.0.0.1:4173/admin/login');
+    await co.getByPlaceholder('admin@yaans.lk').fill(email);
+    await co.getByPlaceholder('••••••••••••', { exact: true }).fill(TEST_PASSWORD);
+    await co.getByRole('button', { name: 'Sign In to Admin Console', exact: true }).click();
+    await expect(co.getByRole('heading', { name: 'Complete administrator security setup' })).toBeVisible();
+    const passwordForm = co.locator('form').filter({ has: co.getByRole('button', { name: 'Update Admin Password', exact: true }) });
+    await passwordForm.locator('input').nth(0).fill(TEST_PASSWORD);
+    await passwordForm.locator('input').nth(1).fill(personal);
+    await passwordForm.locator('input').nth(2).fill(personal);
+    await passwordForm.getByRole('button', { name: 'Update Admin Password', exact: true }).click();
+    await expect(passwordForm.locator('input').nth(0)).toHaveValue('');
+    await co.getByLabel('Current password', { exact: true }).fill(personal);
+    await co.getByRole('button', { name: 'Set up authenticator' }).click();
+    const secret = await co.getByLabel('Authenticator setup key').innerText();
+    const totp = new OTPAuth.TOTP({ secret: OTPAuth.Secret.fromBase32(secret), algorithm: 'SHA1', digits: 6, period: 30 });
+    await co.getByLabel('Six-digit authenticator code').fill(totp.generate());
+    await co.getByRole('button', { name: 'Enable authenticator', exact: true }).click();
+    await expect(co.getByText('Save these recovery codes in your password manager now. They are shown once.')).toBeVisible();
+    await expect(co.getByRole('heading', { name: 'Marketplace Operations', exact: true })).toHaveCount(0);
+    await co.getByRole('button', { name: 'I saved my recovery codes' }).click();
+    await expect(co.getByRole('heading', { name: 'Marketplace Operations', exact: true })).toBeVisible();
+    await expect(co.getByRole('button', { name: 'Co-admin Access', exact: true })).toHaveCount(0);
+    await co.getByRole('button', { name: 'Product content and moderation', exact: true }).click();
+    await co.getByRole('button', { name: 'Edit product content', exact: true }).first().click();
+    await expect(co.getByLabel('Product title')).toBeVisible();
+    await expect(co.getByLabel('Price (LKR)', { exact: true })).toHaveCount(0);
+    await expect(co.getByLabel('Stock', { exact: true })).toHaveCount(0);
+    const denied = await coContext.request.get('http://127.0.0.1:4173/api/admin/overview'); expect(denied.status()).toBe(403);
+    expect(await co.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(errors).toEqual([]);
+  } finally { await coContext.close(); }
+});

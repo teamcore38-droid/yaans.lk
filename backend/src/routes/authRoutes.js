@@ -1,3 +1,4 @@
+import { isOwner, adminSetupRequired } from '../../../shared/adminAccess.js';
 import { businessSettings, sellerCommission } from '../../../shared/businessSettings.js';
 import mongoose from 'mongoose';
 import { createStaffSession, touchStaffSession } from '../services/staffSessions.js';
@@ -28,7 +29,7 @@ function sanitizeUser(user, store) {
     phone: user.phone,
     role: user.role,
     ...(user.role === 'staff' ? { staffMustChangePassword: Boolean(user.staffMustChangePassword), canEditProducts: user.canEditProducts === true } : {}),
-    ...(user.role === 'admin' ? { mfaEnabled:Boolean(user.adminMfa?.enabled) } : {}),
+    ...(user.role === 'admin' ? { mfaEnabled:Boolean(user.adminMfa?.enabled), adminAccess:isOwner(user)?'owner':'coadmin', adminPermissions:isOwner(user)?[]:(user.adminPermissions || []), adminMustChangePassword:user.adminMustChangePassword === true, adminSetupRequired:adminSetupRequired(user) } : {}),
     sellerId: user.sellerId,
     sellerStatus: seller ? seller.status : null,
     sellerStoreName: seller ? seller.storeName : null,
@@ -165,7 +166,17 @@ router.post('/admin/login', loginIpLimit, adminAccountLimit, async (req, res) =>
     return res.status(403).json({ message: 'This administrator account requires a secure password reset by the site owner.' });
   }
 
-  if (user.adminMfa?.enabled) return res.json({requiresMfa:true,challengeToken:createMfaChallenge(user)});
+  if (user.adminMustChangePassword && user.adminInvitationExpiresAt && new Date(user.adminInvitationExpiresAt).getTime() <= Date.now()) throw httpError(403,'Your temporary access expired. Ask the owner to reset it.');
+  if (user.adminMfa?.enabled) {
+    if (req.body.code) {
+      try {
+      const verified = await verifyMfaLogin(createMfaChallenge(user), req.body.code);
+      await recordSecurityEvent('admin_mfa_login_success',{userId:verified._id,role:verified.role,ip:req.ip});
+      return issueSession(req,res,verified,store,{sessionExpiresIn:'1h'});
+      } catch(error) { await recordSecurityEvent('admin_mfa_login_failed',{ip:req.ip,outcome:'denied'}); throw error; }
+    }
+    return res.json({requiresMfa:true,challengeToken:createMfaChallenge(user)});
+  }
 
   recordAdminAuditLog(store, {
     event: 'ADMIN_LOGIN_SUCCESS',
@@ -177,7 +188,7 @@ router.post('/admin/login', loginIpLimit, adminAccountLimit, async (req, res) =>
   await persistStore(store);
 
   await recordSecurityEvent('admin_login_success',{userId:user._id,role:user.role,ip:req.ip});
-  return issueSession(req,res,user,store,{sessionExpiresIn:'1h',mfaEnrollmentRecommended:true});
+  return issueSession(req,res,user,store,{sessionExpiresIn:'1h',mfaEnrollmentRequired:true});
 });
 
 router.post('/admin/mfa/login',loginIpLimit,sharedRateLimit('mfa-verification',10,15*60000),async(req,res)=>{
@@ -413,6 +424,8 @@ router.put('/update-credentials', authenticate, async (req, res) => {
 
   if (newPassword) {
     validateNewPassword(newPassword);
+    if (user.adminMustChangePassword && await bcrypt.compare(newPassword, user.passwordHash)) throw httpError(400,'Choose a new password different from the temporary password.');
+    if (user.role === 'admin') { user.adminMustChangePassword = false; delete user.adminInvitationExpiresAt; }
     user.passwordHash = await bcrypt.hash(newPassword, user.role==='admin'?12:10);
   }
   if(newPassword||(newEmail&&newEmail.trim().toLowerCase()!==req.user.email.toLowerCase()))user.tokenVersion=(user.tokenVersion||0)+1;

@@ -2,13 +2,13 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { startIsolatedApp } from './helpers/isolated-app.js';
-import { accounts, TEST_PASSWORD, shippingAddress } from '../../tests/support/fixtures.js';
+import { adminLoginBody, accounts, TEST_PASSWORD, shippingAddress } from '../../tests/support/fixtures.js';
 import { DEFAULT_BUSINESS_SETTINGS } from '../../shared/businessSettings.js';
 test('business publishing, safety boundaries and order policy snapshots', {timeout:180000}, async t=>{
   const app=await startIsolatedApp();t.after(()=>app.close());t.beforeEach(()=>app.reset());
   const fresh=()=>structuredClone(DEFAULT_BUSINESS_SETTINGS);
   async function req(path,token,body,method=body?'POST':'GET',headers={}){const response=await fetch(app.url+'/api'+path,{method,headers:{...(token?{Authorization:`Bearer ${token}`} : {}),...(body?{'Content-Type':'application/json'}:{}),...headers},body:body?JSON.stringify(body):undefined});return{status:response.status,data:await response.json().catch(()=>({})),headers:response.headers};}
-  async function login(email,admin=false){const result=await req(admin?'/auth/admin/login':'/auth/login',null,{email,password:TEST_PASSWORD});assert.equal(result.status,200);return result.data.token;}
+  async function login(email,admin=false){const result=await req(admin?'/auth/admin/login':'/auth/login',null,admin?adminLoginBody(email):{email,password:TEST_PASSWORD});assert.equal(result.status,200);return result.data.token;}
   const settingsPath='/admin/business-settings';
   async function publish(token,settings){const data=(await req(settingsPath,token)).data;const draft=await req(settingsPath+'/draft',token,{revision:data.revision,settings,currentPassword:TEST_PASSWORD},'PUT');assert.equal(draft.status,200,JSON.stringify(draft.data));const result=await req(settingsPath+'/publish',token,{revision:draft.data.revision,currentPassword:TEST_PASSWORD});assert.equal(result.status,200,JSON.stringify(result.data));return result;}
   async function place(){const result=await req('/orders/checkout',null,{items:[{productId:'prd_test_lamp',quantity:1}],shippingAddress,paymentMethod:'COD',codConfirmedByCustomer:true},'POST',{'Idempotency-Key':randomUUID()});assert.equal(result.status,201);return result.data;}
@@ -26,7 +26,7 @@ test('business publishing, safety boundaries and order policy snapshots', {timeo
     assert.ok(await app.mongo.collection('securityevents').findOne({event:'BUSINESS_SETTINGS_PUBLISHED'}));
     const restored=await req(settingsPath+'/restore',admin,{revision:2,version:0,currentPassword:TEST_PASSWORD});assert.equal(restored.status,200);
     assert.equal((await req('/marketplace/categories')).data.businessSettings.identity.name,'Private draft');
-    const browser=await req('/auth/admin/login',null,{email:accounts.admin,password:TEST_PASSWORD},'POST',{'X-Yaans-Client':'browser'});const cookie=browser.headers.getSetCookie().map(value=>value.split(';')[0]).join('; ');
+    const browser=await req('/auth/admin/login',null,adminLoginBody(),'POST',{'X-Yaans-Client':'browser'});const cookie=browser.headers.getSetCookie().map(value=>value.split(';')[0]).join('; ');
     assert.equal((await req(settingsPath+'/publish',null,{revision:3,currentPassword:TEST_PASSWORD},'POST',{Cookie:cookie})).status,403);
   });
   await t.test('shipping rules, purchase limits and seller overrides are enforced on the server',async()=>{

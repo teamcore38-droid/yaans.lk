@@ -12,15 +12,15 @@ export default function AdminMfaSettings({ user, refreshUser, showToast }) {
   const confirm=async event=>{
     event.preventDefault();setBusy(true);setError('');
     try{const result=await apiRequest('/auth/admin/mfa/confirm',{method:'POST',body:JSON.stringify({code:code.trim()})});
-      setSetup(null);setCode('');setRecovery(result.recoveryCodes);await refreshUser();showToast('Authenticator enabled. Save your recovery codes.');}
+      setSetup(null);setCode('');setRecovery(result.recoveryCodes);showToast('Authenticator enabled. Save your recovery codes.');}
     catch(e){setError(e.message);}finally{setBusy(false);}
   };
   return <section className="rounded-xl border border-slate-200 bg-white p-5 space-y-3 text-sm">
     <h3 className="font-bold">Administrator authenticator</h3>
     {error&&<p role="alert" className="text-red-700">{error}</p>}
     {user?.mfaEnabled&&<p>An authenticator is enabled. Signing in requires your password and a current authenticator or unused recovery code.</p>}
-    {!user?.mfaEnabled&&!setup&&<form onSubmit={start} className="space-y-3">
-      <p>Enable an authenticator before public launch. Use an authenticator app that supports time-based codes.</p>
+    {!user?.mfaEnabled&&!setup&&!recovery.length&&<form onSubmit={start} className="space-y-3">
+      <p>An authenticator is required for administrative access. Use an authenticator app that supports time-based codes.</p>
       <label className="block">Current password
         <input type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)} className="block border rounded p-2 w-full" />
       </label>
@@ -36,7 +36,7 @@ export default function AdminMfaSettings({ user, refreshUser, showToast }) {
       <p className="font-bold">Save these recovery codes in your password manager now. They are shown once.</p>
       <p>Each code works once. Keep them separate from the authenticator. Never send setup keys or codes in chat.</p>
       <ul className="font-mono select-all">{recovery.map(value=><li key={value}>{value}</li>)}</ul>
-      <button type="button" onClick={()=>setRecovery([])} className="underline">I saved my recovery codes</button>
+      <button type="button" disabled={busy} onClick={async()=>{setBusy(true);try{await refreshUser();setRecovery([]);}catch(e){setError(e.message);}finally{setBusy(false);}}} className="underline">I saved my recovery codes</button>
     </div>}
   </section>;
 }

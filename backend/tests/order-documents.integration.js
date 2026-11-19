@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {randomUUID} from 'node:crypto';
 import {startIsolatedApp} from './helpers/isolated-app.js';
-import {accounts,TEST_PASSWORD,shippingAddress} from '../../tests/support/fixtures.js';
+import {adminLoginBody,accounts,TEST_PASSWORD,shippingAddress} from '../../tests/support/fixtures.js';
 import {processOrderEmails,confirmationEmail} from '../src/services/orderEmails.js';
 import {recordCashMovement} from '../src/services/finance.js';
 
@@ -12,7 +12,7 @@ test('private documents and durable confirmation outbox', {timeout:180000}, asyn
     const r=await fetch(app.url+'/api'+path,{method,headers:{...(token?{Authorization:`Bearer ${token}`} : {}),...(access?{'X-Order-Access-Token':access}:{}),...(body?{'Content-Type':'application/json'}:{}),...(key?{'Idempotency-Key':key}:{})},body:body?JSON.stringify(body):undefined});
     return {status:r.status,data:r.headers.get('content-type')?.includes('pdf')?Buffer.from(await r.arrayBuffer()):await r.json(),headers:r.headers};
   }
-  async function login(email,admin=false){const r=await req(admin?'/auth/admin/login':'/auth/login',{body:{email,password:TEST_PASSWORD}});assert.equal(r.status,200);return r.data.token;}
+  async function login(email,admin=false){const r=await req(admin?'/auth/admin/login':'/auth/login',{body:admin?adminLoginBody(email):{email,password:TEST_PASSWORD}});assert.equal(r.status,200);return r.data.token;}
   const payload=()=>({items:[{productId:'prd_test_spice',variantLabel:'100 g',quantity:1},{productId:'prd_test_lamp',quantity:1}],shippingAddress,customerEmail:'guest@test.invalid',paymentMethod:'COD',codConfirmedByCustomer:true});
   async function place(options={}){const key=randomUUID(),body=payload(),r=await req('/orders/checkout',{body,key,...options});assert.equal(r.status,201,JSON.stringify(r.data));return {...r.data,key,body};}
   await t.test('checkout creates immutable documents once, restricts owner/guest/seller access and downloads PDFs',async()=>{

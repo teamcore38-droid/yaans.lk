@@ -1,3 +1,4 @@
+import { isOwner, adminSetupRequired } from '../../../shared/adminAccess.js';
 import { verifyStaffSession, STAFF_SESSION_SECONDS } from '../services/staffSessions.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
@@ -62,6 +63,11 @@ async function resolveAuthentication(req) {
   }
   if (user.role === 'staff') await verifyStaffSession(decoded, user, req);
   req.user = user;
+  if (user.adminMustChangePassword && user.adminInvitationExpiresAt && new Date(user.adminInvitationExpiresAt).getTime() <= Date.now() && req.path !== '/logout') throw httpError(403,'Your temporary access expired. Ask the owner to reset it.');
+  const setupPaths = new Set(['/api/auth/me', '/api/auth/admin/mfa/enroll', '/api/auth/admin/mfa/confirm', '/api/auth/update-credentials', '/api/auth/logout']);
+  if (adminSetupRequired(user) && !setupPaths.has(req.originalUrl.split('?')[0])) {
+    throw httpError(403, 'Complete your password and authenticator setup before accessing operations.');
+  }
 }
 
 export async function authenticate(req, _res, next) {
@@ -78,7 +84,7 @@ export async function optionalAuthenticate(req, _res, next) {
 export function requireRole(...roles) {
   return async (req, res, next) => {
     if (!req.user) return res.status(401).json({ message: 'Authentication required.' });
-    if (!roles.includes(req.user.role)) {
+    if (!roles.includes(req.user.role) || (req.user.role === 'admin' && !isOwner(req.user))) {
       await recordSecurityEvent('authorization_denied', { userId:req.user._id, role:req.user.role, ip:req.ip, outcome:'denied' });
       return res.status(403).json({ message: 'Access denied.' });
     }

@@ -122,15 +122,15 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
             </div>
             <div>
               <h2 className="text-base font-extrabold text-slate-900">
-                Yaans.lk Master Administrator Account
+                {user.adminAccess==='coadmin'?'Yaans.lk Co-admin Account':'Yaans.lk Master Administrator Account'}
               </h2>
               <p className="text-xs text-slate-500">
-                Highest administrative authority on Yaans.lk marketplace
+                {user.adminAccess==='coadmin'?'Individual access to assigned marketplace operations':'Highest administrative authority on Yaans.lk marketplace'}
               </p>
             </div>
           </div>
           <span className="px-3 py-1 rounded-full bg-sky-100 text-sky-900 text-xs font-extrabold uppercase tracking-wide">
-            Active Super Admin
+            {user.adminAccess==='coadmin'?'Co-admin':'Owner'}
           </span>
         </div>
 
@@ -295,7 +295,7 @@ export default function AdminAccountTab({ user, refreshUser, showToast }) {
                   onChange={(e) =>
                     setAdminPasswordForm({ ...adminPasswordForm, newPassword: e.target.value })
                   }
-                  placeholder="Minimum 6 characters"
+                  placeholder="Minimum 15 characters"
                   className="w-full pl-3 pr-10 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />
                 <button

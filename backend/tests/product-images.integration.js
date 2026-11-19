@@ -4,7 +4,7 @@ import { Writable } from 'node:stream';
 import sharp from 'sharp';
 import { v2 as cloudinary } from 'cloudinary';
 import { startIsolatedApp } from './helpers/isolated-app.js';
-import { accounts, TEST_PASSWORD } from '../../tests/support/fixtures.js';
+import { adminLoginBody, accounts, TEST_PASSWORD } from '../../tests/support/fixtures.js';
 
 test('gallery writes retain ownership checks, validate every entry and persist image order', {timeout:180000}, async t => {
   const app=await startIsolatedApp(); t.after(()=>app.close());
@@ -13,7 +13,7 @@ test('gallery writes retain ownership checks, validate every entry and persist i
     return {status:response.status,data:await response.json()};
   }
   const seller=(await request('/auth/login',null,{email:accounts.seller,password:TEST_PASSWORD},'POST')).data.token;
-  const admin=(await request('/auth/admin/login',null,{email:accounts.admin,password:TEST_PASSWORD},'POST')).data.token;
+  const admin=(await request('/auth/admin/login',null,adminLoginBody(),'POST')).data.token;
   const images=Array.from({length:8},(_,i)=>`https://example.com/product-${i}.jpg`);
   assert.equal((await request('/seller/products/prd_test_spice',seller,{images})).status,200);
   assert.equal((await request('/seller/products/prd_test_lamp',seller,{images})).status,403);

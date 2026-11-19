@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import bcrypt from 'bcryptjs';
 import { startIsolatedApp } from './helpers/isolated-app.js';
-import { accounts, TEST_PASSWORD, shippingAddress } from '../../tests/support/fixtures.js';
+import { adminLoginBody, accounts, TEST_PASSWORD, shippingAddress } from '../../tests/support/fixtures.js';
 
 const runFile = promisify(execFile);
 const payload = (quantity = 1) => ({ items: [{ productId: 'prd_test_spice', variantLabel: '100 g', quantity }],
@@ -48,7 +48,7 @@ test('security, durable orders and recovery with real MongoDB transactions', { t
     return { status: response.status, data: await response.json() };
   };
   const login = async (email, admin = false, password = TEST_PASSWORD) => {
-    const result = await request(admin ? '/auth/admin/login' : '/auth/login', { body: { email, password } });
+    const result = await request(admin ? '/auth/admin/login' : '/auth/login', { body: admin ? adminLoginBody(email, password) : { email, password } });
     assert.equal(result.status, 200); return result.data.token;
   };
   const place = async (options = {}) => {

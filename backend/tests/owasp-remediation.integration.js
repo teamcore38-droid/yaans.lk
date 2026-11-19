@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import * as OTPAuth from 'otpauth';
 import { startIsolatedApp } from './helpers/isolated-app.js';
-import { accounts, TEST_PASSWORD, shippingAddress } from '../../tests/support/fixtures.js';
+import { adminLoginBody, accounts, TEST_PASSWORD, shippingAddress } from '../../tests/support/fixtures.js';
 
 test('OWASP remediation with actual HTTP routes and isolated MongoDB',{timeout:180000},async t=>{
   const app=await startIsolatedApp();t.after(()=>app.close());
@@ -13,7 +13,7 @@ test('OWASP remediation with actual HTTP routes and isolated MongoDB',{timeout:1
     const data=await response.json();return {status:response.status,data,headers:response.headers};
   }
   async function login(role='customer'){
-    const result=await request(role==='admin'?'/auth/admin/login':'/auth/login',{method:'POST',body:{email:accounts[role],password:TEST_PASSWORD}});
+    const result=await request(role==='admin'?'/auth/admin/login':'/auth/login',{method:'POST',body:role==='admin'?adminLoginBody():{email:accounts[role],password:TEST_PASSWORD}});
     assert.equal(result.status,200);assert.ok(result.data.token);return result.data.token;
   }
   async function scenario(name,work){await t.test(name,async()=>{await app.reset();await work();});}
@@ -90,6 +90,7 @@ test('OWASP remediation with actual HTTP routes and isolated MongoDB',{timeout:1
     const publicView=await request('/marketplace/products/prd_test_spice');assert.equal(publicView.data.reviews.find(x=>x._id==='legacy').verifiedPurchase,false);
   });
   await scenario('authenticator enrollment protects its secret, revokes old sessions and consumes recovery codes once',async()=>{
+    await app.mongo.collection('users').updateOne({_id:'usr_test_admin'},{$unset:{adminMfa:''}});
     const token=await login('admin');
     assert.equal((await request('/auth/admin/mfa/enroll',{method:'POST',token,body:{}})).status,401);
     const begin=await request('/auth/admin/mfa/enroll',{method:'POST',token,body:{currentPassword:TEST_PASSWORD}});assert.equal(begin.status,200);

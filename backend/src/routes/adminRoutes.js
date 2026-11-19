@@ -1,8 +1,11 @@
+import { authorizeAdminRoute } from '../middleware/adminAccess.js';
+import { assertOperationsProductRevision } from '../services/operationsProducts.js';
+import { mountAdminOperations } from './adminOperations.js';
 import { validateProductImages } from '../services/productImages.js';
 import { createRouter } from '../config/router.js';
 import { getStore, persistStore, generateId, idFilter } from '../config/db.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
-import { uploadMiddleware, uploadToCloudinary } from '../config/cloudinary.js';
+import { uploadMiddleware, uploadToCloudinary, handleProductImageUpload } from '../config/cloudinary.js';
 import { recordAdminAuditLog } from '../config/auditLogger.js';
 import { recordCashMovement, recordSellerPayout, payoutEligible, restockReturnedPackage } from '../services/finance.js';
 import { uploadLimit } from '../middleware/sharedRateLimit.js';
@@ -12,7 +15,9 @@ import { httpError } from '../config/errors.js';
 
 const router = createRouter();
 
-router.use(authenticate, requireRole('admin'));
+router.use(authenticate, (req,res,next) => { if(req.user.role !== 'admin')return res.status(403).json({message:'Access denied.'}); return authorizeAdminRoute(req,res,next); });
+mountAdminOperations(router);
+router.post('/product-image',uploadLimit,uploadMiddleware.single('image'),async(req,res)=>res.status(201).json(await handleProductImageUpload(req)));
 router.use((req,_res,next)=>{
   try {
     if(!['POST','PUT','PATCH'].includes(req.method))return next();
@@ -147,6 +152,7 @@ router.put('/products/:productId/moderation', async (req, res) => {
   if (!product) {
     return res.status(404).json({ message: 'Product not found.' });
   }
+  assertOperationsProductRevision(req, product);
 
   if (approvalStatus) product.approvalStatus = approvalStatus;
   if (isFeatured !== undefined) product.isFeatured = Boolean(isFeatured);
@@ -177,6 +183,7 @@ router.put('/products/:productId', async (req, res) => {
   if (!product) {
     return res.status(404).json({ message: 'Product not found.' });
   }
+  assertOperationsProductRevision(req, product);
 
   const {
     title,
@@ -236,6 +243,7 @@ router.put('/products/:productId', async (req, res) => {
 
   // Audit trail
   product.lastEditedBy = 'admin';
+  product.lastEditedById = req.user._id;
   product.lastEditedAt = new Date().toISOString();
 
   recordAdminAuditLog(store, {
@@ -431,7 +439,7 @@ router.post('/categories', async (req, res) => {
   if (!name || !quadHeadline) {
     return res.status(400).json({ message: 'Category name and 2x2 quad card headline are required.' });
   }
-  const store = await getStore({ categories: true });
+  const store = await getStore({ categories: true, platformConfig: true });
   const slug = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -480,6 +488,7 @@ router.post('/categories', async (req, res) => {
   };
 
   store.categories.push(newCat);
+  recordAdminAuditLog(store, {action:'category_created',adminId:req.user._id,adminEmail:req.user.email,ip:req.ip,metadata:{resourceId:req.params.bannerId||req.params.categoryId||null}});
   await persistStore(store);
   return res.status(201).json({ category: newCat, message: 'Category created.' });
 });
@@ -487,7 +496,7 @@ router.post('/categories', async (req, res) => {
 // PUT /api/admin/categories/:categoryId
 router.put('/categories/:categoryId', async (req, res) => {
   const { categoryId } = req.params;
-  const store = await getStore({ categories: { $or: [idFilter(categoryId), { slug: categoryId }] } });
+  const store = await getStore({ categories: { $or: [idFilter(categoryId), { slug: categoryId }] }, platformConfig: true });
 
   const category = store.categories.find(
     (c) => c._id === categoryId || c.slug === categoryId
@@ -526,6 +535,7 @@ router.put('/categories/:categoryId', async (req, res) => {
     }));
   }
 
+  recordAdminAuditLog(store, {action:'category_updated',adminId:req.user._id,adminEmail:req.user.email,ip:req.ip,metadata:{resourceId:req.params.bannerId||req.params.categoryId||null}});
   await persistStore(store);
   return res.json({
     category,
@@ -647,6 +657,7 @@ router.post('/banners', async (req, res) => {
   };
 
   store.platformConfig.banners.push(newBanner);
+  recordAdminAuditLog(store, {action:'banner_created',adminId:req.user._id,adminEmail:req.user.email,ip:req.ip,metadata:{resourceId:req.params.bannerId||req.params.categoryId||null}});
   await persistStore(store);
   return res.status(201).json({ banner: newBanner, message: 'Homepage banner card created.' });
 });
@@ -696,6 +707,7 @@ router.put('/banners/:bannerId', async (req, res) => {
   if (active !== undefined) banner.active = Boolean(active);
   if (displayOrder !== undefined) banner.displayOrder = Number(displayOrder);
 
+  recordAdminAuditLog(store, {action:'banner_updated',adminId:req.user._id,adminEmail:req.user.email,ip:req.ip,metadata:{resourceId:req.params.bannerId||req.params.categoryId||null}});
   await persistStore(store);
   return res.json({ banner, message: 'Homepage banner card updated.' });
 });
@@ -728,6 +740,7 @@ router.delete('/banners/:bannerId', async (req, res) => {
   }
 
   store.platformConfig.banners.splice(idx, 1);
+  recordAdminAuditLog(store, {action:'banner_deleted',adminId:req.user._id,adminEmail:req.user.email,ip:req.ip,metadata:{resourceId:req.params.bannerId||req.params.categoryId||null}});
   await persistStore(store);
   return res.json({ message: 'Banner card removed from homepage.' });
 });
@@ -741,6 +754,7 @@ router.put('/config/banners', async (req, res) => {
   }
   const store = await getStore({ platformConfig: true });
   store.platformConfig.banners = banners;
+  recordAdminAuditLog(store, {action:'banners_updated',adminId:req.user._id,adminEmail:req.user.email,ip:req.ip,metadata:{resourceId:req.params.bannerId||req.params.categoryId||null}});
   await persistStore(store);
   return res.json({
     banners: store.platformConfig.banners,

@@ -28,6 +28,9 @@ const AdminAccountTab = lazy(() => import('./admin/AdminAccountTab.jsx'));
 const BusinessSettingsTab = lazy(() => import('./admin/BusinessSettingsTab.jsx'));
 const StaffManagementTab = lazy(() => import('./admin/StaffManagementTab.jsx'));
 const AdminAuditLogTab = lazy(() => import('./admin/AdminAuditLogTab.jsx'));
+const CoAdminConsole = lazy(() => import('./admin/CoAdminConsole.jsx'));
+const CoAdminManagement = lazy(() => import('./admin/CoAdminManagement.jsx'));
+const OperationRequests = lazy(() => import('./admin/OperationRequests.jsx'));
 
 export default function AdminDashboardPage() {
   const {
@@ -99,7 +102,7 @@ export default function AdminDashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (user?.role === 'admin' && user.adminAccess !== 'coadmin' && user.mfaEnabled !== false && !user.adminMustChangePassword) {
       fetchOverview();
     } else {
       setLoading(false);
@@ -144,6 +147,12 @@ export default function AdminDashboardPage() {
     );
   }
 
+  if (user.mfaEnabled === false || user.adminMustChangePassword) {
+    return <main className="max-w-5xl mx-auto px-4 py-6 space-y-4"><h1 className="text-2xl font-bold">Complete administrator security setup</h1><p>Change your temporary password if requested, then enable your own authenticator and save the recovery codes. Operational access stays locked until setup is complete.</p><button onClick={async()=>{if(await logout())navigate('/admin/login');}}>Sign out</button><Suspense fallback={<p>Loading account security…</p>}><AdminAccountTab user={user} refreshUser={refreshUser} showToast={showToast}/></Suspense></main>;
+  }
+  if (user.adminAccess === 'coadmin') {
+    return <Suspense fallback={<p>Loading operations…</p>}><CoAdminConsole user={user} refreshUser={refreshUser} showToast={showToast} logout={logout}/></Suspense>;
+  }
   if (loading && !data) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -307,6 +316,8 @@ export default function AdminDashboardPage() {
           { id: 'orders', label: `All Split Orders (${orders.length})`, icon: Package },
           { id: 'business', label: 'Business Policies & Storefront', icon: ShieldCheck },
           { id: 'staff', label: 'Staff Accounts', icon: ShieldCheck },
+          { id: 'coadmins', label: 'Co-admin Access', icon: ShieldCheck },
+          { id: 'requests', label: 'Operations Requests', icon: Package },
           { id: 'account', label: 'Admin Account & Security', icon: ShieldCheck },
           { id: 'audit', label: `Security & Audit Logs (${data?.platformConfig?.adminAuditLogs?.length || 0})`, icon: ShieldAlert }
         ].map((tab) => {
@@ -398,6 +409,8 @@ export default function AdminDashboardPage() {
         {/* TAB 7: ADMIN ACCOUNT & SECURITY CREDENTIALS */}
         {activeTab === 'business' && <BusinessSettingsTab sellers={sellers} onPublished={() => refreshCategories(true)} />}
         {activeTab === 'staff' && <StaffManagementTab />}
+        {activeTab === 'coadmins' && <CoAdminManagement />}
+        {activeTab === 'requests' && <OperationRequests owner />}
         {activeTab === 'account' && (
           <AdminAccountTab user={user} refreshUser={refreshUser} showToast={showToast} />
         )}

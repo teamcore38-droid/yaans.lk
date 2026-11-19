@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { accounts, TEST_PASSWORD } from '../support/fixtures.js';
+import { nextAdminRecoveryCode, accounts, TEST_PASSWORD } from '../support/fixtures.js';
 
 for (const role of ['seller', 'admin']) test(`${role} photo cards support upload, replacement, main selection, order and saved removal`, async ({ page, context }, testInfo) => {
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
@@ -10,6 +10,7 @@ for (const role of ['seller', 'admin']) test(`${role} photo cards support upload
   await page.getByPlaceholder(role==='admin'?'admin@yaans.lk':'name@example.lk').fill(accounts[role]);
   await page.getByPlaceholder(role==='admin'?'••••••••••••':'••••••••',{exact:true}).fill(TEST_PASSWORD);
   await page.getByRole('button',{name:role==='admin'?'Sign In to Admin Console':'Sign In',exact:true}).click();
+  if(role==='admin'){await page.getByLabel('Authenticator or recovery code').fill(nextAdminRecoveryCode());await page.getByRole('button',{name:'Sign In to Admin Console',exact:true}).click();}
   await page.getByRole('button',{name:role==='admin'?/^Product & Category Moderation/:/^Products & Cloudinary Upload/}).click();
   if(role==='admin') await page.getByRole('row').filter({hasText:'Test Ceylon Spice'}).getByRole('button',{name:'Edit',exact:true}).click();
   else await page.getByRole('img',{name:'Test Ceylon Spice',exact:true}).locator('../..').getByRole('button',{name:'Edit',exact:true}).click();

@@ -45,6 +45,8 @@ export async function requireProductionVerification(environment = process.env, o
   }
   getJwtSecret();
   if (!/^mongodb(?:\+srv)?:\/\//.test(environment.MONGODB_URI || '')) throw new Error('Production database configuration is missing.');
+  const mfaKey = Buffer.from(environment.MFA_ENCRYPTION_KEY || '', 'base64');
+  if (mfaKey.length !== 32 || mfaKey.toString('base64') !== environment.MFA_ENCRYPTION_KEY) throw new Error('Production requires a canonical base64 MFA_ENCRYPTION_KEY containing 32 bytes. Preserve the existing key for enrolled administrators.');
   await waitForFullVerification(environment.VERCEL_GIT_COMMIT_SHA, options);
 }
 

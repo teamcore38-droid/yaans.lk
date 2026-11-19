@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { accounts, TEST_PASSWORD, shippingAddress } from '../support/fixtures.js';
+import { nextAdminRecoveryCode, accounts, TEST_PASSWORD, shippingAddress } from '../support/fixtures.js';
 
 let browserErrors;
 test.beforeEach(async ({ context, page }) => {
@@ -22,6 +22,7 @@ async function login(page, email, admin = false) {
   await page.getByPlaceholder(admin ? 'admin@yaans.lk' : 'name@example.lk').fill(email);
   await page.getByPlaceholder(admin ? '••••••••••••' : '••••••••', { exact: true }).fill(TEST_PASSWORD);
   await page.getByRole('button', { name: admin ? 'Sign In to Admin Console' : 'Sign In', exact: true }).click();
+  if (admin) { await page.getByLabel('Authenticator or recovery code').fill(nextAdminRecoveryCode()); await page.getByRole('button', { name: 'Sign In to Admin Console', exact: true }).click(); }
 }
 
 async function fillAddress(page) {
@@ -437,7 +438,8 @@ test('administrator security and staff provisioning work on desktop and mobile',
   expect(fitsScreen).toBe(true);
   await tab.click();
   await expect(page.getByRole('heading',{name:'Administrator authenticator',exact:true})).toBeVisible();
-  await expect(page.getByRole('button',{name:'Set up authenticator',exact:true})).toBeVisible();
+  await expect(page.getByText('An authenticator is enabled. Signing in requires your password and a current authenticator or unused recovery code.', {exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Set up authenticator',exact:true})).toHaveCount(0);
   await page.getByRole('button', { name: 'Business Policies & Storefront', exact: true }).click();
   await page.getByText('Announcements', {exact:true}).click();
   const previousSettings = await (await request.get('/api/marketplace/categories')).json();

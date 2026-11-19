@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { isOwner } from '../../../shared/adminAccess.js';
 import {createHash,timingSafeEqual} from 'node:crypto';
 import {createRouter} from '../config/router.js';
 import {idFilter} from '../config/db.js';
@@ -26,7 +27,7 @@ async function scope(req,sellerOnly=false) {
     sellerId=sub.sellerId;subs=[sub];order=await db.collection('orders').findOne(idFilter(sub.parentOrderId),{maxTimeMS:3000});
   }else{
     order=await db.collection('orders').findOne({$or:[idFilter(id),{orderNumber:id}]},{maxTimeMS:3000});
-    if(order && req.user?.role!=='admin')assertOrderAccess(order,req.user,req.headers['x-order-access-token']);
+    if(order && !isOwner(req.user))assertOrderAccess(order,req.user,req.headers['x-order-access-token']);
     if(order)subs=await db.collection('suborders').find({parentOrderId:String(order._id)},{maxTimeMS:3000}).limit(100).toArray();
   }
   if(!order)throw httpError(404,'Order not found.');

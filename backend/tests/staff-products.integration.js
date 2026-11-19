@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import mongoose from 'mongoose';
 import { randomUUID } from 'node:crypto';
 import { startIsolatedApp } from './helpers/isolated-app.js';
-import { accounts, TEST_PASSWORD, shippingAddress } from '../../tests/support/fixtures.js';
+import { adminLoginBody, accounts, TEST_PASSWORD, shippingAddress } from '../../tests/support/fixtures.js';
 const password='Staff-product-password!123', personal='Staff-personal-password!456';
 test('permission-scoped staff product editing preserves inventory and administration barriers', {timeout:180000}, async t=>{
   const app=await startIsolatedApp();t.after(()=>app.close());t.beforeEach(()=>app.reset());
@@ -11,7 +11,7 @@ test('permission-scoped staff product editing preserves inventory and administra
     const r=await fetch(app.url+'/api'+path,{method,headers:{...(token?{Authorization:`Bearer ${token}`} : {}),...(body?{'Content-Type':'application/json'}:{}),...headers},body:body?JSON.stringify(body):undefined});
     return {status:r.status,data:await r.json().catch(()=>({})),headers:r.headers};
   }
-  async function login(email,pass=TEST_PASSWORD,path='/auth/login'){const result=await req(path,null,{email,password:pass});assert.equal(result.status,200);return result.data.token;}
+  async function login(email,pass=TEST_PASSWORD,path='/auth/login'){const result=await req(path,null,path==='/auth/admin/login'?adminLoginBody(email,pass):{email,password:pass});assert.equal(result.status,200);return result.data.token;}
   async function setup(){
     const admin=await login(accounts.admin,TEST_PASSWORD,'/auth/admin/login');
     const created=await req('/admin/staff',admin,{name:'Product Staff',email:'products@test.invalid',phone:'0771234567',password,currentPassword:TEST_PASSWORD});assert.equal(created.status,201);

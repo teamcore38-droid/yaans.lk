@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { startIsolatedApp } from './helpers/isolated-app.js';
-import { accounts, TEST_PASSWORD, shippingAddress } from '../../tests/support/fixtures.js';
+import { adminLoginBody, accounts, TEST_PASSWORD, shippingAddress } from '../../tests/support/fixtures.js';
 
 test('order notifications are durable, private, idempotent and independently readable', { timeout: 120000 }, async t => {
   const app = await startIsolatedApp(); t.after(() => app.close());
@@ -12,7 +12,7 @@ test('order notifications are durable, private, idempotent and independently rea
       body: body ? JSON.stringify(body) : undefined });
     return { status: response.status, data: await response.json(), cache: response.headers.get('cache-control') };
   }
-  const login = async (email, admin = false) => (await request(admin ? '/auth/admin/login' : '/auth/login', null, { email, password: TEST_PASSWORD })).data.token;
+  const login = async (email, admin = false) => (await request(admin ? '/auth/admin/login' : '/auth/login', null, admin ? adminLoginBody(email) : { email, password: TEST_PASSWORD })).data.token;
   const admin = await login(accounts.admin, true), seller = await login(accounts.seller), other = await login(accounts.otherSeller), customer = await login(accounts.customer);
   assert.equal((await request('/notifications')).status, 401);
   assert.equal((await request('/notifications', customer)).status, 403);

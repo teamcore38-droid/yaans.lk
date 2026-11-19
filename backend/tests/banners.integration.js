@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { Writable } from 'node:stream';
 import { v2 as cloudinary } from 'cloudinary';
 import { startIsolatedApp } from './helpers/isolated-app.js';
-import { accounts, TEST_PASSWORD } from '../../tests/support/fixtures.js';
+import { adminLoginBody, accounts, TEST_PASSWORD } from '../../tests/support/fixtures.js';
 
 test('banner images persist independently through secured API writes and storefront fallbacks', { timeout: 180000 }, async t => {
   const app = await startIsolatedApp();
@@ -16,7 +16,7 @@ test('banner images persist independently through secured API writes and storefr
     });
     return { status: response.status, data: await response.json(), headers: response.headers };
   }
-  const login = await request('/auth/admin/login', { method: 'POST', body: { email: accounts.admin, password: TEST_PASSWORD }, headers: { 'X-Yaans-Client': 'browser' } });
+  const login = await request('/auth/admin/login', { method: 'POST', body: adminLoginBody(), headers: { 'X-Yaans-Client': 'browser' } });
   assert.equal(login.status, 200);
   const cookies = login.headers.getSetCookie();
   const cookie = cookies.map(value => value.split(';')[0]).join('; ');

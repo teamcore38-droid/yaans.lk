@@ -1,8 +1,21 @@
 import bcrypt from 'bcryptjs';
+import { createHash, createCipheriv } from 'node:crypto';
 import { getInitialSeedState } from '../../backend/src/seed/initialState.js';
 
 // Synthetic accounts only. Never copy a developer or production database into tests.
 export const TEST_PASSWORD = 'Testing@123-passphrase!';
+// Synthetic one-time recovery factors. Tests exercise the real MFA verification;
+// none of these credentials are accepted outside the disposable test database.
+let recoverySequence = 0;
+export const nextAdminRecoveryCode = () => (++recoverySequence).toString(16).padStart(24, '0');
+export const adminLoginBody = (email = accounts.admin, password = TEST_PASSWORD) => ({ email, password, code: nextAdminRecoveryCode() });
+function testAdminMfa() {
+  const cipher = createCipheriv('aes-256-gcm', Buffer.alloc(32, 7), Buffer.alloc(12, 7));
+  cipher.setAAD(Buffer.from('yaans-admin-mfa-v1'));
+  const ciphertext = Buffer.concat([cipher.update('JBSWY3DPEHPK3PXP', 'utf8'), cipher.final()]);
+  return { enabled: true, secret: { iv: Buffer.alloc(12, 7).toString('base64'), tag: cipher.getAuthTag().toString('base64'), ciphertext: ciphertext.toString('base64') }, lastStep: 0,
+    recoveryHashes: Array.from({ length: 512 }, (_, i) => createHash('sha256').update((i + 1).toString(16).padStart(24, '0')).digest('hex')) };
+}
 export const accounts = {
   admin: 'admin@test.yaans.invalid',
   customer: 'customer@test.yaans.invalid',
@@ -56,7 +69,7 @@ export function buildTestStore() {
   ] }];
   return {
     users: [
-      user('usr_test_admin', 'Test Administrator', accounts.admin, 'admin'),
+      { ...user('usr_test_admin', 'Test Administrator', accounts.admin, 'admin'), adminMfa: testAdminMfa() },
       user('usr_test_customer', 'Test Customer', accounts.customer, 'customer'),
       user('usr_test_seller', 'Test Seller', accounts.seller, 'seller', sellers[0]._id),
       user('usr_test_other', 'Other Test Seller', accounts.otherSeller, 'seller', sellers[1]._id)

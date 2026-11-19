@@ -31,7 +31,7 @@ test('authenticator setup requires confirmation and shows recovery codes only af
   const user=userEvent.setup();await user.type(screen.getByLabelText('Current password'),'Test administrator passphrase');await user.click(screen.getByRole('button',{name:'Set up authenticator'}));
   await screen.findByLabelText('Authenticator setup key');expect(screen.queryByText('synthetic-recovery-code')).not.toBeInTheDocument();
   await user.type(screen.getByLabelText('Six-digit authenticator code'),'123456');await user.click(screen.getByRole('button',{name:'Enable authenticator'}));
-  await screen.findByText('synthetic-recovery-code');await waitFor(()=>expect(refreshUser).toHaveBeenCalled());
+  await screen.findByText('synthetic-recovery-code');expect(refreshUser).not.toHaveBeenCalled();
   expect(screen.queryByLabelText('Authenticator setup key')).not.toBeInTheDocument();
-  await user.click(screen.getByRole('button',{name:'I saved my recovery codes'}));expect(screen.queryByText('synthetic-recovery-code')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button',{name:'I saved my recovery codes'}));await waitFor(()=>expect(refreshUser).toHaveBeenCalled());expect(screen.queryByText('synthetic-recovery-code')).not.toBeInTheDocument();
 });

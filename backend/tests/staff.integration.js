@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { captureBackup } from '../src/config/backupRepository.js';
 import { startIsolatedApp } from './helpers/isolated-app.js';
-import { accounts, TEST_PASSWORD, shippingAddress } from '../../tests/support/fixtures.js';
+import { adminLoginBody, accounts, TEST_PASSWORD, shippingAddress } from '../../tests/support/fixtures.js';
 
 const temporary = 'Temporary-staff-password!123';
 const permanent = 'Personal-staff-password!456';
@@ -18,7 +18,7 @@ test('staff security, account lifecycle, bounded reads and sessions', { timeout:
     return { status: response.status, data: await response.json().catch(() => ({})), headers: response.headers };
   }
   async function login(email, password = TEST_PASSWORD, path = '/auth/login') {
-    const result = await request(path, { body: { email, password } }); assert.equal(result.status, 200); return result.data.token;
+    const result = await request(path, { body: path === '/auth/admin/login' ? adminLoginBody(email,password) : { email, password } }); assert.equal(result.status, 200); return result.data.token;
   }
   const adminLogin = () => login(accounts.admin, TEST_PASSWORD, '/auth/admin/login');
   async function create(admin) {
@@ -52,7 +52,7 @@ test('staff security, account lifecycle, bounded reads and sessions', { timeout:
     assert.match(list.headers.get('cache-control'), /no-store/);
     const audit = await app.mongo.collection('securityevents').findOne({ event: 'STAFF_CREATED' });
     assert.equal(audit.metadata.staffId, staff._id); assert.ok(!JSON.stringify(audit).includes(temporary));
-    const browserAdmin = await request('/auth/admin/login', { body: { email: accounts.admin, password: TEST_PASSWORD }, headers: { 'X-Yaans-Client': 'browser' } });
+    const browserAdmin = await request('/auth/admin/login', { body: adminLoginBody(), headers: { 'X-Yaans-Client': 'browser' } });
     const cookies = browserAdmin.headers.getSetCookie().map(value => value.split(';')[0]).join('; ');
     assert.equal((await request('/admin/staff', { body: { ...account, email: 'second@test.invalid' }, headers: { Cookie: cookies } })).status, 403);
   });

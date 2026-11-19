@@ -63,7 +63,7 @@ export default function Footer() {
             className="h-9 w-auto object-contain mb-3"
           />
           <p className="text-xs text-slate-600 leading-relaxed">
-            {business.identity.description}
+            Sri Lanka’s marketplace connecting shoppers with local sellers and Sri Lankan women entrepreneurs.
           </p>
         </div>
 

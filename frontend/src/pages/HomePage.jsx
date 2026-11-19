@@ -1,5 +1,5 @@
 import { useBusinessSettings } from '../hooks/useBusinessSettings.js';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { safeInternalLink } from '../../../shared/safeLinks.js';
 import {
@@ -17,10 +17,102 @@ import { useMarketplace } from '../context/MarketplaceContext.jsx';
 import CategoryQuadCard from '../components/CategoryQuadCard.jsx';
 import ProductCard from '../components/ProductCard.jsx';
 import { imageUrl, imageSrcSet } from '../utils/images.js';
+import { apiRequest } from '../utils/api.js';
 
 function HomeLayout({ sections, children }) {
   const ordered = React.Children.toArray(children).sort((a,b)=>(sections[a.props?.['data-home-section']]?.position || 0)-(sections[b.props?.['data-home-section']]?.position || 0));
   return <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 space-y-3 sm:space-y-5">{ordered}</div>;
+}
+
+function RecommendedSection({ section, initialProducts }) {
+  const [page, setPage] = useState(() => ({ extra: [], offset: initialProducts.length, total: null, loading: false, error: '' }));
+  const [visibleLimit, setVisibleLimit] = useState(40);
+  const [inView, setInView] = useState(false);
+  const [manualRequest, setManualRequest] = useState(false);
+  const sentinel = useRef(null);
+  const request = useRef(null);
+  const products = useMemo(() => {
+    const seen = new Set();
+    return [...initialProducts, ...page.extra].filter(product => {
+      if (seen.has(product._id)) return false;
+      seen.add(product._id);
+      return true;
+    });
+  }, [initialProducts, page.extra]);
+  const target = Math.min(visibleLimit, page.total ?? visibleLimit);
+  const hasMore = page.total === null || page.offset < page.total;
+
+  useEffect(() => {
+    const element = sentinel.current;
+    if (!element || !('IntersectionObserver' in window)) return;
+    const observer = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), { rootMargin: '200px' });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const loadNext = useCallback(async () => {
+    if (request.current || !hasMore || products.length >= target) return;
+    const controller = new AbortController();
+    request.current = controller;
+    setPage(previous => ({ ...previous, loading: true, error: '' }));
+    try {
+      const limit = Math.min(12, target - products.length);
+      const result = await apiRequest(`/marketplace/recommendations?offset=${page.offset}&limit=${limit}`, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      setPage(previous => ({ extra: [...previous.extra, ...result.products],
+        offset: result.products.length ? previous.offset + result.products.length : result.total,
+        total: result.total, loading: false, error: '' }));
+    } catch (error) {
+      if (!controller.signal.aborted) setPage(previous => ({ ...previous, loading: false, error: error.message || 'Could not load recommendations.' }));
+    } finally {
+      if (request.current === controller) request.current = null;
+    }
+  }, [hasMore, products.length, target, page.offset]);
+
+  useEffect(() => {
+    if (products.length >= target) {
+      if (manualRequest) setManualRequest(false);
+      return;
+    }
+    if (((visibleLimit <= 40 && inView) || manualRequest) && !page.error) loadNext();
+  }, [products.length, target, visibleLimit, inView, manualRequest, page.error, loadNext]);
+  useEffect(() => () => request.current?.abort(), []);
+
+  const shown = products.slice(0, visibleLimit);
+  const firstFortyReady = page.total > 40 && shown.length >= 40;
+  const moreToShow = page.total > shown.length && (hasMore || products.length > shown.length);
+
+  return (
+    <section hidden={!section.enabled} data-home-section="recommended">
+      <div className="flex items-center justify-between gap-2 mb-2 sm:mb-3">
+        <div>
+          <h2 className="text-base sm:text-lg font-extrabold text-slate-900">{section.title}</h2>
+          <p className="hidden sm:block text-xs text-slate-500">{section.subtitle}</p>
+        </div>
+        <Link to="/products" aria-label="Browse All Products" className="shrink-0 whitespace-nowrap text-xs font-bold text-sky-700 hover:text-sky-800 inline-flex items-center gap-0.5">
+          <span className="sm:hidden">View all</span><span className="hidden sm:inline">Browse All Products</span> <ChevronRight className="w-4 h-4" />
+        </Link>
+      </div>
+      {shown.length > 0 ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+          {shown.map(product => <ProductCard key={product._id} product={product} compact />)}
+        </div>
+      ) : (
+        <div className="p-8 rounded-xl bg-white border border-slate-200 text-center">
+          <p className="text-xs text-slate-500">Marketplace catalog is ready. New listings will appear here automatically.</p>
+        </div>
+      )}
+      {page.loading && <p role="status" className="mt-3 text-xs text-slate-600">Loading recommendations...</p>}
+      {page.error && <div role="alert" className="mt-3 text-xs text-red-700">{page.error}{' '}
+        <button type="button" onClick={() => { setPage(previous => ({ ...previous, error: '' })); setManualRequest(true); }} className="font-bold underline">Retry</button>
+      </div>}
+      <div ref={sentinel} aria-hidden="true" className="h-1" />
+      {firstFortyReady && <div className="mt-4 flex flex-wrap justify-center gap-2">
+        {moreToShow && <button type="button" onClick={() => { setVisibleLimit(limit => limit + 12); setManualRequest(true); }} className="px-5 py-2 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs">Load More</button>}
+        <Link to="/products" className="px-5 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs">See All Products</Link>
+      </div>}
+    </section>
+  );
 }
 
 export default function HomePage() {
@@ -358,12 +450,12 @@ export default function HomePage() {
         </div>
 
         {verifiedSellers.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div role="region" aria-label="Shop Local Sellers" className="flex overflow-x-auto snap-x snap-mandatory gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible sm:snap-none">
             {verifiedSellers.map((seller) => (
               <Link
                 key={seller._id}
                 to={`/store/${seller.slug}`}
-                className="p-3.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50/70 hover:bg-white transition flex items-start gap-3"
+                className="w-full shrink-0 snap-start sm:w-auto sm:shrink p-3.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50/70 hover:bg-white transition flex items-start gap-3"
               >
                 <img
                   src={seller.logoUrl}
@@ -408,37 +500,7 @@ export default function HomePage() {
       </section>
 
       {/* Recommended Marketplace Products */}
-      <section hidden={!business.home.recommended.enabled} data-home-section="recommended">
-        <div className="flex items-center justify-between gap-2 mb-2 sm:mb-3">
-          <div>
-            <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
-              {business.home.recommended.title}
-            </h2>
-            <p className="hidden sm:block text-xs text-slate-500">
-              {business.home.recommended.subtitle}
-            </p>
-          </div>
-          <Link
-            to="/products"
-            aria-label="Browse All Products"
-            className="shrink-0 whitespace-nowrap text-xs font-bold text-sky-700 hover:text-sky-800 inline-flex items-center gap-0.5"
-          >
-            <span className="sm:hidden">View all</span><span className="hidden sm:inline">Browse All Products</span> <ChevronRight className="w-4 h-4" />
-          </Link>
-        </div>
-
-        {recommendedProducts.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-            {recommendedProducts.map((product) => (
-              <ProductCard key={product._id} product={product} compact />
-            ))}
-          </div>
-        ) : (
-          <div className="p-8 rounded-xl bg-white border border-slate-200 text-center">
-            <p className="text-xs text-slate-500">Marketplace catalog is ready. New listings will appear here automatically.</p>
-          </div>
-        )}
-      </section>
+      <RecommendedSection key={business.home.recommended.source} data-home-section="recommended" section={business.home.recommended} initialProducts={recommendedProducts} />
     </HomeLayout>
   );
 }

@@ -29,7 +29,8 @@ test('a configured custom logo remains unchanged',()=>{
 test('desktop category search still submits its category and query',()=>{
   renderHeader();
   fireEvent.change(screen.getByRole('combobox',{name:'Filter search by category'}),{target:{value:'ceramics'}});
-  const input=screen.getByPlaceholderText('Search Yaans.lk for homemade achcharu, clay pots, headphones, spices...');
+  const input=screen.getAllByPlaceholderText('Handmade dresses, cane crafts, bouquets')[0];
+  expect(screen.getAllByPlaceholderText('Handmade dresses, cane crafts, bouquets')).toHaveLength(2);
   fireEvent.change(input,{target:{value:'clay pots'}});fireEvent.submit(input.closest('form'));
   expect(screen.getByLabelText('Current route')).toHaveTextContent('/products?q=clay+pots&category=ceramics');
 });

@@ -55,6 +55,23 @@ test('populated catalog reads stay bounded and preserve visibility, filters and 
     assert.ok(result.data.verifiedSellers.every((seller) => seller.bankDetails === undefined && seller.contactEmail === undefined));
   });
 
+  await t.test('recommendation pages continue the home order without duplicates or hidden products', async () => {
+    const home = await request('/home');
+    returned = {};
+    const first = await request('/recommendations?offset=0&limit=10');
+    const second = await request('/recommendations?offset=10&limit=12');
+    assert.equal(first.status, 200); assert.equal(second.status, 200);
+    assert.ok(first.data.total > 40);
+    assert.deepEqual(first.data.products.map(product => product._id), home.data.recommendedProducts.map(product => product._id));
+    assert.equal(second.data.products.length, 12);
+    assert.ok(second.data.products.every(product => !first.data.products.some(previous => previous._id === product._id)));
+    assert.ok([...first.data.products, ...second.data.products].every(product => product.approvalStatus === 'approved' && product._writeVersion === undefined));
+    assert.ok(returned.products <= 24, 'Recommendation pages must transfer only their bounded products.');
+    for (const query of ['offset=-1', 'offset[]=1', 'offset=10001', 'offset=1000000', 'limit=13', 'limit=0']) {
+      assert.equal((await request(`/recommendations?${query}`)).status, 400);
+    }
+  });
+
   await t.test('review pages preserve chronological order across BSON dates and strings without loading unrelated reviews', async () => {
     await app.mongo.collection('reviews').insertMany([
       { _id: 'rev_native_date', productId: 'prd_test_spice', customerName: 'Synthetic', rating: 4, comment: 'Native date review', createdAt: new Date('2027-01-01T00:00:00Z') },

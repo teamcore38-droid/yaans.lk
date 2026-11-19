@@ -150,7 +150,7 @@ export default function Navbar() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search Yaans.lk for homemade achcharu, clay pots, headphones, spices..."
+                  placeholder="Handmade dresses, cane crafts, bouquets"
                   className="w-full min-w-0 px-3.5 py-2 text-sm text-slate-900 bg-transparent focus:outline-none"
                 />
                 <button
@@ -273,7 +273,7 @@ export default function Navbar() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search Yaans.lk (spices, electronics, clay pots...)"
+                  placeholder="Handmade dresses, cane crafts, bouquets"
                   className="w-full px-3 py-2 text-sm text-slate-900 bg-transparent focus:outline-none"
                 />
                 <button

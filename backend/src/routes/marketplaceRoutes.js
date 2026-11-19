@@ -7,7 +7,7 @@ import mongoose from 'mongoose';
 import { sharedRateLimit } from '../middleware/sharedRateLimit.js';
 import { stringField } from '../config/inputValidation.js';
 import { httpError } from '../config/errors.js';
-import { catalogHome, catalogSettings, catalogCategories, catalogProducts, catalogProduct, catalogSeller } from '../services/catalog.js';
+import { catalogHome, catalogSettings, catalogCategories, catalogProducts, catalogProduct, catalogSeller, catalogRecommendations } from '../services/catalog.js';
 
 const router = createRouter();
 
@@ -15,6 +15,8 @@ router.get('/home', async (_req, res) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.json(await catalogHome());
 });
+
+router.get('/recommendations', async (req, res) => res.json(await catalogRecommendations(req.query)));
 
 router.get('/districts', async (_req, res) => {
   const config = await catalogSettings();

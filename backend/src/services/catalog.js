@@ -54,10 +54,8 @@ export async function catalogHome() {
     catalogCategories(), MODEL_MAP.sellers.collection.find({ status: 'approved' }, { ...readOptions, projection: sellerProjection }).toArray(), catalogSettings()
   ]);
   const home = config.businessSettings.home;
-  const collectionPipeline = section => {
-    const filter = section.source === 'homemade' ? {isHomemade:true} : section.source === 'deals' ? deals : section.source === 'featured' ? {isFeatured:true} : {};
-    return [{ $match: section.enabled ? filter : {_id:{$exists:false}} }, ...(section.source === 'popular' ? [{$sort:{soldCount:-1,_id:1}}] : []), {$limit:section.limit}];
-  };
+  const collectionPipeline = section => [{ $match: section.enabled ? sectionFilter(section) : {_id:{$exists:false}} },
+    ...(section.source === 'popular' ? [{$sort:{soldCount:-1,_id:1}}] : []), {$limit:section.limit}];
   const [groups] = await MODEL_MAP.products.collection.aggregate([
     { $match: { approvalStatus: 'approved', sellerId: { $in: sellers.map(({ _id }) => String(_id)) } } },
     { $project: projection },
@@ -65,7 +63,8 @@ export async function catalogHome() {
       homemadeProducts: collectionPipeline(home.homemade),
       dealProducts: collectionPipeline(home.deals),
       featuredProducts: [{ $match: { isFeatured: true } }, { $limit: 8 }],
-      recommendedProducts: collectionPipeline(home.recommended)
+      recommendedProducts: [{ $match: home.recommended.enabled ? sectionFilter(home.recommended) : {_id:{$exists:false}} },
+        { $sort: recommendationSort(home.recommended) }, { $limit: home.recommended.limit }]
     } }
   ], readOptions).toArray();
   return { businessSettings: config.businessSettings, businessVersion: config.businessVersion || 0, businessEffectiveAt: config.businessEffectiveAt || null, codEnabledGlobally: config.codEnabledGlobally !== false, commissionRates: { standard: config.defaultCommissionPercent ?? 8, homemade: config.homemadeCommissionPercent ?? 5 }, categories, banners: (config.banners || []).map((banner, i) => ({ ...banner,
@@ -76,6 +75,39 @@ export async function catalogHome() {
     const view = sellerView(seller);
     return Object.fromEntries(['_id', 'storeName', 'slug', 'sellerType', 'isHomemadeVendor', 'district', 'city', 'logoUrl', 'rating', 'reviewCount'].map((field) => [field, view[field]]));
   }), districts: config.districts, codEnabledGlobally: config.codEnabledGlobally, shippingMode: config.shippingMode || 'custom', flatShippingRateLkr: config.flatShippingRateLkr ?? 350 };
+}
+
+function sectionFilter(section) {
+  return section.source === 'homemade' ? { isHomemade: true }
+    : section.source === 'deals' ? deals
+    : section.source === 'featured' ? { isFeatured: true } : {};
+}
+
+function recommendationSort(section) {
+  return section.source === 'popular' ? { soldCount: -1, _id: 1 } : { _id: 1 };
+}
+
+// Fetch only the next visible batch. Settings choose the source; query strings
+// cannot override approval, seller visibility, sorting, or the page bound.
+export async function catalogRecommendations(query = {}) {
+  const offsetText = text(query, 'offset', '0', 6);
+  const limitText = text(query, 'limit', '12', 2);
+  if (!/^(0|[1-9]\d{0,4})$/.test(offsetText) || Number(offsetText) > 10000 ||
+      !/^(?:[1-9]|1[0-2])$/.test(limitText)) {
+    throw httpError(400, 'Invalid recommendation page.');
+  }
+  const offset = Number(offsetText), limit = Number(limitText);
+  await connectDatabase();
+  const [ids, config] = await Promise.all([approvedSellerIds(), catalogSettings()]);
+  const section = config.businessSettings.home.recommended;
+  if (!section.enabled) return { products: [], total: 0 };
+  const filter = { approvalStatus: 'approved', sellerId: { $in: ids }, ...sectionFilter(section) };
+  const [products, total] = await Promise.all([
+    MODEL_MAP.products.collection.find(filter, { ...readOptions, projection })
+      .sort(recommendationSort(section)).skip(offset).limit(limit).toArray(),
+    MODEL_MAP.products.collection.countDocuments(filter, readOptions)
+  ]);
+  return { products: products.map(clean), total };
 }
 
 export async function catalogProducts(query = {}, restrictedSellerId) {

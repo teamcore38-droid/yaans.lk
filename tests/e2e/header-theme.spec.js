@@ -25,7 +25,7 @@ test('red wave header fits mobile, tablet and desktop without covering controls'
     });
     expect(decoration.background).toContain('svg');expect(decoration.pointerEvents).toBe('none');expect(decoration.animation).toBe('none');
     await expect(header.getByRole('link',{name:'Wishlist',exact:true})).toHaveCSS('color','rgb(255, 255, 255)');
-    const search=width<768?header.getByPlaceholder('Search Yaans.lk (spices, electronics, clay pots...)'):header.getByPlaceholder('Search Yaans.lk for homemade achcharu, clay pots, headphones, spices...');
+    const search=header.locator('input[placeholder="Handmade dresses, cane crafts, bouquets"]:visible');
     await expect(search).toBeVisible();await expect(search).toHaveCSS('color','rgb(15, 23, 42)');
     const cart=await header.getByRole('link',{name:'Cart, 0 items',exact:true}).boundingBox();
     expect(cart.x+cart.width).toBeLessThanOrEqual(width);
@@ -42,7 +42,7 @@ test('red wave header fits mobile, tablet and desktop without covering controls'
 test('themed header keeps search, menu, location, account and cart navigation working',async({page},testInfo)=>{
   await page.goto('/');const header=page.getByRole('banner');
   const mobile=page.viewportSize().width<768;
-  const search=mobile?header.getByPlaceholder('Search Yaans.lk (spices, electronics, clay pots...)'):header.getByPlaceholder('Search Yaans.lk for homemade achcharu, clay pots, headphones, spices...');
+  const search=header.locator('input[placeholder="Handmade dresses, cane crafts, bouquets"]:visible');
   await search.fill('Test Ceylon Spice');await search.press('Enter');await expect(page).toHaveURL(/\/products\?q=Test\+Ceylon\+Spice/);
   const district=header.getByRole('button',{name:page.viewportSize().width<1024?'Deliver to Colombo ▾':'Deliver to Sri Lanka Colombo District',exact:true});
   await district.click();await page.getByText('Choose Your Delivery District',{exact:true}).locator('xpath=ancestor::div[contains(@class,"max-w-md")][1]').getByRole('button',{name:'Kandy',exact:true}).click();

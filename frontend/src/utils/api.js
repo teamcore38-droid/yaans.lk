@@ -17,7 +17,7 @@ export function browserSessionKey() {
 
 function catalogKey(endpoint) {
   const url = new URL(endpoint, 'http://catalog.local');
-  if (!/^\/marketplace\/(home|categories|districts|products(?:\/[^/]+)?|sellers\/[^/]+)$/.test(url.pathname)) {
+  if (!/^\/marketplace\/(home|categories|districts|recommendations|products(?:\/[^/]+)?|sellers\/[^/]+)$/.test(url.pathname)) {
     return null;
   }
   url.searchParams.sort();

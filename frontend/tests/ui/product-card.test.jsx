@@ -69,3 +69,11 @@ test('regular products do not display the homemade tag',()=>{
   expect(screen.queryByText('Homemade SL')).not.toBeInTheDocument();
   expect(screen.getByRole('group',{name:'Product rating'})).toBeVisible();
 });
+
+test('mobile titles clamp to two lines without a reserved minimum height', () => {
+  render(<MemoryRouter><ProductCard product={{ ...product, title: 'A very long product name that needs multiple lines on a narrow card' }} /></MemoryRouter>);
+  const title = screen.getByText('A very long product name that needs multiple lines on a narrow card');
+  expect(title).toHaveClass('line-clamp-2');
+  expect(title).toHaveClass('sm:min-h-[2.5rem]');
+  expect(title).not.toHaveClass('min-h-[2.5rem]');
+});

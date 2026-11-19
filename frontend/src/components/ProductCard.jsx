@@ -59,7 +59,7 @@ export default function ProductCard({ product, compact = false, priority = false
         </div>
 
         {/* Product Info */}
-        <div className="p-3">
+        <div className="p-2.5 sm:p-3">
           {/* Seller & Origin District */}
           <div className="flex items-center justify-between gap-1 text-[11px] text-slate-500 mb-1">
             <Link
@@ -77,7 +77,7 @@ export default function ProductCard({ product, compact = false, priority = false
           {/* Title */}
           <Link
             to={`/product/${product.slug || product._id}`}
-            className="block text-sm font-semibold text-slate-900 hover:text-sky-700 line-clamp-2 leading-snug min-h-[2.5rem]"
+            className="text-sm font-semibold text-slate-900 hover:text-sky-700 line-clamp-2 leading-snug sm:min-h-[2.5rem]"
           >
             {product.title}
           </Link>
@@ -122,7 +122,7 @@ export default function ProductCard({ product, compact = false, priority = false
         </div>
       </div>
 
-      <div className="px-3 pb-3 flex items-stretch gap-1.5">
+      <div className="px-2.5 pb-2.5 sm:px-3 sm:pb-3 flex items-stretch gap-1.5">
         <button
           type="button"
           disabled={product.stock <= 0}

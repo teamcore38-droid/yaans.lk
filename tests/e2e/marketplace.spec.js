@@ -149,6 +149,46 @@ test('product card actions stay aligned and direct checkout preserves the cart',
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('yaans_cart')))).toEqual(savedCart);
 });
 
+test('short and long titles share a compact two-column mobile row', async ({ page }) => {
+  const shortName = 'Tea';
+  const longName = 'Handcrafted floral wooden tabletop decoration with a much longer product name';
+  await page.route('**/api/marketplace/products?*', async route => {
+    const response = await route.fetch();
+    const body = await response.json();
+    await route.fulfill({ response, json: {
+      ...body, products: body.products.map((product, index) => ({
+        ...product, title: index === 0 ? shortName : longName
+      }))
+    } });
+  });
+  await page.goto('/products');
+  const shortTitle = page.getByText(shortName, { exact: true });
+  const longTitle = page.getByText(longName, { exact: true });
+  await expect(shortTitle).toBeVisible();
+  await expect(longTitle).toBeVisible();
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 850 });
+    const [shortBox, longBox] = await Promise.all([shortTitle.boundingBox(), longTitle.boundingBox()]);
+    expect(shortBox.y).toBe(longBox.y);
+    expect(longBox.x).toBeGreaterThan(shortBox.x);
+    const metrics = await Promise.all([shortTitle, longTitle].map(title => title.evaluate(element => {
+      const style = getComputedStyle(element);
+      return { height: element.getBoundingClientRect().height, lineHeight: parseFloat(style.lineHeight),
+        clamp: style.webkitLineClamp, minHeight: style.minHeight };
+    })));
+    expect(metrics[0].clamp).toBe('2');
+    expect(metrics[1].clamp).toBe('2');
+    expect(metrics[0].minHeight).toBe('0px');
+    expect(metrics[0].height).toBeLessThan(metrics[1].height);
+    expect(metrics[1].height).toBeLessThanOrEqual(metrics[1].lineHeight * 2 + 1);
+    const buttons = [shortTitle, longTitle].map(title => title.locator('xpath=../../..').getByRole('button', { name: 'Buy Now' }));
+    const [leftButton, rightButton] = await Promise.all(buttons.map(button => button.boundingBox()));
+    expect(Math.abs(leftButton.y - rightButton.y)).toBeLessThan(1);
+  }
+  await page.setViewportSize({ width: 1280, height: 850 });
+  await expect(shortTitle).toHaveCSS('min-height', '40px');
+});
+
 test('guest multi-seller checkout creates a confirmed order that can be tracked', async ({ page }, testInfo) => {
   for (const slug of ['test-ceylon-spice', 'test-desk-lamp']) {
     await page.goto(`/product/${slug}`);

@@ -1,5 +1,7 @@
 # Product galleries
 
+Photo cards use responsive wrapping columns with square, contained previews. Edit (pencil) opens the single-photo replacement picker; Remove (red trash) detaches the photo from the editor. A green Main image badge identifies the first photo. Non-main photos expose Make main below Edit/Remove, with labelled Earlier/Later ordering controls below. Add photos opens the existing multiple-file picker. All action buttons have 44 px minimum height. The image count, HTTPS URL entry, eight-photo/4 MiB limits, sequential uploads, busy-state locking, closed-editor protection and explicit product-save behavior are preserved. Missing upload URLs are rejected without replacing existing photos. No new dependencies, API calls or storefront changes are introduced; editor previews use responsive CDN sizes and lazy decoding.
+
 Seller, administrator and permitted staff editors share a gallery with multiple-file selection, individual replacement/removal, ordering and a main-image selector. The first array entry is the main image. Changes are persisted with the product save, using existing authorization and write-conflict protections.
 
 - New galleries accept one to eight images. Existing galleries above eight may be retained, reordered or reduced; adding/replacing requires reducing to eight first. No automatic truncation occurs.

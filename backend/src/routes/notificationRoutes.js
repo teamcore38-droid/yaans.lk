@@ -6,8 +6,9 @@ import { httpError } from '../config/errors.js';
 import { sharedRateLimit } from '../middleware/sharedRateLimit.js';
 
 const router = createRouter();
+router.use(sharedRateLimit('order-notifications-ip',600,60000));
 router.use(authenticate, requireRole('admin', 'seller', 'staff'));
-router.use(sharedRateLimit('order-notifications', 120, 60000));
+router.use(sharedRateLimit('order-notifications', 120, 60000, req=>req.user._id));
 router.use((_req, res, next) => { res.set('Cache-Control', 'private, no-store'); next(); });
 async function recipient(req) {
   await connectDatabase();

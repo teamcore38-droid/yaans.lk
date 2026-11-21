@@ -21,7 +21,8 @@ import marketplaceRoutes from './routes/marketplaceRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import sellerRoutes from './routes/sellerRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
-import { operationalStatus, recordOperationalEvent } from './config/operations.js';
+import { operationalStatus, recordOperationalEvent, recordRateLimitRejection } from './config/operations.js';
+import { sendRateLimited } from './middleware/sharedRateLimit.js';
 import { corsOrigin } from './config/origins.js';
 import { recordSecurityEvent } from './config/securityEvents.js';
 
@@ -50,21 +51,25 @@ app.use(
     credentials: true
   })
 );
+// Cheap per-process backstop before JSON parsing. The shared outer API budget
+// belongs at Vercel's WAF, without a MongoDB write on every catalogue read.
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 400,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler:async(req,res)=>{
+    await recordRateLimitRejection('api-process', Math.max(1, req.rateLimit.used - req.rateLimit.limit));
+    return sendRateLimited(res, Math.max(1, Math.ceil((req.rateLimit.resetTime.getTime()-Date.now())/1000)));
+  }
+});
+app.use('/api', apiLimiter);
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false, limit:'64kb', parameterLimit:100 }));
 app.use('/api',(req,_res,next)=>{
   if(['POST','PUT','PATCH'].includes(req.method)&&req.is('application/json')&&(!req.body||typeof req.body!=='object'||Array.isArray(req.body)))return next(Object.assign(new Error('A JSON object is required.'),{status:400}));
   next();
 });
-
-// Rate limiting for API protection
-const apiLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 400,
-  standardHeaders: true,
-  legacyHeaders: false
-});
-app.use('/api', apiLimiter);
 
 // A reversible read-only window lets old deployments drain during a persistence
 // cutover. Quotes are read-only; every account/order/admin mutation is held.
@@ -138,6 +143,7 @@ app.use(async (err, _req, res, _next) => {
     await recordOperationalEvent(/Mongo|Mongoose/.test(err.name) ? 'database_error' : 'server_error');
   }
   if(status===403)await recordSecurityEvent('request_denied',{ip:_req.ip,userId:_req.user?._id,role:_req.user?.role,outcome:'denied'});
+  if(status===429)return sendRateLimited(res,err.retryAfter || Number(res.getHeader('Retry-After')) || 60);
   res.status(status).json({ message: err.name==='MulterError'?'The upload exceeds the permitted file, field or nesting limits.':err.status ? err.message : status === 409 ? 'A record with these details already exists.' : 'The request could not be saved. Please try again.', ...(['WRITE_CONFLICT', 'IDEMPOTENCY_CONFLICT'].includes(err.code) ? { code: err.code } : {}) });
 });
 

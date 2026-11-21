@@ -26,6 +26,15 @@ test('notification outages remain visible without crashing the dashboard', async
   expect(await screen.findByRole('alert')).toHaveTextContent('Retrying automatically');
 });
 
+test('polling respects Retry-After even when it exceeds the normal backoff ceiling',async()=>{
+  vi.useFakeTimers();apiRequest.mockRejectedValue(Object.assign(new Error('Wait'),{status:429,retryAfter:300}));
+  const {unmount}=render(<OrderNotifications onViewOrders={()=>{}}/>);
+  await act(async()=>{});expect(apiRequest).toHaveBeenCalledTimes(1);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(299999);});expect(apiRequest).toHaveBeenCalledTimes(1);
+  apiRequest.mockResolvedValue({unreadCount:0,notifications:[]});
+  await act(async()=>{await vi.advanceTimersByTimeAsync(1);});expect(apiRequest).toHaveBeenCalledTimes(2);unmount();
+});
+
 test('polls only while visible and stops after unmount', async () => {
   vi.useFakeTimers();
   apiRequest.mockResolvedValue({ unreadCount: 0, notifications: [] });

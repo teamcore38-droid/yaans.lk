@@ -15,7 +15,9 @@ test('browser API bootstrap preserves the real 400-per-minute production IP limi
   assert.equal(blocked.status, 429);
   assert.equal(blocked.headers.get('ratelimit-remaining'), '0');
   assert.ok(Number(blocked.headers.get('retry-after')) > 0);
-  await blocked.text();
+  const failure=await blocked.json();
+  assert.equal(failure.code,'RATE_LIMITED');assert.equal(failure.retryAfter,Number(blocked.headers.get('retry-after')));
+  assert.match(blocked.headers.get('cache-control'),/no-store/);
   // The same protection still applies to cart requests from that IP.
   const quote = await fetch(`${app.url}/api/orders/quote`, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}'

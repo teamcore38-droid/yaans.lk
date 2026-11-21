@@ -7,7 +7,7 @@ import bcrypt from 'bcryptjs';
 import { getStore, persistStore, generateId, idFilter, withTransaction } from '../config/db.js';
 import { authenticate, signToken, getJwtSecret, usesDefaultAdminPassword, credentialsRevoked } from '../middleware/auth.js';
 import { recordAdminAuditLog } from '../config/auditLogger.js';
-import { loginIpLimit, loginAccountLimit, adminAccountLimit, sharedRateLimit } from '../middleware/sharedRateLimit.js';
+import { loginIpLimit, loginAccountLimit, adminAccountLimit, sharedRateLimit, credentialChangeLimit } from '../middleware/sharedRateLimit.js';
 import { validateAuthBody, validateNewPassword } from '../config/inputValidation.js';
 import { setSessionCookies, clearSessionCookies, newCsrfToken } from '../config/sessionCookies.js';
 import { recordSecurityEvent } from '../config/securityEvents.js';
@@ -392,7 +392,7 @@ router.put('/profile', authenticate, async (req, res) => {
 
 // PUT /api/auth/update-credentials
 // Allows updating username/email, password, name, phone with current password verification
-router.put('/update-credentials', authenticate, async (req, res) => {
+router.put('/update-credentials', authenticate, credentialChangeLimit, async (req, res) => {
   const { currentPassword, newEmail, newPassword, newName, newPhone } = req.body;
   const store = await getStore({ users: { $or: [idFilter(req.user._id), { email: typeof newEmail === 'string' ? newEmail.toLowerCase().trim() : '' }] }, sellers: { _id: req.user.sellerId || null } });
   const user = store.users.find((u) => u._id === req.user._id);

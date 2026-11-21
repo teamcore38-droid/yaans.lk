@@ -1,5 +1,6 @@
 import React, {useRef,useState} from 'react';
 import {apiRequest,formatLkr} from '../utils/api.js';
+import {apiFailure} from '../utils/retryAfter.js';
 
 export default function OrderDocuments({orderId,packageId,accessToken=''}) {
   const [documents,setDocuments]=useState(null),[selected,setSelected]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
@@ -10,7 +11,7 @@ export default function OrderDocuments({orderId,packageId,accessToken=''}) {
   async function view(doc){setBusy(true);setError('');try{const result=await apiRequest(`${endpoint}/${encodeURIComponent(doc._id)}`,{headers,cache:'no-store'});setSelected(result.document);dialog.current?.showModal();}catch(e){setError(e.message);}finally{setBusy(false);}}
   async function download(doc){setBusy(true);setError('');try{
     const response=await fetch(`${import.meta.env.VITE_API_URL || '/api'}${endpoint}/${encodeURIComponent(doc._id)}?format=pdf`,{credentials:'same-origin',headers:{'X-Yaans-Client':'browser',...headers}});
-    if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.message || 'Document download failed.');}
+    if(!response.ok){const data=await response.json().catch(()=>({}));throw apiFailure(response,data);}
     const blob=await response.blob();const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`${doc.number}.pdf`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }catch(e){setError(e.message);}finally{setBusy(false);}}
   return <section aria-label="Order documents" className="border rounded-lg p-3 space-y-3 text-sm">

@@ -1,9 +1,24 @@
+import { apiFailure, rateLimitFailure, announceRateLimit } from './retryAfter.js';
+
 const API_BASE = import.meta.env?.VITE_API_URL || '/api';
 const responses = new Map();
 const pendingRequests = new Map();
 const STORAGE_PREFIX = 'yaans_catalog_v1:';
 const MAX_CACHE_ENTRIES = 40;
+const cooldowns = new Map();
 let cacheGeneration = 0;
+
+export function clearRequestCooldowns() { cooldowns.clear(); }
+
+function cooldownKey(endpoint, method, session, body) {
+  const url = new URL(endpoint, 'http://api.local');
+  let identity = '';
+  if (/\/auth\/(?:admin\/|staff\/)?login$/.test(url.pathname) && typeof body === 'string') {
+    try { const email=JSON.parse(body).email; if(typeof email==='string')identity=email.trim().toLowerCase().slice(0,254); } catch { /* Invalid bodies are validated by the server. */ }
+  }
+  const search = url.pathname === '/marketplace/products' && url.searchParams.get('q')?.trim() ? ':search' : '';
+  return `${method}:${url.pathname}${search}:${session}:${identity}`;
+}
 
 export function browserSessionKey() {
   if(typeof document==='undefined')return '';
@@ -85,6 +100,14 @@ export async function apiRequest(endpoint, options = {}) {
   }
   // Public catalog responses are identical for guests and signed-in users.
   const session = browserSessionKey();
+  const coolingKey = cooldownKey(endpoint, method, session, options.body);
+  const deadline = cooldowns.get(coolingKey);
+  if (deadline > Date.now()) {
+    const error=rateLimitFailure(Math.ceil((deadline-Date.now())/1000));
+    announceRateLimit(error);
+    throw error;
+  }
+  if(deadline)cooldowns.delete(coolingKey);
   const headers = {
     ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
     'X-Yaans-Client':'browser',
@@ -101,9 +124,11 @@ export async function apiRequest(endpoint, options = {}) {
     const response = await fetch(`${API_BASE}${endpoint}`, { ...options, credentials:'same-origin', headers });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const error = new Error(data.message || `Request failed (${response.status})`);
-      error.status = response.status;
-      error.code = data.code;
+      const error = apiFailure(response,data);
+      if(error.status===429){
+        cooldowns.set(coolingKey,error.retryAt);
+        if(cooldowns.size>128)cooldowns.delete(cooldowns.keys().next().value);
+      }
       throw error;
     }
     if (publicKey && options.cache !== 'no-store' && generation === cacheGeneration) {

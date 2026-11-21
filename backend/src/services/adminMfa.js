@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 import { getJwtSecret, credentialsRevoked } from '../middleware/auth.js';
 import { getStore, persistStore, idFilter, withTransaction } from '../config/db.js';
 import { httpError } from '../config/errors.js';
-import { consumeLimit } from '../middleware/sharedRateLimit.js';
+import { consumeLimit, rateLimitError } from '../middleware/sharedRateLimit.js';
 
 function encryptionKey() {
   const value=process.env.MFA_ENCRYPTION_KEY || '';
@@ -68,7 +68,7 @@ export async function verifyMfaLogin(challenge,code) {
   // A signed challenge identifies the account; changing IP or requesting another
   // challenge must not multiply the number of authenticator guesses.
   const limit=await consumeLimit('mfa-account',decoded.id,10,5*60000);
-  if(!limit.allowed)throw httpError(429,'Too many authenticator attempts. Wait five minutes before trying again.');
+  if(!limit.allowed)throw rateLimitError(limit.retryAfter);
   return withTransaction(async session=>{
     const store=await getStore({users:idFilter(decoded.id)},{session});const user=store.users[0];
     if(!user||user.role!=='admin'||!user.isActive||credentialsRevoked(user)||!user.adminMfa?.enabled||decoded.tokenVersion!==(user.tokenVersion||0))throw httpError(401,'Sign in again.');

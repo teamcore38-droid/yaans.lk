@@ -17,6 +17,23 @@ test.beforeEach(async ({ context, page }) => {
 });
 test.afterEach(() => expect(browserErrors).toEqual([]));
 
+test('a rate-limited sign-in shows a countdown, suppresses repeated requests and leaves browsing available',async({page})=>{
+  let attempts=0;
+  await page.route('**/api/auth/login',route=>{attempts++;return route.fulfill({status:429,headers:{'Retry-After':'3'},json:{code:'RATE_LIMITED',message:'Wait.'}});});
+  await page.goto('/login');
+  await page.getByPlaceholder('name@example.lk').fill('limited@test.invalid');
+  await page.getByPlaceholder('••••••••',{exact:true}).fill(TEST_PASSWORD);
+  await page.getByRole('button',{name:'Sign In',exact:true}).click();
+  await expect(page.getByRole('status')).toContainText(/Please wait [123] seconds?/);
+  await page.getByRole('button',{name:'Sign In',exact:true}).click();
+  expect(attempts).toBe(1);
+  await expect(page.getByRole('status')).toBeHidden({timeout:6000});
+  expect(attempts).toBe(1,'Sign-in must never replay automatically');
+  await page.getByRole('button',{name:'Sign In',exact:true}).click();
+  await expect.poll(()=>attempts).toBe(2);
+  await page.goto('/products');await expect(page.getByRole('link',{name:'Test Ceylon Spice',exact:true}).last()).toBeVisible();
+});
+
 async function login(page, email, admin = false) {
   await page.goto(admin ? '/admin/login' : '/login');
   await page.getByPlaceholder(admin ? 'admin@yaans.lk' : 'name@example.lk').fill(email);

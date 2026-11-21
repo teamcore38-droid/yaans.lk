@@ -1,0 +1,12 @@
+{
+  "name": "API burst observability",
+  "active": true,
+  "description": "Observe excessive API bursts before enabling blocking; preserve static pages and existing account limits.",
+  "conditionGroup": [{ "conditions": [{ "type": "path", "op": "pre", "value": "/api/" }] }],
+  "action": {
+    "mitigate": {
+      "action": "rate_limit",
+      "rateLimit": { "action": "log", "algo": "fixed_window", "keys": ["ip"], "limit": 1200, "window": 60 }
+    }
+  }
+}

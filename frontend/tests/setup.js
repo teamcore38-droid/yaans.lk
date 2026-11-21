@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
-import { invalidateCatalogCache } from '../src/utils/api.js';
+import { invalidateCatalogCache, clearRequestCooldowns } from '../src/utils/api.js';
 
 afterEach(() => {
   cleanup();
@@ -12,4 +12,5 @@ afterEach(() => {
   sessionStorage.clear();
   for(const value of document.cookie.split(';'))document.cookie=`${value.split('=')[0].trim()}=; Max-Age=0; path=/`;
   invalidateCatalogCache();
+  clearRequestCooldowns();
 });

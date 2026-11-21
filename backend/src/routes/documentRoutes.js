@@ -5,14 +5,14 @@ import {createRouter} from '../config/router.js';
 import {idFilter} from '../config/db.js';
 import {httpError} from '../config/errors.js';
 import {authenticate,optionalAuthenticate,requireRole} from '../middleware/auth.js';
-import {sharedRateLimit} from '../middleware/sharedRateLimit.js';
+import {sharedRateLimit,documentLimit} from '../middleware/sharedRateLimit.js';
 import {assertOrderAccess} from '../services/orders.js';
 import {documentBundle,readDocument} from '../services/orderDocuments.js';
 import {emailConfiguration,processOrderEmails} from '../services/orderEmails.js';
 
 const router=createRouter();
 router.use((_req,res,next)=>{res.set({'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Robots-Tag':'noindex, nofollow'});next();});
-router.use(sharedRateLimit('order-documents',60,60000,req=>req.ip));
+router.use(sharedRateLimit('order-documents-ip',300,60000));
 async function scope(req,sellerOnly=false) {
   const db=mongoose.connection.db;const id=req.params.id;
   if(!id || id.length>128)throw httpError(400,'Invalid order ID.');
@@ -43,16 +43,16 @@ const deliver=(sellerOnly=false)=>async(req,res)=>{
   const pdf=await documentPdf(doc);
   res.set({'Content-Type':'application/pdf','Content-Disposition':`attachment; filename="${doc.number.replace(/[^A-Za-z0-9_-]/g,'_')}.pdf"`});res.send(pdf);
 };
-router.get('/orders/:id',optionalAuthenticate,deliver());
-router.get('/orders/:id/:documentId',optionalAuthenticate,deliver());
-router.get('/packages/:id',authenticate,requireRole('seller','admin'),deliver(true));
-router.get('/packages/:id/:documentId',authenticate,requireRole('seller','admin'),deliver(true));
-router.get('/email-status',authenticate,requireRole('admin'),async(_req,res)=>{
+router.get('/orders/:id',optionalAuthenticate,documentLimit,deliver());
+router.get('/orders/:id/:documentId',optionalAuthenticate,documentLimit,deliver());
+router.get('/packages/:id',authenticate,requireRole('seller','admin'),documentLimit,deliver(true));
+router.get('/packages/:id/:documentId',authenticate,requireRole('seller','admin'),documentLimit,deliver(true));
+router.get('/email-status',authenticate,requireRole('admin'),documentLimit,async(_req,res)=>{
   const counts=await mongoose.connection.db.collection('orderemailjobs').aggregate([{$group:{_id:'$status',count:{$sum:1}}}],{maxTimeMS:3000}).toArray();
   const {ready,enabled}=emailConfiguration();res.json({ready,enabled,counts:Object.fromEntries(counts.map(x=>[x._id,x.count]))});
 });
-router.post('/retry-emails',authenticate,requireRole('admin'),sharedRateLimit('email-admin-retry',5,60000,req=>req.user._id),async(_req,res)=>res.json(await processOrderEmails()));
-router.post('/email-worker',async(req,res)=>{
+router.post('/retry-emails',authenticate,requireRole('admin'),documentLimit,sharedRateLimit('email-admin-retry',5,60000,req=>req.user._id),async(_req,res)=>res.json(await processOrderEmails()));
+router.post('/email-worker',documentLimit,async(req,res)=>{
   const secret=process.env.ORDER_EMAIL_WORKER_SECRET,provided=req.headers.authorization || '';
   if(!secret || secret.length<32 || !timingSafeEqual(createHash('sha256').update(provided).digest(),createHash('sha256').update(`Bearer ${secret}`).digest()))throw httpError(401,'Worker authentication required.');
   res.json(await processOrderEmails());

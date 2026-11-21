@@ -40,6 +40,19 @@ export async function recordOperationalEvent(name) {
   } catch { console.error('[Yaans operation]', { event: 'metric_write_failed', originalEvent: name }); }
 }
 
+// The limiter samples at rejected counts 1, 2, 4, 8, ... per shared bucket.
+// This retains a lower bound without adding a second write to every rejection.
+export async function recordRateLimitRejection(scope, rejected) {
+  if (!Number.isSafeInteger(rejected) || rejected < 1 || rejected > 1048576 || (rejected & (rejected - 1)) !== 0) return;
+  if (mongoose.connection.readyState !== 1) return;
+  const bucket = Math.floor(Date.now() / 300000) * 300000;
+  try {
+    await mongoose.connection.db.collection('operationalmetrics').updateOne({ _id: `rate-limit:${scope}:${bucket}` },
+      { $inc: { count: rejected === 1 ? 1 : rejected / 2 }, $setOnInsert: { name:'rate_limit_rejected', scope, bucket:new Date(bucket), expiresAt:new Date(bucket + 7 * 86400000) } },
+      { upsert:true, maxTimeMS:1000 });
+  } catch { console.error('[Yaans operation]', { event:'rate_limit_metric_write_failed', scope }); }
+}
+
 export async function operationalStatus() {
   const since = new Date(Date.now() - 60 * 60000);
   const metrics = await mongoose.connection.db.collection('operationalmetrics').aggregate([
@@ -56,6 +69,7 @@ export async function operationalStatus() {
   if ((counts.checkout_failure || 0) >= 3) alerts.push('checkout_failures');
   if ((counts.database_error || 0) >= 3) alerts.push('database_errors');
   if ((counts.server_error || 0) >= 5) alerts.push('server_errors');
+  if ((counts.rate_limit_rejected || 0) >= 50) alerts.push('rate_limit_abuse');
   if ((securityCounts.admin_login_failed || 0) + (securityCounts.admin_mfa_login_failed || 0) >= 5) alerts.push('admin_authentication_failures');
   if ((securityCounts.login_failed || 0) >= 20) alerts.push('login_failures');
   if ((securityCounts.authentication_denied || 0) + (securityCounts.authorization_denied || 0) >= 30) alerts.push('access_denials');

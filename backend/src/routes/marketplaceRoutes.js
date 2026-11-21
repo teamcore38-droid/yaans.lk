@@ -4,7 +4,7 @@ import { getStore, persistStore, generateId, idFilter, withTransaction, MODEL_MA
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { createHash } from 'node:crypto';
 import mongoose from 'mongoose';
-import { sharedRateLimit } from '../middleware/sharedRateLimit.js';
+import { sharedRateLimit, searchLimit } from '../middleware/sharedRateLimit.js';
 import { stringField } from '../config/inputValidation.js';
 import { httpError } from '../config/errors.js';
 import { catalogHome, catalogSettings, catalogCategories, catalogProducts, catalogProduct, catalogSeller, catalogRecommendations } from '../services/catalog.js';
@@ -35,7 +35,7 @@ router.get('/policies/:version', async(req,res)=>{
 });
 
 router.get('/categories', async (_req, res) => { const [categories,config] = await Promise.all([catalogCategories(),catalogSettings()]); res.json({ categories, businessSettings: config.businessSettings, businessVersion: config.businessVersion || 0, businessEffectiveAt: config.businessEffectiveAt || null, codEnabledGlobally: config.codEnabledGlobally !== false, commissionRates: {standard:config.defaultCommissionPercent ?? 8,homemade:config.homemadeCommissionPercent ?? 5} }); });
-router.get('/products', async (req, res) => res.json(await catalogProducts(req.query)));
+router.get('/products', (req,res,next) => typeof req.query.q === 'string' && req.query.q.trim() ? searchLimit(req,res,next) : next(), async (req, res) => res.json(await catalogProducts(req.query)));
 router.get('/products/:idOrSlug', async (req, res) => res.json(await catalogProduct(req.params.idOrSlug, req.query)));
 
 // POST /api/marketplace/products/:productId/reviews

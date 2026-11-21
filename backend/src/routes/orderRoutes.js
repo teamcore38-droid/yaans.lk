@@ -5,13 +5,13 @@ import { authenticate, optionalAuthenticate } from '../middleware/auth.js';
 import { normalizeCartItems, buildMultiSellerCartBreakdown } from '../services/cart.js';
 import { loadCartStore, checkout, checkoutResult, customerAction, assertOrderAccess, customerOrder, customerPackage } from '../services/orders.js';
 import { httpError } from '../config/errors.js';
-import { sharedRateLimit } from '../middleware/sharedRateLimit.js';
+import { sharedRateLimit, quoteLimit } from '../middleware/sharedRateLimit.js';
 import { recordOperationalEvent } from '../config/operations.js';
 
 const router = createRouter();
 router.use((_req, res, next) => { res.set('Cache-Control', 'private, no-store'); next(); });
 
-router.post('/quote', async (req, res) => {
+router.post('/quote', quoteLimit, async (req, res) => {
   const items = normalizeCartItems(req.body.items || []);
   const store = await loadCartStore(items);
   return res.json(buildMultiSellerCartBreakdown(items, req.body.destinationDistrict || 'Colombo', store));

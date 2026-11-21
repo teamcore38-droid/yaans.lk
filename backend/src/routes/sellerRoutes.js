@@ -7,7 +7,7 @@ import { authenticate, requireRole } from '../middleware/auth.js';
 import { uploadMiddleware, handleProductImageUpload } from '../config/cloudinary.js';
 import { fulfillmentTransitions } from '../../../shared/orderStatus.js';
 import { releaseInventory } from '../services/orders.js';
-import { uploadLimit } from '../middleware/sharedRateLimit.js';
+import { uploadLimit, bulkImportLimit } from '../middleware/sharedRateLimit.js';
 import { httpError } from '../config/errors.js';
 import { sanitizeHighlights, sanitizeSlug, stringField } from '../config/inputValidation.js';
 
@@ -317,7 +317,7 @@ router.patch('/products/:productId/stock', async (req, res) => {
 
 // POST /api/seller/products/bulk-import
 // Bulk import product catalog from CSV
-router.post('/products/bulk-import', async (req, res) => {
+router.post('/products/bulk-import', bulkImportLimit, async (req, res) => {
   const store = await sellerStore(req);
   const seller = resolveSellerForRequest(req, store);
   if (!seller) {

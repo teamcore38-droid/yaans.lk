@@ -20,6 +20,7 @@ export default function OrderNotifications({ onViewOrders, onSessionExpired }) {
       if (stopped || busy || document.hidden) return;
       clearTimeout(timer);
       busy = true;
+      let retryDelay = 30000;
       try {
         const result = await apiRequest('/notifications');
         if (stopped) return;
@@ -44,9 +45,10 @@ export default function OrderNotifications({ onViewOrders, onSessionExpired }) {
         if (!stopped && onSessionExpired && [401, 403].includes(error.status)) { onSessionExpired(); return; }
         if (!stopped) setError('Notifications are unavailable. Retrying automatically.');
         failures++;
+        retryDelay=Math.max(Math.min(30000*2**failures,240000),Number.isFinite(error.retryAfter)?error.retryAfter*1000:0);
       } finally {
         busy = false;
-        if (!stopped) timer = setTimeout(poll, Math.min(30000 * 2 ** failures, 240000));
+        if (!stopped) timer = setTimeout(poll, retryDelay);
       }
     }
     const visible = () => { if (!document.hidden) poll(); };

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
-import { apiRequest, getCachedApiResponse, invalidateCatalogCache } from '../src/utils/api.js';
+import { apiRequest, getCachedApiResponse, invalidateCatalogCache, clearRequestCooldowns } from '../src/utils/api.js';
 import { imageUrl, imageSrcSet } from '../src/utils/images.js';
 
 const originalFetch = globalThis.fetch;
@@ -12,11 +12,39 @@ const storage = () => {
 };
 const response = (body, status = 200) => ({ ok: status < 400, status, json: async () => body });
 
+test('429 cooldown prevents repeat network calls, preserves browsing and requires an explicit retry',async()=>{
+  let now=1000000,calls=0;Date.now=()=>now;
+  globalThis.fetch=async()=>{calls++;return calls===1?{...response({message:'Wait.'},429),headers:{get:()=> '120'}}:response({products:[]});};
+  await assert.rejects(apiRequest('/marketplace/products?q=spice'),e=>e.retryAfter===120);
+  now+=1000;
+  await assert.rejects(apiRequest('/marketplace/products?q=changed'),e=>e.retryAfter===119);assert.equal(calls,1);
+  assert.deepEqual(await apiRequest('/marketplace/products?category=food'),{products:[]});assert.equal(calls,2);
+  now+=120000;assert.equal(calls,2,'No request is automatically replayed');
+  await apiRequest('/marketplace/products?q=spice');assert.equal(calls,3);
+});
+
+test('checkout cooldown never automatically retries a write or changes its idempotency key',async()=>{
+  let now=1000000;Date.now=()=>now;const calls=[];
+  globalThis.fetch=async(_url,options)=>{calls.push(options);return calls.length===1?{...response({},429),headers:{get:()=> '5'}}:response({order:{_id:'one'}});};
+  const options={method:'POST',body:'{}',headers:{'Idempotency-Key':'same-order-request'}};
+  await assert.rejects(apiRequest('/orders/checkout',options),{status:429});
+  await assert.rejects(apiRequest('/orders/checkout',options),{status:429});assert.equal(calls.length,1);
+  now+=5001;assert.equal(calls.length,1);
+  await apiRequest('/orders/checkout',options);assert.equal(calls.length,2);assert.equal(calls[1].headers['Idempotency-Key'],'same-order-request');
+});
+
+test('an account-specific login cooldown does not prevent a different account signing in',async()=>{
+  let calls=0;globalThis.fetch=async()=>++calls===1?{...response({},429),headers:{get:()=> '60'}}:response({user:{}});
+  const signIn=email=>apiRequest('/auth/login',{method:'POST',body:JSON.stringify({email,password:'private password'})});
+  await assert.rejects(signIn('one@test.invalid'),{status:429});await signIn('two@test.invalid');assert.equal(calls,2);
+});
+
 beforeEach(() => {
   globalThis.localStorage = storage();
   globalThis.sessionStorage = storage();
   globalThis.document = {cookie:''};
   invalidateCatalogCache();
+  clearRequestCooldowns();
 });
 afterEach(() => { globalThis.fetch = originalFetch; Date.now = originalNow; globalThis.document=originalDocument; });
 

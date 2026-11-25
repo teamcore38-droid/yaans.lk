@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import sharp from 'sharp';
+import decodeQR from 'qr/decode.js';
 import { nextAdminRecoveryCode, accounts, TEST_PASSWORD, shippingAddress } from '../support/fixtures.js';
 
 let browserErrors;
@@ -36,11 +38,48 @@ test('a rate-limited sign-in shows a countdown, suppresses repeated requests and
 
 async function login(page, email, admin = false) {
   await page.goto(admin ? '/admin/login' : '/login');
+  await submitSignIn(page, email, admin);
+}
+
+async function submitSignIn(page, email, admin) {
   await page.getByPlaceholder(admin ? 'admin@yaans.lk' : 'name@example.lk').fill(email);
   await page.getByPlaceholder(admin ? '••••••••••••' : '••••••••', { exact: true }).fill(TEST_PASSWORD);
   await page.getByRole('button', { name: admin ? 'Sign In to Admin Console' : 'Sign In', exact: true }).click();
   if (admin) { await page.getByLabel('Authenticator or recovery code').fill(nextAdminRecoveryCode()); await page.getByRole('button', { name: 'Sign In to Admin Console', exact: true }).click(); }
 }
+
+test('scanning the received order QR resumes the exact order after admin MFA', async ({ page, request, context }) => {
+  const placed = await request.post('/api/orders/checkout', {
+    headers: { 'Idempotency-Key': randomUUID() },
+    data: {
+      items: [{ productId: 'prd_test_spice', variantLabel: '100 g', quantity: 1 }],
+      shippingAddress, customerEmail: 'qr-order@test.invalid', paymentMethod: 'COD', codConfirmedByCustomer: true
+    }
+  });
+  expect(placed.status()).toBe(201);
+  const { order } = await placed.json();
+  await login(page, accounts.admin, true);
+  await page.getByRole('button', { name: /All Split Orders/ }).click();
+  const card = page.getByText(`Master Order #${order.orderNumber}`, { exact: true }).locator('../..').locator('..');
+  await card.getByRole('button', { name: 'View invoices & documents' }).click();
+  await card.getByRole('button', { name: `View ${order.orderNumber}-SUMMARY`, exact: true }).click();
+  const document = page.getByRole('dialog', { name: 'Order document preview' });
+  const image = await document.getByRole('img', { name: 'QR code for this admin order' }).getAttribute('src');
+  const { data, info } = await sharp(Buffer.from(image.split(',')[1], 'base64')).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const scanUrl = decodeQR({ width: info.width, height: info.height, data });
+  expect(scanUrl).toBe(`http://127.0.0.1:4173/admin/orders/${order._id}`);
+  await expect(document.getByRole('link', { name: /Open admin order/ })).toHaveAttribute('href', new URL(scanUrl).pathname);
+
+  await context.clearCookies();
+  await page.goto(scanUrl);
+  await expect(page).toHaveURL(/\/admin\/login$/);
+  await expect(page.getByText(shippingAddress.recipientName, { exact: true })).toHaveCount(0);
+  await submitSignIn(page, accounts.admin, true);
+  await expect(page).toHaveURL(scanUrl);
+  await expect(page.getByRole('heading', { name: `Order ${order.orderNumber}`, exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Delivery details' })).toContainText(shippingAddress.recipientName);
+  await expect(page.getByRole('region', { name: 'Seller packages' })).toContainText('Test Ceylon Spice');
+});
 
 async function fillAddress(page) {
   await page.getByPlaceholder('e.g., Kasun Perera').fill(shippingAddress.recipientName);

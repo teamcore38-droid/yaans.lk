@@ -5,6 +5,8 @@ import {startIsolatedApp} from './helpers/isolated-app.js';
 import {adminLoginBody,accounts,TEST_PASSWORD,shippingAddress} from '../../tests/support/fixtures.js';
 import {processOrderEmails,confirmationEmail} from '../src/services/orderEmails.js';
 import {recordCashMovement} from '../src/services/finance.js';
+import sharp from 'sharp';
+import decodeQR from 'qr/decode.js';
 
 test('private documents and durable confirmation outbox', {timeout:180000}, async t=>{
   const app=await startIsolatedApp();t.after(()=>app.close());t.beforeEach(()=>app.reset());
@@ -15,6 +17,43 @@ test('private documents and durable confirmation outbox', {timeout:180000}, asyn
   async function login(email,admin=false){const r=await req(admin?'/auth/admin/login':'/auth/login',{body:admin?adminLoginBody(email):{email,password:TEST_PASSWORD}});assert.equal(r.status,200);return r.data.token;}
   const payload=()=>({items:[{productId:'prd_test_spice',variantLabel:'100 g',quantity:1},{productId:'prd_test_lamp',quantity:1}],shippingAddress,customerEmail:'guest@test.invalid',paymentMethod:'COD',codConfirmedByCustomer:true});
   async function place(options={}){const key=randomUUID(),body=payload(),r=await req('/orders/checkout',{body,key,...options});assert.equal(r.status,201,JSON.stringify(r.data));return {...r.data,key,body};}
+  async function assertAdminQr(documentPath, orderId, admin, access) {
+    const expected = 'http://127.0.0.1:4173/admin/orders/' + orderId;
+    const preview = await req(documentPath, {token:admin});
+    assert.equal(preview.status, 200);
+    assert.match(preview.data.adminQr, /^data:image\/gif;base64,/);
+    const {data,info} = await sharp(Buffer.from(preview.data.adminQr.split(',')[1], 'base64')).ensureAlpha().raw().toBuffer({resolveWithObject:true});
+    assert.equal(decodeQR({width:info.width,height:info.height,data}), expected);
+    const printed = await req(documentPath+'?format=pdf', {token:admin});
+    assert.equal(printed.status, 200);
+    assert.ok(printed.data.includes(Buffer.from(expected)));
+    const guestPreview = await req(documentPath, {access});
+    assert.equal(guestPreview.status, 200);
+    assert.equal(guestPreview.data.adminQr, undefined);
+    const guestPdf = await req(documentPath+'?format=pdf', {access});
+    assert.equal(guestPdf.status, 200);
+    assert.ok(!guestPdf.data.includes(Buffer.from(expected)));
+  }
+
+  await t.test('received orders have an admin QR and the scanned details require authorized sign-in',async()=>{
+    const {order,guestAccessToken:access}=await place();
+    const admin=await login(accounts.admin,true);
+    await assertAdminQr(`/documents/orders/${order._id}/${order._id}%3Asummary`,order._id,admin,access);
+    const detailPath=`/admin/orders/${order._id}`;
+    assert.equal((await req(detailPath,{access})).status,401);
+    for(const email of [accounts.customer,accounts.seller]){
+      assert.equal((await req(detailPath,{token:await login(email)})).status,403);
+    }
+    const detail=await req(detailPath,{token:admin});
+    assert.equal(detail.status,200);
+    assert.match(detail.headers.get('cache-control'),/no-store/);
+    assert.equal(detail.data.order.orderNumber,order.orderNumber);
+    assert.equal(detail.data.packages.length,2);
+    assert.ok(detail.data.packages[0].items[0].title);
+    assert.ok(!/guestAccess|paymentReceipt|settlementId|bankDetails/.test(JSON.stringify(detail.data)));
+    assert.equal((await req('/admin/orders/missing',{token:admin})).status,404);
+    assert.equal((await req('/admin/orders/%2F',{token:admin})).status,400);
+  });
   await t.test('checkout creates immutable documents once, restricts owner/guest/seller access and downloads PDFs',async()=>{
     const placed=await place(),{order,subOrders,guestAccessToken:access}=placed;
     const path=`/documents/orders/${order._id}`;
@@ -50,6 +89,8 @@ test('private documents and durable confirmation outbox', {timeout:180000}, asyn
     await app.mongo.collection('suborders').updateOne({_id:sub._id},{$set:{fulfillmentStatus:'delivered'}});
     await recordCashMovement('receipt',sub._id,{amountLkr:sub.grossTotalLkr,bankReference:'COURIER-REFERENCE-001'},{_id:'usr_test_admin',email:accounts.admin});
     assert.ok(await app.mongo.collection('orderdocuments').findOne({_id:`${sub._id}:receipt`}));
+    const admin=await login(accounts.admin,true);
+    await assertAdminQr(`/documents/orders/${order._id}/${sub._id}%3Areceipt`,order._id,admin,access);
     await app.mongo.collection('suborders').updateOne({_id:sub._id},{$set:{fulfillmentStatus:'returned'}});
     await recordCashMovement('refund',sub._id,{amountLkr:sub.grossTotalLkr,bankReference:'REFUND-REFERENCE-001'},{_id:'usr_test_admin',email:accounts.admin});
     assert.ok(await app.mongo.collection('orderdocuments').findOne({_id:`${sub._id}:refund`}));

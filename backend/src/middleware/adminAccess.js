@@ -4,6 +4,7 @@ import { httpError } from '../config/errors.js';
 import { recordSecurityEvent } from '../config/securityEvents.js';
 const rules=[
  ['GET',/^\/operations$/,null],['GET',/^\/operation-requests$/, 'orders'],['POST',/^\/operation-requests$/, 'orders'],
+ ['GET',/^\/orders\/[^/]+$/, 'orders'],
  ['GET',/^\/banners$/, 'merchandising'],['POST',/^\/banners$/, 'merchandising'],['PUT',/^\/banners\/[^/]+$/, 'merchandising'],['DELETE',/^\/banners\/[^/]+$/, 'merchandising'],
  ['PUT',/^\/config\/banners$/, 'merchandising'],['POST',/^\/categories$/, 'merchandising'],['PUT',/^\/categories\/[^/]+$/, 'merchandising'],
  ['PUT',/^\/sellers\/[^/]+\/status$/, 'sellers'],['PUT',/^\/products\/[^/]+(?:\/moderation)?$/, 'products'],

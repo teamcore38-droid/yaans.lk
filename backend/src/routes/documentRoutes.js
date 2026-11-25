@@ -9,6 +9,7 @@ import {sharedRateLimit,documentLimit} from '../middleware/sharedRateLimit.js';
 import {assertOrderAccess} from '../services/orders.js';
 import {documentBundle,readDocument} from '../services/orderDocuments.js';
 import {emailConfiguration,processOrderEmails} from '../services/orderEmails.js';
+import {adminOrderUrl,orderQr} from '../services/adminOrderQr.js';
 
 const router=createRouter();
 router.use((_req,res,next)=>{res.set({'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Robots-Tag':'noindex, nofollow'});next();});
@@ -37,10 +38,15 @@ const deliver=(sellerOnly=false)=>async(req,res)=>{
   const {order,subs,sellerId}=await scope(req,sellerOnly);
   if(!req.params.documentId)return res.json({documents:await documentBundle(order,subs,sellerId)});
   const doc=await readDocument(order,subs,req.params.documentId,sellerId);
-  if(req.query.format===undefined)return res.json({document:doc});
+  const orderUrl = !sellerOnly && isOwner(req.user) && ['summary','receipt'].includes(doc.kind)
+    ? adminOrderUrl(String(order._id)) : null;
+  if(req.query.format===undefined) {
+    const adminQr = orderUrl ? await orderQr(orderUrl, 'data-url') : null;
+    return res.json({document:doc,...(adminQr ? {adminQr} : {})});
+  }
   if(req.query.format!=='pdf')throw httpError(400,'Unsupported document format.');
   const {documentPdf}=await import('../services/documentPdf.js');
-  const pdf=await documentPdf(doc);
+  const pdf=await documentPdf(doc, {orderUrl});
   res.set({'Content-Type':'application/pdf','Content-Disposition':`attachment; filename="${doc.number.replace(/[^A-Za-z0-9_-]/g,'_')}.pdf"`});res.send(pdf);
 };
 router.get('/orders/:id',optionalAuthenticate,documentLimit,deliver());

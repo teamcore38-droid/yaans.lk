@@ -1,5 +1,7 @@
 import OrderDocuments from '../../components/OrderDocuments.jsx';
 import React from 'react';
+import { Link } from 'react-router-dom';
+import { adminOrderPath } from '../../../../shared/adminOrderPath.js';
 import { formatLkr } from '../../utils/api.js';
 
 export default function OrdersTab({ orders, subOrders }) {
@@ -11,6 +13,7 @@ export default function OrdersTab({ orders, subOrders }) {
       <div className="space-y-4">
         {orders.map((ord) => {
           const subs = subOrders.filter((s) => s.parentOrderId === ord._id);
+          const detailsPath = adminOrderPath(ord._id);
           return (
             <div
               key={ord._id}
@@ -34,6 +37,7 @@ export default function OrdersTab({ orders, subOrders }) {
                 </div>
               </div>
 
+              {detailsPath && <Link to={detailsPath} className="inline-block font-semibold text-sky-800 underline">View order details</Link>}
               <OrderDocuments orderId={ord._id} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                 {subs.map((sub) => (

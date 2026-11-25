@@ -1,15 +1,33 @@
 import mongoose from 'mongoose';
 import { randomUUID } from 'node:crypto';
 import { hasAdminPermission, isOwner } from '../../../shared/adminAccess.js';
+import { adminOrderPath } from '../../../shared/adminOrderPath.js';
 import { stringField } from '../config/inputValidation.js';
 import { httpError } from '../config/errors.js';
 import { idFilter, getStore, persistStore, withTransaction } from '../config/db.js';
 import { recordAdminAuditLog } from '../config/auditLogger.js';
-import { sharedRateLimit } from '../middleware/sharedRateLimit.js';
+import { documentLimit, sharedRateLimit } from '../middleware/sharedRateLimit.js';
+import { recordSecurityEvent } from '../config/securityEvents.js';
 import { operationsProductFields as productFields, operationsProductRevision } from '../services/operationsProducts.js';
 const sellerFields={_id:1,storeName:1,sellerType:1,description:1,contactEmail:1,contactPhone:1,district:1,city:1,status:1,createdAt:1};
 const orderFields={_id:1,orderNumber:1,customerEmail:1,customerPhone:1,shippingAddress:1,overallStatus:1,createdAt:1};
 export function mountAdminOperations(router){
+ router.get('/orders/:id',documentLimit,async(req,res)=>{
+  const { id }=req.params;
+  if(!adminOrderPath(id))throw httpError(400,'Invalid order ID.');
+  const db=mongoose.connection.db;
+  const order=await db.collection('orders').findOne(idFilter(id),{projection:{
+    ...orderFields,paymentMethod:1,itemsSubtotalLkr:1,totalDeliveryFeeLkr:1,grandTotalLkr:1
+  },maxTimeMS:3000});
+  if(!order)throw httpError(404,'Order not found.');
+  const packages=await db.collection('suborders').find({parentOrderId:String(order._id)},{projection:{
+    subOrderNumber:1,sellerName:1,fulfillmentStatus:1,courierPartner:1,trackingCode:1,
+    'items.title':1,'items.variantLabel':1,'items.quantity':1,'items.lineTotalLkr':1
+  },maxTimeMS:3000}).limit(50).toArray();
+  await recordSecurityEvent('admin_order_view',{userId:req.user._id,role:'admin',ip:req.ip});
+  res.set({'Referrer-Policy':'no-referrer','X-Robots-Tag':'noindex, nofollow'});
+  res.json({order,packages});
+ });
  router.get('/operations',async(req,res)=>{
   const module=stringField(req.query.module,'Module',{required:true,maximum:30});
   if(!hasAdminPermission(req.user,module))throw httpError(403,'Module access is not assigned.');

@@ -21,6 +21,7 @@ const AdminDashboardPage = lazy(pageLoaders.admin);
 const StaffDashboardPage = lazy(pageLoaders.staff);
 const StaffLoginPage = lazy(pageLoaders.staffLogin);
 const AdminLoginPage = lazy(pageLoaders.adminLogin);
+const AdminOrderPage = lazy(pageLoaders.adminOrder);
 const PrivacyPolicyPage = lazy(pageLoaders.privacy);
 const TermsConditionsPage = lazy(pageLoaders.terms);
 const PolicyArchivePage = lazy(() => import('./pages/PolicyArchivePage.jsx'));
@@ -106,6 +107,7 @@ export default function App() {
                   <Route path="/staff/login" element={<StaffLoginPage />} />
                   <Route path="/staff" element={<StaffDashboardPage />} />
                   <Route path="/admin/login" element={<AdminLoginPage />} />
+                  <Route path="/admin/orders/:orderId" element={<AdminOrderPage />} />
                   <Route
                     path="/admin"
                     element={

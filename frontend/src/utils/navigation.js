@@ -13,6 +13,7 @@ export const pageLoaders = {
   staffLogin: () => import('../pages/StaffLoginPage.jsx'),
   admin: () => import('../pages/AdminDashboardPage.jsx'),
   adminLogin: () => import('../pages/AdminLoginPage.jsx'),
+  adminOrder: () => import('../pages/AdminOrderPage.jsx'),
   account: () => import('../pages/AuthAccountPages.jsx'),
   privacy: () => import('../pages/PrivacyPolicyPage.jsx'),
   terms: () => import('../pages/TermsConditionsPage.jsx'),
@@ -54,7 +55,7 @@ export function prefetchPage(href) {
       '/privacy': 'privacy', '/privacy-policy': 'privacy',
       '/terms': 'terms', '/terms-and-conditions': 'terms',
       '/cookies': 'cookies', '/cookies-policy': 'cookies'
-    }[pathname];
+    }[pathname] || (/^\/admin\/orders\/[A-Za-z0-9_-]{1,128}$/.test(pathname) ? 'adminOrder' : undefined);
   }
   if (page) pageLoaders[page]().catch(() => {});
   if (endpoint) apiRequest(endpoint).catch(() => {});

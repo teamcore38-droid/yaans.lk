@@ -33,7 +33,7 @@
       "destination": "/api/index"
     },
     {
-      "source": "/((?!api/|assets/|brand/|favicon\\.png).*)",
+      "source": "/((?!api/|assets/|brand/|favicon\\.(?:ico|png)$).*)",
       "destination": "/index.html"
     }
   ]

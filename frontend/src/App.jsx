@@ -15,6 +15,7 @@ const ProductDetailPage = lazy(pageLoaders.product);
 const CartPage = lazy(pageLoaders.cart);
 const CheckoutPage = lazy(pageLoaders.checkout);
 const TrackOrderPage = lazy(pageLoaders.tracking);
+const PackageReceiptPage = lazy(pageLoaders.packageReceipt);
 const SellerStorefrontPage = lazy(pageLoaders.store);
 const SellerDashboardPage = lazy(pageLoaders.seller);
 const AdminDashboardPage = lazy(pageLoaders.admin);
@@ -92,6 +93,7 @@ export default function App() {
                   <Route path="/cart" element={<CartPage />} />
                   <Route path="/checkout" element={<CheckoutPage />} />
                   <Route path="/track-order" element={<TrackOrderPage />} />
+                  <Route path="/package-receipt/:packageId" element={<PackageReceiptPage />} />
                   <Route path="/store/:slugOrId" element={<SellerStorefrontPage />} />
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/register" element={<RegisterCustomerPage />} />

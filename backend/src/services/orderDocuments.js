@@ -51,23 +51,26 @@ export async function capturePackageDocuments(sub, session) {
   if (sub.fulfillmentStatus==='cancelled') await insertDocument(saved,'cancellation',sub.statusHistory?.at(-1)?.timestamp || new Date().toISOString(),session,{paymentStatus:'Cancelled'});
 }
 
-export async function documentBundle(order, subs, sellerId = null) {
+export async function documentBundle(order, subs, scope = {}) {
+  const { packageId, kinds } = scope;
   const db=mongoose.connection.db;
-  const saved=await db.collection('orderdocuments').find({orderId:String(order._id),...(sellerId?{sellerId}:{})},{projection:{_id:1,title:1,kind:1,number:1,packageNumber:1,issuedAt:1,legacy:1},maxTimeMS:3000}).limit(501).toArray();
+  const saved=await db.collection('orderdocuments').find({orderId:String(order._id),...(packageId?{packageId}:{}),...(kinds?{kind:{$in:kinds}}:{})},{projection:{_id:1,title:1,kind:1,number:1,packageNumber:1,issuedAt:1,legacy:1},maxTimeMS:3000}).limit(501).toArray();
   // Read-only fallback: no mutation on GET, with clearly identified legacy documents.
   const result=[];
-  if (!sellerId) result.push({...base(order),kind:'summary'});
-  for(const sub of subs.filter(s=>!sellerId || s.sellerId===sellerId)) {
-    for(const kind of ['invoice','packing-slip']) result.push({...base(order,sub),kind});
+  if (!packageId) result.push({...base(order),kind:'summary'});
+  for(const sub of subs.filter(s=>!packageId || String(s._id)===packageId)) {
+    for(const kind of ['invoice','packing-slip']) {
+      if (!kinds || kinds.includes(kind)) result.push({...base(order,sub),kind});
+    }
   }
   return [...saved, ...result.map(doc=>({_id:`${doc.packageId || doc.orderId}:${doc.kind}`,kind:doc.kind,title:titles[doc.kind],number:`${doc.packageNumber || doc.orderNumber}-${doc.kind.toUpperCase()}`,packageNumber:doc.packageNumber,issuedAt:doc.orderDate,legacy:true})).filter(doc=>!saved.some(existing=>existing._id===doc._id))];
 }
 
-export async function readDocument(order, subs, id, sellerId = null) {
+export async function readDocument(order, subs, id, scope = {}) {
   if(typeof id!=='string' || id.length>200)throw httpError(400,'Invalid document.');
-  const allowed=await documentBundle(order,subs,sellerId);
+  const allowed=await documentBundle(order,subs,scope);
   if(!allowed.some(doc=>doc._id===id))throw httpError(404,'Document not found.');
-  const saved=await mongoose.connection.db.collection('orderdocuments').findOne({_id:id,orderId:String(order._id),...(sellerId?{sellerId}:{})},{maxTimeMS:3000});
+  const saved=await mongoose.connection.db.collection('orderdocuments').findOne({_id:id,orderId:String(order._id),...(scope.packageId?{packageId:scope.packageId}:{}),...(scope.kinds?{kind:{$in:scope.kinds}}:{})},{maxTimeMS:3000});
   if(saved)return saved;
   const kind=id.slice(id.lastIndexOf(':')+1), sub=subs.find(s=>`${s._id}:${kind}`===id);
   return {...base(order,sub),...allowed.find(d=>d._id===id),legacy:true};

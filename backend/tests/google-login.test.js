@@ -41,5 +41,6 @@ test('verified Google identity requires a request-bound nonce, permanent subject
 
 test('customer login return paths reject external, executable and privileged destinations', () => {
   for (const route of ['//evil.invalid', '/\\evil.invalid', '/%2fevil.invalid', 'https://evil.invalid', '/admin', '/staff', '/seller/dashboard', '/api/auth/login', '/login', '/products\n']) assert.equal(customerRedirect(route), '/account');
-  for (const route of ['/', '/checkout', '/cart', '/wishlist', '/products?q=spice', '/product/spice', '/store/kandy']) assert.equal(customerRedirect(route), route);
+  for (const route of ['/', '/checkout', '/cart', '/wishlist', '/products?q=spice', '/product/spice', '/store/kandy', '/package-receipt/sub_123']) assert.equal(customerRedirect(route), route);
+  assert.equal(customerRedirect('/package-receipt/sub_123/other'), '/account');
 });

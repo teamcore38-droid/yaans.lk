@@ -67,6 +67,9 @@ async function checkAdminOrderQr(page, request) {
   await expect(page.getByRole('heading', { name: `Order ${order.orderNumber}`, exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Delivery details' })).toContainText(shippingAddress.recipientName);
   await expect(page.getByRole('region', { name: 'Seller packages' })).toContainText('Test Ceylon Spice');
+  const labelDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download receipt QR label' }).click();
+  expect((await labelDownload).suggestedFilename()).toBe(`${order.orderNumber}-S1-RECEIPT-LABEL.pdf`);
 
   const documents = page.getByRole('region', { name: 'Order documents' });
   await documents.getByRole('button', { name: 'View invoices & documents' }).click();
@@ -275,7 +278,7 @@ test('guest multi-seller checkout creates a confirmed order that can be tracked'
   await page.getByRole('button', { name: /Confirm COD Order/ }).click();
   const response = await created;
   expect(response.status()).toBe(201);
-  const { order, subOrders } = await response.json();
+  const { order, subOrders, guestAccessToken } = await response.json();
   expect(subOrders).toHaveLength(2);
   expect(order.grandTotalLkr).toBe(4200);
   await expect(page.getByRole('heading', { name: new RegExp(order.orderNumber) })).toBeVisible();
@@ -297,6 +300,18 @@ test('guest multi-seller checkout creates a confirmed order that can be tracked'
   for (const subOrder of subOrders) {
     await expect(page.getByText(new RegExp(`^Package [12]: ${subOrder.subOrderNumber}$`))).toBeVisible();
   }
+  await page.goto(`/package-receipt/${subOrders[0]._id}`);
+  await expect(page.getByRole('heading', { name: 'Package receipt' })).toBeVisible();
+  await expect(page.getByText(shippingAddress.recipientName, { exact: true })).toHaveCount(0);
+  await page.getByLabel('Private access code').fill('A'.repeat(43));
+  await page.getByRole('button', { name: 'View package documents' }).click();
+  await expect(page.getByRole('alert')).toContainText('private access code');
+  await page.getByLabel('Private access code').fill(guestAccessToken);
+  await page.getByRole('button', { name: 'View package documents' }).click();
+  await expect(page.getByRole('button', { name: `View ${invoiceNumber}` })).toBeVisible();
+  await expect(page.getByText(subOrders[1].subOrderNumber, { exact: false })).toHaveCount(0);
+  await page.getByRole('button', { name: `View ${invoiceNumber}` }).click();
+  await expect(page.getByRole('dialog')).toContainText('Commercial invoice');
 });
 
 test('checkout failure preserves the cart and a retry can succeed', async ({ page }) => {

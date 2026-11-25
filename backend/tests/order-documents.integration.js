@@ -82,6 +82,49 @@ test('private documents and durable confirmation outbox', {timeout:180000}, asyn
     try {const r=await req('/orders/checkout',{body:payload(),key:randomUUID()});assert.equal(r.status,503);assert.equal(await app.mongo.collection('orderdocuments').countDocuments({}),0);assert.equal(await app.mongo.collection('orders').countDocuments({customerEmail:'guest@test.invalid'}),0);}
     finally{await app.mongo.command({collMod:'orderemailjobs',validator:{}});}
   });
+  await t.test('packing label and scanned receipt stay scoped to one package',async()=>{
+    const {order,subOrders,guestAccessToken:access}=await place();
+    const own=subOrders.find(sub=>sub.sellerId==='sel_test_pantry');
+    const other=subOrders.find(sub=>sub._id!==own._id);
+    const seller=await login(accounts.seller);
+    const customer=await login(accounts.customer);
+    const admin=await login(accounts.admin,true);
+    const labelPath=id=>`/documents/packages/${id}/receipt-label`;
+    const scannedPath=`/documents/package-receipts/${own._id}`;
+    assert.equal((await req(labelPath(own._id),{access})).status,401);
+    assert.equal((await req(labelPath(own._id),{token:customer})).status,403);
+    assert.equal((await req(labelPath(other._id),{token:seller})).status,403);
+    for(const token of [seller,admin]){
+      const label=await req(labelPath(own._id),{token});
+      assert.equal(label.status,200);
+      assert.match(label.headers.get('content-disposition'),/RECEIPT-LABEL\.pdf/);
+      assert.match(label.headers.get('cache-control'),/no-store/);
+      assert.ok(label.data.includes(Buffer.from(`http://127.0.0.1:4173/package-receipt/${own._id}`)));
+      assert.ok(!label.data.includes(Buffer.from(access)));
+    }
+    for(const options of [{},{access:'A'.repeat(43)},{token:customer},{token:seller}]){
+      assert.equal((await req(scannedPath,options)).status,403);
+    }
+    const invoice=await req(scannedPath,{access});
+    assert.equal(invoice.status,200);
+    assert.deepEqual(invoice.data.documents.map(d=>d.kind),['invoice']);
+    for(const id of [other._id+':invoice',own._id+':packing-slip',order._id+':summary']){
+      assert.equal((await req(`${scannedPath}/${encodeURIComponent(id)}?format=pdf`,{access})).status,404);
+    }
+    await app.mongo.collection('suborders').updateOne({_id:own._id},{$set:{fulfillmentStatus:'delivered'}});
+    await recordCashMovement('receipt',own._id,{amountLkr:own.grossTotalLkr,bankReference:'STAGING-QR-PACKAGE-001'},{_id:'usr_test_admin',email:accounts.admin});
+    const paid=await req(scannedPath,{access});
+    assert.deepEqual(paid.data.documents.map(d=>d.kind).sort(),['invoice','receipt']);
+    const pdf=await req(`${scannedPath}/${own._id}%3Areceipt?format=pdf`,{access});
+    assert.equal(pdf.status,200);
+    assert.ok(!pdf.data.includes(Buffer.from('/admin/orders/')));
+    await app.mongo.collection('orders').updateOne({_id:order._id},{$set:{guestAccessExpiresAt:new Date(0)}});
+    assert.equal((await req(scannedPath,{access})).status,403);
+    const registered=await place({token:customer});
+    const customerPackage=`/documents/package-receipts/${registered.subOrders[0]._id}`;
+    assert.equal((await req(customerPackage,{token:customer})).status,200);
+    assert.equal((await req(customerPackage,{access})).status,403);
+  });
   await t.test('collection, refund and cancellation get separate documents without changing the original invoice',async()=>{
     const {order,subOrders,guestAccessToken:access}=await place();const sub=subOrders[0];
     const original=await app.mongo.collection('orderdocuments').findOne({_id:`${sub._id}:invoice`});

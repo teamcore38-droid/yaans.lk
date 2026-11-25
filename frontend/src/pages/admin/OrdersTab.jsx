@@ -1,4 +1,5 @@
 import OrderDocuments from '../../components/OrderDocuments.jsx';
+import PackageReceiptLabel from '../../components/PackageReceiptLabel.jsx';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { adminOrderPath } from '../../../../shared/adminOrderPath.js';
@@ -56,6 +57,7 @@ export default function OrdersTab({ orders, subOrders }) {
                       {formatLkr(sub.deliveryFeeLkr)} | Commission ({sub.commissionRatePercent}%):{' '}
                       <strong>{formatLkr(sub.commissionAmountLkr)}</strong>
                     </div>
+                    <PackageReceiptLabel packageId={sub._id} packageNumber={sub.subOrderNumber} />
                   </div>
                 ))}
               </div>

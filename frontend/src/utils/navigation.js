@@ -7,6 +7,7 @@ export const pageLoaders = {
   cart: () => import('../pages/CartPage.jsx'),
   checkout: () => import('../pages/CheckoutPage.jsx'),
   tracking: () => import('../pages/TrackOrderPage.jsx'),
+  packageReceipt: () => import('../pages/PackageReceiptPage.jsx'),
   store: () => import('../pages/SellerStorefrontPage.jsx'),
   seller: () => import('../pages/SellerDashboardPage.jsx'),
   staff: () => import('../pages/StaffDashboardPage.jsx'),
@@ -40,6 +41,8 @@ export function prefetchPage(href) {
   } else if (pathname === '/products') {
     page = 'products';
     endpoint = productsEndpoint(search);
+  } else if (/^\/package-receipt\/[A-Za-z0-9_-]{1,128}$/.test(pathname)) {
+    page = 'packageReceipt';
   } else if (/^\/product\/[^/]+$/.test(pathname)) {
     page = 'product';
     const district = localStorage.getItem('yaans_district') || 'Colombo';

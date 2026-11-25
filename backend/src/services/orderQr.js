@@ -1,10 +1,10 @@
 import { adminOrderPath } from '../../../shared/adminOrderPath.js';
+import { packageReceiptPath } from '../../../shared/packageReceiptPath.js';
 
-export function adminOrderUrl(orderId, env = process.env) {
-  const path = adminOrderPath(orderId);
+function documentUrl(path, env) {
   if (!path) return null;
   // Vercel provides this hostname for the deployment. Request headers and
-  // customer data must never determine where a printed code sends an admin.
+  // customer data must never determine where a printed code sends a reader.
   if (env.VERCEL_ENV === 'preview') {
     if (!/^[a-z0-9-]{1,63}\.vercel\.app$/i.test(env.VERCEL_URL || '')) return null;
     return `https://${env.VERCEL_URL}${path}`;
@@ -14,6 +14,9 @@ export function adminOrderUrl(orderId, env = process.env) {
   if (env.NODE_ENV !== 'production' && env.VERCEL_ENV !== 'production') return `http://localhost:5173${path}`;
   return `https://yaans.lk${path}`;
 }
+
+export const adminOrderUrl = (orderId, env = process.env) => documentUrl(adminOrderPath(orderId), env);
+export const packageReceiptUrl = (packageId, env = process.env) => documentUrl(packageReceiptPath(packageId), env);
 
 export async function orderQr(url, format) {
   const { default: encodeQR } = await import('qr');

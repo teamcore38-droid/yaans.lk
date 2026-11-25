@@ -4,6 +4,7 @@ import { hasAdminPermission, isOwner } from '../../../shared/adminAccess.js';
 import { adminOrderPath } from '../../../shared/adminOrderPath.js';
 import { useMarketplace } from '../context/MarketplaceContext.jsx';
 import OrderDocuments from '../components/OrderDocuments.jsx';
+import PackageReceiptLabel from '../components/PackageReceiptLabel.jsx';
 import { apiRequest, formatLkr } from '../utils/api.js';
 
 const statusLabel = value => String(value || 'Unknown').replaceAll('_', ' ');
@@ -57,6 +58,7 @@ function OrderDetails({ orderId, owner, clearSession }) {
             <span className="shrink-0">{formatLkr(item.lineTotalLkr)}</span>
           </li>)}
         </ul>
+        {owner && <PackageReceiptLabel packageId={pkg._id} packageNumber={pkg.subOrderNumber} />}
       </article>)}
       {!packages.length && <p>No seller packages are available for this order.</p>}
     </section>

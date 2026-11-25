@@ -7,7 +7,7 @@ export function customerRedirect(value, fallback = '/account') {
   const checked = query < 0 ? value : value.slice(0, query) + value.slice(query).replace(/%20/gi, '+');
   if (!isSafeInternalLink(checked)) return fallback;
   const pathname = new URL(value, 'https://yaans.lk').pathname;
-  return /^(?:\/$|\/(?:account|checkout|cart|wishlist|products)$|\/(?:product|store)\/[^/]+$)/.test(pathname) ? value : fallback;
+  return /^(?:\/$|\/(?:account|checkout|cart|wishlist|products)$|\/(?:product|store)\/[^/]+$|\/package-receipt\/[A-Za-z0-9_-]{1,128}$)/.test(pathname) ? value : fallback;
 }
 
 export function customerAuthPath(page, returnTo) {

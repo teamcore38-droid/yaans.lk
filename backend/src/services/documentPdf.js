@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { orderQr } from './adminOrderQr.js';
+import { orderQr } from './orderQr.js';
 
 const assets = {
   NotoSans: fileURLToPath(new URL('../assets/fonts/NotoSans.ttf', import.meta.url)),
@@ -10,6 +10,39 @@ const logo = fileURLToPath(new URL('../assets/brand/yaans-logo-horizontal-white.
 const palette = {brand:'#791B20', gold:'#F4BF43', ink:'#172438', muted:'#657184', line:'#E1E5EB', light:'#F6F7FA', green:'#176147', greenLight:'#EAF5EF', amberLight:'#FFF7E5', red:'#942C32'};
 const headings = {invoice:'INVOICE', summary:'ORDER SUMMARY', 'packing-slip':'PACKING SLIP', receipt:'PAYMENT RECEIPT', refund:'REFUND CONFIRMATION', cancellation:'CANCELLATION'};
 const segmenter = new Intl.Segmenter('en', {granularity:'grapheme'});
+
+function drawQr(pdf, matrix, x, y, size) {
+  const unit = size / matrix.length;
+  pdf.rect(x, y, size, size).fill('#FFFFFF');
+  matrix.forEach((row, r) => row.forEach((dark, c) => {
+    if (dark) pdf.rect(x + c * unit, y + r * unit, unit, unit);
+  }));
+  pdf.fill('#000000');
+}
+
+export async function packageReceiptLabelPdf(packageNumber, url) {
+  const [{ default: PDFDocument }, qr] = await Promise.all([import('pdfkit'), orderQr(url, 'raw')]);
+  // 4 × 6 inches fits standard packing label printers and prints on plain paper.
+  const pdf = new PDFDocument({ size: [288, 432], margin: 0, info: { Title: 'Yaans.lk package receipt label' } });
+  const chunks = [];
+  const completed = new Promise((resolve, reject) => {
+    pdf.on('data', chunk => chunks.push(chunk));
+    pdf.on('end', () => resolve(Buffer.concat(chunks)));
+    pdf.on('error', reject);
+  });
+  pdf.font('Helvetica-Bold').fontSize(19).fillColor(palette.ink)
+    .text('Yaans.lk', 18, 48, { width: 252, align: 'center' });
+  pdf.moveTo(28, 87).lineTo(260, 87).lineWidth(0.8).strokeColor(palette.line).stroke();
+  pdf.font('Helvetica-Bold').fontSize(17).fillColor(palette.ink)
+    .text('Scan for your receipt', 18, 112, { width: 252, align: 'center' });
+  pdf.font('Helvetica').fontSize(10).fillColor(palette.muted)
+    .text(packageNumber, 18, 141, { width: 252, align: 'center', height: 25, ellipsis: true });
+  drawQr(pdf, qr, 60, 170, 168);
+  pdf.link(60, 170, 168, 168, url);
+  pdf.fontSize(11).fillColor(palette.ink).text('Sign in or enter the private access code from your order confirmation.', 28, 357, { width: 232, align: 'center' });
+  pdf.end();
+  return completed;
+}
 
 // PDF rendering and local artwork load only after the document access check.
 // All positions and page breaks are bounded here; PDFKit never lays out untrusted HTML.
@@ -107,12 +140,7 @@ export async function documentPdf(doc, { orderUrl } = {}) {
   text(status,M+26,y+9,referenceW-40,{size:8.5,bold:true,color:statusColor});
   y+=51;
   if(qr){
-    const unit=qrSize/qr.length;
-    pdf.rect(qrX,qrY,qrSize,qrSize).fill('#FFFFFF');
-    qr.forEach((row, r) => row.forEach((dark, c) => {
-      if(dark)pdf.rect(qrX+c*unit,qrY+r*unit,unit,unit);
-    }));
-    pdf.fill('#000000');
+    drawQr(pdf,qr,qrX,qrY,qrSize);
     text('Scan for admin order',qrX,qrY+qrSize,qrSize,{size:7,align:'center',color:palette.muted});
     pdf.link(qrX,qrY,qrSize,qrSize+11,orderUrl);
     y=Math.max(y,qrY+qrSize+24);

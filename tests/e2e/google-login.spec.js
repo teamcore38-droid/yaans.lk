@@ -23,7 +23,7 @@ test('Google customer onboarding preserves the cart, restores a secure session, 
   const id = randomUUID(); await googleProvider(context, request, id);
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto('/product/test-ceylon-spice');
-  await page.getByRole('button', { name: 'Add to Cart', exact: true }).click();
+  await page.getByRole('group', { name: 'Purchase options', exact: true }).getByRole('button', { name: 'Add to Cart' }).click();
   const cart = await page.evaluate(() => localStorage.getItem('yaans_cart'));
   await page.goto('/login?redirect=/checkout');
   await page.getByRole('button', { name: 'Continue with Google', exact: true }).click();
@@ -91,7 +91,7 @@ test('Google sign-in resumes an unfinished guest checkout without submitting an 
   let checkoutRequests = 0;
   page.on('request', req => { if (req.url().endsWith('/api/orders/checkout') && req.method() === 'POST') checkoutRequests++; });
   await page.goto('/product/test-ceylon-spice');
-  await page.getByRole('button', { name: 'Buy Now (Cash on Delivery)', exact: true }).click();
+  await page.getByRole('group', { name: 'Purchase options', exact: true }).getByRole('button', { name: 'Buy Now (Cash on Delivery)' }).click();
   await page.getByPlaceholder('e.g., Kasun Perera').fill('Draft Recipient');
   await page.getByPlaceholder('e.g., 077 412 3987').fill('0771234567');
   await page.getByPlaceholder('e.g., No. 42/B, Fife Road, Thimbirigasyaya').fill('42 Draft Street');

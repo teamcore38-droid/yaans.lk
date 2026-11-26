@@ -24,7 +24,7 @@ test('header sign-in returns a customer to the product or filtered results they 
 
 test('guest checkout can sign in via the header and keeps delivery details, cart and district', async ({ page }) => {
   await page.goto('/product/test-ceylon-spice');
-  await page.getByRole('button', { name: 'Buy Now (Cash on Delivery)', exact: true }).click();
+  await page.getByRole('group', { name: 'Purchase options', exact: true }).getByRole('button', { name: 'Buy Now (Cash on Delivery)' }).click();
   await page.getByPlaceholder('e.g., Kasun Perera').fill('Draft Buyer');
   await page.getByPlaceholder('e.g., 077 412 3987').fill('0771234567');
   await page.getByPlaceholder('e.g., No. 42/B, Fife Road, Thimbirigasyaya').fill('8 Draft Lane');
@@ -42,7 +42,7 @@ test('guest checkout can sign in via the header and keeps delivery details, cart
 
 test('email registration from checkout returns to the preserved draft', async ({ page }) => {
   await page.goto('/product/test-ceylon-spice');
-  await page.getByRole('button', { name: 'Buy Now (Cash on Delivery)', exact: true }).click();
+  await page.getByRole('group', { name: 'Purchase options', exact: true }).getByRole('button', { name: 'Buy Now (Cash on Delivery)' }).click();
   await page.getByPlaceholder('e.g., No. 42/B, Fife Road, Thimbirigasyaya').fill('Registration Draft Lane');
   await page.getByRole('link', { name: 'Sign in to continue checkout' }).click();
   await page.getByRole('link', { name: 'Create Customer Account', exact: true }).click();

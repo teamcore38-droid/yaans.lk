@@ -19,6 +19,8 @@ test.beforeEach(async ({ context, page }) => {
 });
 test.afterEach(() => expect(browserErrors).toEqual([]));
 
+const inlinePurchaseOptions = (page) => page.getByRole('group', { name: 'Purchase options', exact: true });
+
 test('a rate-limited sign-in shows a countdown, suppresses repeated requests and leaves browsing available',async({page})=>{
   let attempts=0;
   await page.route('**/api/auth/login',route=>{attempts++;return route.fulfill({status:429,headers:{'Retry-After':'3'},json:{code:'RATE_LIMITED',message:'Wait.'}});});
@@ -175,7 +177,7 @@ test('homemade card badge sits beside the rating and stays inside narrow cards',
 
 test('product card actions stay aligned and direct checkout preserves the cart', async ({ page }) => {
   await page.goto('/product/test-desk-lamp');
-  await page.getByRole('button', { name: 'Add to Cart', exact: true }).click();
+  await inlinePurchaseOptions(page).getByRole('button', { name: 'Add to Cart' }).click();
   await page.goto('/products?q=Test%20Ceylon%20Spice');
   const buy = page.getByRole('button', { name: 'Buy Now', exact: true }).first();
   const row = buy.locator('..');
@@ -251,23 +253,30 @@ test('short and long titles share a compact two-column mobile row', async ({ pag
   await expect(shortTitle).toHaveCSS('min-height', '40px');
 });
 
-test('product details keep mobile purchase actions above navigation and use the selected quantities', async ({ page }) => {
+test('product details keep mobile purchase actions above navigation alongside the inline controls', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/product/test-ceylon-spice');
-  const actions = page.getByRole('group', { name: 'Purchase options' });
-  const buy = actions.getByRole('button', { name: 'Buy Now (Cash on Delivery)', exact: true });
-  const cart = actions.getByRole('button', { name: 'Add to Cart', exact: true });
+  const inline = inlinePurchaseOptions(page);
+  const floating = page.getByRole('group', { name: 'Floating purchase options', exact: true });
+  const inlineBuy = inline.getByRole('button', { name: 'Buy Now (Cash on Delivery)' });
+  const inlineCart = inline.getByRole('button', { name: 'Add to Cart' });
+  const floatingBuy = floating.getByRole('button', { name: 'Buy Now (Cash on Delivery)' });
+  const floatingCart = floating.getByRole('button', { name: 'Add to Cart' });
+  const increase = page.getByRole('button', { name: '+', exact: true });
   const navigation = page.getByRole('navigation', { name: 'Mobile navigation' });
-  await expect(actions).toBeInViewport({ ratio: 1 });
-  expect(await buy.innerText()).toBe('Buy Now');
-  expect(await cart.innerText()).toBe('');
-  await expect(cart).toHaveCSS('background-color', 'rgb(255, 196, 71)');
-  await expect(buy).toHaveCSS('background-image', 'linear-gradient(rgb(216, 36, 50), rgb(161, 22, 32))');
+  const redGradient = 'linear-gradient(rgb(216, 36, 50), rgb(161, 22, 32))';
+  await expect(floating).toBeInViewport({ ratio: 1 });
+  expect(await floatingBuy.innerText()).toBe('Buy Now');
+  expect(await floatingCart.innerText()).toBe('');
+  await expect(floatingCart).toHaveCSS('background-color', 'rgb(255, 196, 71)');
+  await expect(floatingBuy).toHaveCSS('background-image', redGradient);
+  await expect(inlineBuy).toHaveCSS('background-image', redGradient);
+  await expect(inlineCart).toHaveCSS('background-color', 'rgb(251, 191, 36)');
 
   for (const width of [390, 320, 767]) {
     await page.setViewportSize({ width, height: 844 });
     const [barBox, navBox, buyBox, cartBox] = await Promise.all(
-      [actions, navigation, buy, cart].map(locator => locator.boundingBox())
+      [floating, navigation, floatingBuy, floatingCart].map(locator => locator.boundingBox())
     );
     expect(navBox.y - (barBox.y + barBox.height)).toBeGreaterThan(0);
     expect(navBox.y - (barBox.y + barBox.height)).toBeLessThanOrEqual(8);
@@ -279,52 +288,71 @@ test('product details keep mobile purchase actions above navigation and use the 
     expect(cartBox.x + cartBox.width).toBeLessThan(width);
   }
 
-  await page.setViewportSize({ width: 768, height: 844 });
-  await expect(navigation).toBeHidden();
-  await expect(actions).toHaveCSS('position', 'static');
-  await expect(buy).toHaveCSS('background-image', 'none');
-  expect(await cart.innerText()).toBe('Add to Cart');
-  expect(await buy.innerText()).toBe('Buy Now (Cash on Delivery)');
-  expect((await cart.boundingBox()).y).toBeLessThan((await buy.boundingBox()).y);
+  for (const width of [768, 1280]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect(navigation).toBeHidden();
+    await expect(floating).toBeHidden();
+    await expect(inline).toHaveCSS('position', 'static');
+    await expect(inlineBuy).toHaveCSS('background-image', redGradient);
+    expect((await increase.boundingBox()).y).toBeLessThan((await inlineCart.boundingBox()).y);
+    expect((await inlineCart.boundingBox()).y).toBeLessThan((await inlineBuy.boundingBox()).y);
+  }
 
   await page.setViewportSize({ width: 390, height: 844 });
+  await inline.scrollIntoViewIfNeeded();
+  await expect(inline).toBeInViewport({ ratio: 1 });
+  await expect(floating).toBeInViewport({ ratio: 1 });
+  expect((await increase.boundingBox()).y).toBeLessThan((await inlineCart.boundingBox()).y);
+  expect((await inlineCart.boundingBox()).y).toBeLessThan((await inlineBuy.boundingBox()).y);
+  const inlineBox = await inline.boundingBox();
+  expect(inlineBox.y + inlineBox.height).toBeLessThan((await floating.boundingBox()).y);
+
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  await expect(actions).toBeInViewport({ ratio: 1 });
+  await expect(floating).toBeInViewport({ ratio: 1 });
   const lastFooterLink = page.getByRole('contentinfo').getByRole('link').last();
   await expect(lastFooterLink).toBeInViewport({ ratio: 1 });
   const footerLinkBox = await lastFooterLink.boundingBox();
-  expect(footerLinkBox.y + footerLinkBox.height).toBeLessThan((await actions.boundingBox()).y);
+  expect(footerLinkBox.y + footerLinkBox.height).toBeLessThan((await floating.boundingBox()).y);
 
   await page.evaluate(() => window.dispatchEvent(new Event('yaans:reset-cookie-consent')));
   const cookieNotice = page.getByRole('complementary', { name: 'Cookie & Storage Notice' });
   await expect(cookieNotice).toBeVisible();
   const noticeBox = await cookieNotice.boundingBox();
-  expect(noticeBox.y + noticeBox.height).toBeLessThan((await actions.boundingBox()).y);
+  expect(noticeBox.y + noticeBox.height).toBeLessThan((await floating.boundingBox()).y);
   await cookieNotice.getByRole('button', { name: 'Close notice' }).click();
 
   await page.getByRole('button', { name: /^250 g/ }).click();
-  const increase = page.getByRole('button', { name: '+', exact: true });
   await increase.click();
-  await cart.click();
+  await floatingCart.click();
   const added = page.getByText(/Added .* to cart/);
   await expect(added).toBeVisible();
   const toastBox = await added.locator('..').boundingBox();
-  expect(toastBox.y + toastBox.height).toBeLessThan((await actions.boundingBox()).y);
+  expect(toastBox.y + toastBox.height).toBeLessThan((await floating.boundingBox()).y);
   await expect(navigation.getByRole('link', { name: 'Cart, 2 items' })).toBeVisible();
+  await inlineCart.click();
+  await expect(navigation.getByRole('link', { name: 'Cart, 4 items' })).toBeVisible();
 
   await page.getByRole('button', { name: /^100 g/ }).click();
   await increase.click();
-  await buy.click();
+  await inlineBuy.click();
   await expect(page).toHaveURL(/\/checkout$/);
-  await expect(page.getByText('2x Test Ceylon Spice (250 g)', { exact: true })).toBeVisible();
+  await expect(page.getByText('4x Test Ceylon Spice (250 g)', { exact: true })).toBeVisible();
   await expect(page.getByText('3x Test Ceylon Spice (100 g)', { exact: true })).toBeVisible();
-  await expect(actions).toHaveCount(0);
+  await expect(floating).toHaveCount(0);
+
+  await page.goto('/product/test-ceylon-spice');
+  await page.getByRole('button', { name: /^100 g/ }).click();
+  await increase.click();
+  await floatingBuy.click();
+  await expect(page).toHaveURL(/\/checkout$/);
+  await expect(page.getByText('4x Test Ceylon Spice (250 g)', { exact: true })).toBeVisible();
+  await expect(page.getByText('5x Test Ceylon Spice (100 g)', { exact: true })).toBeVisible();
 });
 
 test('guest multi-seller checkout creates a confirmed order that can be tracked', async ({ page }, testInfo) => {
   for (const slug of ['test-ceylon-spice', 'test-desk-lamp']) {
     await page.goto(`/product/${slug}`);
-    await page.getByRole('button', { name: 'Add to Cart', exact: true }).click();
+    await inlinePurchaseOptions(page).getByRole('button', { name: 'Add to Cart' }).click();
   }
   await page.goto('/cart');
   await expect(page.getByRole('heading', { name: 'Multi-Seller Shopping Cart' })).toBeVisible();
@@ -386,7 +414,7 @@ test('guest multi-seller checkout creates a confirmed order that can be tracked'
 
 test('checkout failure preserves the cart and a retry can succeed', async ({ page }) => {
   await page.goto('/product/test-ceylon-spice');
-  await page.getByRole('button', { name: 'Buy Now (Cash on Delivery)', exact: true }).click();
+  await inlinePurchaseOptions(page).getByRole('button', { name: 'Buy Now (Cash on Delivery)' }).click();
   await fillAddress(page);
   let failNext = true;
   await page.route('**/api/orders/checkout', (route) => {
@@ -434,7 +462,7 @@ test('unavailable saved products stay visible and counted until removed, then a 
 
 test('a lost success response is recovered without creating another order', async ({ page }) => {
   await page.goto('/product/test-ceylon-spice');
-  await page.getByRole('button', { name: 'Buy Now (Cash on Delivery)', exact: true }).click();
+  await inlinePurchaseOptions(page).getByRole('button', { name: 'Buy Now (Cash on Delivery)' }).click();
   await fillAddress(page);
   let firstOrder;
   let firstKey;

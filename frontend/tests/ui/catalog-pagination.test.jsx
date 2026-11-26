@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, expect, test, vi } from 'vitest';
@@ -36,7 +36,8 @@ test('review navigation fetches the next page and preserves the chosen product v
   await screen.findByText('Review page 2');
   expect(screen.queryByText('Review page 1')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Next reviews' })).toBeDisabled();
-  await user.click(screen.getByRole('button', { name: /Add to Cart/i }));
+  const purchaseOptions = screen.getByRole('group', { name: 'Purchase options', exact: true });
+  await user.click(within(purchaseOptions).getByRole('button', { name: 'Add to Cart' }));
   expect(addToCart).toHaveBeenCalledWith(expect.objectContaining({ _id: 'spice' }), '250 g', 1);
   await user.click(screen.getByRole('button', { name: 'Previous reviews' }));
   await screen.findByText('Review page 1');
@@ -49,10 +50,12 @@ test.each([
   vi.stubGlobal('fetch', vi.fn(async () => response({ product: { ...product, stock }, seller, codAvailable })));
   render(<MemoryRouter initialEntries={['/products/spice']}><Routes><Route path="/products/:idOrSlug" element={<ProductDetailPage />} /></Routes></MemoryRouter>);
 
-  const buy = await screen.findByRole('button', { name: 'Buy Now (Cash on Delivery)' });
-  const cart = screen.getByRole('button', { name: 'Add to Cart' });
-  expect(buy).toBeDisabled();
-  expect(cart.disabled).toBe(cartDisabled);
+  await screen.findByRole('group', { name: 'Purchase options', exact: true });
+  for (const name of ['Purchase options', 'Floating purchase options']) {
+    const actions = within(screen.getByRole('group', { name, exact: true }));
+    expect(actions.getByRole('button', { name: 'Buy Now (Cash on Delivery)' })).toBeDisabled();
+    expect(actions.getByRole('button', { name: 'Add to Cart' }).disabled).toBe(cartDisabled);
+  }
 });
 
 test('storefront pagination shows complete totals and makes all pages reachable', async () => {

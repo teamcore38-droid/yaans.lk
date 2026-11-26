@@ -3,6 +3,18 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --mobile-bottom-nav-height: calc(3.75rem + env(safe-area-inset-bottom, 0px));
+    --mobile-bottom-overlay-height: calc(4rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  @media not all and (min-width: theme('screens.md')) {
+    :root:has(.product-purchase-actions) {
+      --mobile-bottom-overlay-height: calc(var(--mobile-bottom-nav-height) + 4.75rem);
+      scroll-padding-bottom: var(--mobile-bottom-overlay-height);
+    }
+  }
+
   body {
     background-color: #F3F4F6;
     color: #0F172A;

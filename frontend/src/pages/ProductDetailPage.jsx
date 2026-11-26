@@ -383,26 +383,34 @@ export default function ProductDetailPage() {
             )}
 
             {/* Primary CTAs */}
-            <div className="space-y-2">
-              <button
-                type="button"
-                disabled={product.stock <= 0}
-                onClick={() => addToCart(product, selectedVariant, quantity)}
-                className="w-full py-2.5 px-4 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition"
+            <div className="md:space-y-2">
+              <div
+                role="group"
+                aria-label="Purchase options"
+                className="product-purchase-actions flex flex-row-reverse gap-2 max-md:fixed max-md:inset-x-3 max-md:bottom-[calc(var(--mobile-bottom-nav-height)+0.25rem)] max-md:z-30 max-md:rounded-xl max-md:border max-md:border-slate-200 max-md:bg-white max-md:p-2 max-md:shadow-md md:block md:space-y-2"
               >
-                <ShoppingCart className="w-4 h-4" />
-                Add to Cart
-              </button>
+                <button
+                  type="button"
+                  aria-label="Add to Cart"
+                  disabled={product.stock <= 0}
+                  onClick={() => addToCart(product, selectedVariant, quantity)}
+                  className="flex items-center justify-center gap-2 rounded-lg text-slate-950 font-bold shadow-sm transition max-md:h-12 max-md:w-12 max-md:shrink-0 max-md:bg-[#FFC447] max-md:hover:bg-amber-400 max-md:disabled:opacity-50 md:w-full md:py-2.5 md:px-4 md:bg-amber-400 md:hover:bg-amber-500 md:text-sm"
+                >
+                  <ShoppingCart aria-hidden="true" className="w-6 h-6 md:w-4 md:h-4" />
+                  <span className="hidden md:inline">Add to Cart</span>
+                </button>
 
-              <button
-                type="button"
-                disabled={product.stock <= 0 || data.codAvailable === false}
-                onClick={handleBuyNow}
-                className="w-full py-2.5 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition"
-              >
-                <Banknote className="w-4 h-4 text-amber-400" />
-                Buy Now (Cash on Delivery)
-              </button>
+                <button
+                  type="button"
+                  aria-label="Buy Now (Cash on Delivery)"
+                  disabled={product.stock <= 0 || data.codAvailable === false}
+                  onClick={handleBuyNow}
+                  className="flex items-center justify-center gap-2 rounded-lg text-white font-bold transition max-md:h-12 max-md:flex-1 max-md:bg-gradient-to-b from-[#D82432] to-[#A11620] max-md:disabled:opacity-50 md:w-full md:py-2.5 md:px-4 md:bg-slate-900 md:hover:bg-slate-800 md:text-sm"
+                >
+                  <Banknote aria-hidden="true" className="hidden md:block w-4 h-4 text-amber-400" />
+                  <span>Buy Now<span className="hidden md:inline"> (Cash on Delivery)</span></span>
+                </button>
+              </div>
 
               <button
                 type="button"

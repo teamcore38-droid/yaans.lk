@@ -554,7 +554,7 @@ export default function Navbar() {
       )}
 
       {/* Mobile Bottom Navigation Bar for One-Handed Shopping */}
-      <nav className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-slate-200 flex md:hidden items-center justify-around py-1.5 text-[11px] font-medium text-slate-600 shadow-lg">
+      <nav aria-label="Mobile navigation" className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-slate-200 flex md:hidden items-center justify-around h-[var(--mobile-bottom-nav-height)] pb-[env(safe-area-inset-bottom,0px)] text-[11px] font-medium text-slate-600 shadow-lg">
         <Link
           to="/"
           className={`flex flex-col items-center gap-0.5 px-2 py-1 ${

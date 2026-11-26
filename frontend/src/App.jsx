@@ -56,7 +56,7 @@ function ToastBanner() {
   const { toast } = useMarketplace();
   if (!toast) return null;
   return (
-    <div className="fixed bottom-16 md:bottom-5 right-4 z-50 max-w-sm bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg border border-slate-700 text-xs font-semibold flex items-center gap-2">
+    <div className="fixed bottom-[var(--mobile-bottom-overlay-height)] md:bottom-5 right-4 z-50 max-w-sm bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg border border-slate-700 text-xs font-semibold flex items-center gap-2">
       <span
         className={`w-2 h-2 rounded-full ${
           toast.type === 'error' ? 'bg-red-400' : 'bg-emerald-400'

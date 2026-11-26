@@ -57,7 +57,7 @@ export default function CookieNotice() {
   return (
     <aside
       aria-label="Cookie & Storage Notice"
-      className="fixed bottom-20 md:bottom-5 right-3 md:right-5 left-3 md:left-auto md:max-w-md z-40 bg-white/95 backdrop-blur-md border border-slate-200 shadow-2xl rounded-2xl p-4 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4"
+      className="fixed bottom-[calc(var(--mobile-bottom-overlay-height)+1rem)] md:bottom-5 right-3 md:right-5 left-3 md:left-auto md:max-w-md z-40 bg-white/95 backdrop-blur-md border border-slate-200 shadow-2xl rounded-2xl p-4 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4"
     >
       <div className="flex items-start gap-3">
         <div className="p-2 rounded-xl bg-amber-50 text-amber-700 shrink-0 border border-amber-200">

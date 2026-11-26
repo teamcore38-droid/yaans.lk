@@ -42,6 +42,19 @@ test('review navigation fetches the next page and preserves the chosen product v
   await screen.findByText('Review page 1');
 });
 
+test.each([
+  { stock: 0, codAvailable: true, cartDisabled: true },
+  { stock: 100, codAvailable: false, cartDisabled: false }
+])('purchase actions enforce stock and COD availability (%j)', async ({ stock, codAvailable, cartDisabled }) => {
+  vi.stubGlobal('fetch', vi.fn(async () => response({ product: { ...product, stock }, seller, codAvailable })));
+  render(<MemoryRouter initialEntries={['/products/spice']}><Routes><Route path="/products/:idOrSlug" element={<ProductDetailPage />} /></Routes></MemoryRouter>);
+
+  const buy = await screen.findByRole('button', { name: 'Buy Now (Cash on Delivery)' });
+  const cart = screen.getByRole('button', { name: 'Add to Cart' });
+  expect(buy).toBeDisabled();
+  expect(cart.disabled).toBe(cartDisabled);
+});
+
 test('storefront pagination shows complete totals and makes all pages reachable', async () => {
   vi.stubGlobal('fetch', vi.fn(async (raw) => {
     const url = new URL(raw, 'http://test.local'); const page = Number(url.searchParams.get('page') || 1);

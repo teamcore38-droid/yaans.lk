@@ -8,7 +8,7 @@ export default function Footer() {
   const business = useBusinessSettings();
   const runtime = useBusinessConfiguration();
   return (
-    <footer className="bg-white border-t border-slate-200 mt-12 pb-16 md:pb-0">
+    <footer className="bg-white border-t border-slate-200 mt-12 pb-[var(--mobile-bottom-overlay-height)] md:pb-0">
       {/* Practical Marketplace Value Strip */}
       <div className="border-b border-slate-200 bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 grid grid-cols-2 lg:grid-cols-4 gap-4">

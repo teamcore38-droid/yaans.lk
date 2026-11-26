@@ -251,6 +251,76 @@ test('short and long titles share a compact two-column mobile row', async ({ pag
   await expect(shortTitle).toHaveCSS('min-height', '40px');
 });
 
+test('product details keep mobile purchase actions above navigation and use the selected quantities', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/product/test-ceylon-spice');
+  const actions = page.getByRole('group', { name: 'Purchase options' });
+  const buy = actions.getByRole('button', { name: 'Buy Now (Cash on Delivery)', exact: true });
+  const cart = actions.getByRole('button', { name: 'Add to Cart', exact: true });
+  const navigation = page.getByRole('navigation', { name: 'Mobile navigation' });
+  await expect(actions).toBeInViewport({ ratio: 1 });
+  expect(await buy.innerText()).toBe('Buy Now');
+  expect(await cart.innerText()).toBe('');
+  await expect(cart).toHaveCSS('background-color', 'rgb(255, 196, 71)');
+  await expect(buy).toHaveCSS('background-image', 'linear-gradient(rgb(216, 36, 50), rgb(161, 22, 32))');
+
+  for (const width of [390, 320, 767]) {
+    await page.setViewportSize({ width, height: 844 });
+    const [barBox, navBox, buyBox, cartBox] = await Promise.all(
+      [actions, navigation, buy, cart].map(locator => locator.boundingBox())
+    );
+    expect(navBox.y - (barBox.y + barBox.height)).toBeGreaterThan(0);
+    expect(navBox.y - (barBox.y + barBox.height)).toBeLessThanOrEqual(8);
+    expect(buyBox.y).toBe(cartBox.y);
+    expect(buyBox.height).toBe(cartBox.height);
+    expect(cartBox.width).toBe(cartBox.height);
+    expect(buyBox.width).toBeGreaterThan(cartBox.width);
+    expect(buyBox.x + buyBox.width).toBeLessThan(cartBox.x);
+    expect(cartBox.x + cartBox.width).toBeLessThan(width);
+  }
+
+  await page.setViewportSize({ width: 768, height: 844 });
+  await expect(navigation).toBeHidden();
+  await expect(actions).toHaveCSS('position', 'static');
+  await expect(buy).toHaveCSS('background-image', 'none');
+  expect(await cart.innerText()).toBe('Add to Cart');
+  expect(await buy.innerText()).toBe('Buy Now (Cash on Delivery)');
+  expect((await cart.boundingBox()).y).toBeLessThan((await buy.boundingBox()).y);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect(actions).toBeInViewport({ ratio: 1 });
+  const lastFooterLink = page.getByRole('contentinfo').getByRole('link').last();
+  await expect(lastFooterLink).toBeInViewport({ ratio: 1 });
+  const footerLinkBox = await lastFooterLink.boundingBox();
+  expect(footerLinkBox.y + footerLinkBox.height).toBeLessThan((await actions.boundingBox()).y);
+
+  await page.evaluate(() => window.dispatchEvent(new Event('yaans:reset-cookie-consent')));
+  const cookieNotice = page.getByRole('complementary', { name: 'Cookie & Storage Notice' });
+  await expect(cookieNotice).toBeVisible();
+  const noticeBox = await cookieNotice.boundingBox();
+  expect(noticeBox.y + noticeBox.height).toBeLessThan((await actions.boundingBox()).y);
+  await cookieNotice.getByRole('button', { name: 'Close notice' }).click();
+
+  await page.getByRole('button', { name: /^250 g/ }).click();
+  const increase = page.getByRole('button', { name: '+', exact: true });
+  await increase.click();
+  await cart.click();
+  const added = page.getByText(/Added .* to cart/);
+  await expect(added).toBeVisible();
+  const toastBox = await added.locator('..').boundingBox();
+  expect(toastBox.y + toastBox.height).toBeLessThan((await actions.boundingBox()).y);
+  await expect(navigation.getByRole('link', { name: 'Cart, 2 items' })).toBeVisible();
+
+  await page.getByRole('button', { name: /^100 g/ }).click();
+  await increase.click();
+  await buy.click();
+  await expect(page).toHaveURL(/\/checkout$/);
+  await expect(page.getByText('2x Test Ceylon Spice (250 g)', { exact: true })).toBeVisible();
+  await expect(page.getByText('3x Test Ceylon Spice (100 g)', { exact: true })).toBeVisible();
+  await expect(actions).toHaveCount(0);
+});
+
 test('guest multi-seller checkout creates a confirmed order that can be tracked', async ({ page }, testInfo) => {
   for (const slug of ['test-ceylon-spice', 'test-desk-lamp']) {
     await page.goto(`/product/${slug}`);

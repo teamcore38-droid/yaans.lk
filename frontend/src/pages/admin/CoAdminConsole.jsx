@@ -1,7 +1,8 @@
 import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { apiRequest } from '../../utils/api.js';
 import { ADMIN_PERMISSIONS, hasAdminPermission } from '../../../../shared/adminAccess.js';
+import { adminOrderPath } from '../../../../shared/adminOrderPath.js';
 import ProductImageGalleryEditor from '../../components/ProductImageGalleryEditor.jsx';
 import AdminAccountTab from './AdminAccountTab.jsx';
 import OperationRequests from './OperationRequests.jsx';
@@ -82,7 +83,8 @@ export default function CoAdminConsole({ user, refreshUser, showToast, logout })
       <div className="grid md:grid-cols-2 gap-4">{(data?.rows || []).map(row => <article key={row._id} className="border rounded-xl bg-white p-4 space-y-2 min-w-0 break-words">
         {active === 'products' && <><h2 className="font-bold">{row.title}</h2><p>SKU: {row.sku} · {row.sellerName}</p><p>Status: {row.approvalStatus}</p><div className="flex flex-wrap gap-2"><button className={button} onClick={() => setEditing(row)}>Edit product content</button>{['approved', 'rejected'].map(status => <button key={status} disabled={busy} className={button} onClick={() => mutate('/admin/products/' + encodeURIComponent(row._id) + '/moderation', { approvalStatus: status, revision: row.revision })}>{status === 'approved' ? 'Approve' : 'Reject'} listing</button>)}</div></>}
         {active === 'sellers' && <><h2 className="font-bold">{row.storeName}</h2><p>{row.status} · {row.district} · {row.city}</p><p>{row.description}</p><p>{row.contactEmail} {row.contactPhone}</p><SellerReview seller={row} busy={busy} save={(id, body) => mutate('/admin/sellers/' + encodeURIComponent(id) + '/status', body)}/></>}
-        {active === 'orders' && <><h2 className="font-bold">{row.orderNumber}</h2><p>{row.overallStatus}</p><p>{row.customerEmail} {row.customerPhone}</p><p>{[row.shippingAddress?.recipientName, row.shippingAddress?.addressLine1, row.shippingAddress?.addressLine2, row.shippingAddress?.city, row.shippingAddress?.district].filter(Boolean).join(', ')}</p></>}
+        {active === 'orders' && <><h2 className="font-bold">{row.orderNumber}</h2><p>{row.overallStatus}</p><p>{row.customerEmail} {row.customerPhone}</p><p>{[row.shippingAddress?.recipientName, row.shippingAddress?.addressLine1, row.shippingAddress?.addressLine2, row.shippingAddress?.city, row.shippingAddress?.district].filter(Boolean).join(', ')}</p>
+          {adminOrderPath(row._id) && <Link to={adminOrderPath(row._id)} className="font-semibold text-sky-800 underline">View order details</Link>}</>}
         {active === 'audit' && <><p>{row.event} · {row.outcome}</p><p>{row.method} {row.path}</p><time>{new Date(row.createdAt).toLocaleString()}</time></>}
       </article>)}</div>
       {data?.nextCursor && <button disabled={loading} className={button} onClick={() => load(data.nextCursor)}>Load more</button>}

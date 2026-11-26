@@ -75,6 +75,7 @@ test('co-admin operations enforce individual MFA and owner-controlled permission
     }
     await app.mongo.collection('orders').insertOne({ _id: 'private_order', userId: 'usr_test_customer', orderNumber: 'PRIVATE' });
     assert.equal((await req('/documents/orders/private_order', { token })).status, 403);
+    assert.equal((await req('/admin/orders/private_order', { token })).data.order.orderNumber, 'PRIVATE');
   });
 
   await t.test('allowed modules redact seller identity/finance and protect product pricing, stock and variants', async () => {
@@ -102,6 +103,7 @@ test('co-admin operations enforce individual MFA and owner-controlled permission
     assert.equal((await req('/admin/operations?module=products', { token })).status, 401);
     assert.equal((await req('/auth/admin/mfa/login', { body: { challengeToken: challenge.data.challengeToken, code: codes[0] } })).status, 401);
     const current = await login({ password, code: codes[0] }); assert.equal(current.status, 200);
+    assert.equal((await req('/admin/orders/private_order', { token: current.data.token })).status, 403);
     assert.equal((await req('/admin/operations?module=sellers', { token: current.data.token })).status, 403);
     assert.equal((await req('/admin/products/prd_test_spice', { token: current.data.token, method: 'PUT', body: { priceLkr: 1200, revision: await revision(current.data.token) } })).status, 200);
     assert.equal((await req('/admin/products/prd_test_spice', { token: current.data.token, method: 'PUT', body: { stock: 0 } })).status, 403);

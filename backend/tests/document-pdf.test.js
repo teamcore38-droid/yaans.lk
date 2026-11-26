@@ -1,9 +1,36 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {documentPdf} from '../src/services/documentPdf.js';
+import {documentPdf,packageReceiptLabelPdf} from '../src/services/documentPdf.js';
+import {adminOrderUrl,packageReceiptUrl} from '../src/services/orderQr.js';
 
 const invoice={kind:'invoice',title:'Commercial invoice',number:'YLK-2026-1001-S1-INVOICE',orderNumber:'YLK-2026-1001',packageNumber:'YLK-2026-1001-S1',issuedAt:'2026-11-14T18:45:00Z',paymentMethod:'COD',issuer:{name:'Local Seller',address:'12 Market Road, Colombo',phone:'0771234567'},customer:{recipientName:'Customer',addressLine1:'24 Lake Road',city:'Kandy',district:'Kandy'},items:[{title:'Handwoven basket / සිංහල / தமிழ்',sku:'BASKET-01',variantLabel:'Natural / Large',quantity:2,unitPriceLkr:1500,lineTotalLkr:3000}],subtotalLkr:3000,deliveryLkr:350,totalLkr:3350};
 const pages=buffer=>(buffer.toString('latin1').match(/\/Type \/Page\b/g)||[]).length;
+
+test('admin order links stay within their deployment environment',()=>{
+  assert.equal(adminOrderUrl('ord_ab-12',{VERCEL_ENV:'production'}),'https://yaans.lk/admin/orders/ord_ab-12');
+  assert.equal(adminOrderUrl('ord_ab-12',{VERCEL_ENV:'production',APP_ENV:'staging'}),'https://yaans-lk-staging.vercel.app/admin/orders/ord_ab-12');
+  assert.equal(adminOrderUrl('ord_ab-12',{VERCEL_ENV:'preview',APP_ENV:'staging',VERCEL_URL:'branch-test.vercel.app'}),'https://branch-test.vercel.app/admin/orders/ord_ab-12');
+  assert.equal(adminOrderUrl('ord_ab-12',{VERCEL_ENV:'preview',VERCEL_URL:'branch-test.vercel.app.example.org'}),null);
+  assert.equal(adminOrderUrl('//example.org',{VERCEL_ENV:'production'}),null);
+});
+
+test('the package label is a single printable 4 by 6 inch page with a customer link',async()=>{
+  const url=packageReceiptUrl('sub_example',{APP_ENV:'staging'});
+  assert.equal(url,'https://yaans-lk-staging.vercel.app/package-receipt/sub_example');
+  const pdf=await packageReceiptLabelPdf('YLK-2026-1001-S1',url);
+  assert.equal(pages(pdf),1);
+  assert.match(pdf.toString('latin1'),/\/MediaBox \[0 0 288 432\]/);
+  assert.ok(pdf.includes(Buffer.from(url)));
+  assert.ok(pdf.length<60000);
+});
+
+test('an admin payment receipt has a clickable QR and fits on a single page',async()=>{
+  const orderUrl=adminOrderUrl('ord_01234567-89ab-cdef-0123-456789abcdef',{APP_ENV:'staging'});
+  const pdf=await documentPdf({...invoice,kind:'receipt',title:'Payment receipt'}, {orderUrl});
+  assert.equal(pages(pdf),1);
+  assert.ok(pdf.includes(Buffer.from(orderUrl)));
+  assert.ok(pdf.length<100000);
+});
 
 test('branded invoice embeds local logo/fonts and keeps a normal order on one page',async()=>{
   const before=structuredClone(invoice);

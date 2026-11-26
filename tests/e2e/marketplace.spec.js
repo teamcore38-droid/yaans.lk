@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import sharp from 'sharp';
+import decodeQR from 'qr/decode.js';
 import { nextAdminRecoveryCode, accounts, TEST_PASSWORD, shippingAddress } from '../support/fixtures.js';
 
 let browserErrors;
@@ -36,10 +38,52 @@ test('a rate-limited sign-in shows a countdown, suppresses repeated requests and
 
 async function login(page, email, admin = false) {
   await page.goto(admin ? '/admin/login' : '/login');
+  await submitSignIn(page, email, admin);
+}
+
+async function submitSignIn(page, email, admin) {
   await page.getByPlaceholder(admin ? 'admin@yaans.lk' : 'name@example.lk').fill(email);
   await page.getByPlaceholder(admin ? '••••••••••••' : '••••••••', { exact: true }).fill(TEST_PASSWORD);
   await page.getByRole('button', { name: admin ? 'Sign In to Admin Console' : 'Sign In', exact: true }).click();
   if (admin) { await page.getByLabel('Authenticator or recovery code').fill(nextAdminRecoveryCode()); await page.getByRole('button', { name: 'Sign In to Admin Console', exact: true }).click(); }
+}
+
+async function checkAdminOrderQr(page, request) {
+  const placed = await request.post('/api/orders/checkout', {
+    headers: { 'Idempotency-Key': randomUUID() },
+    data: {
+      items: [{ productId: 'prd_test_spice', variantLabel: '100 g', quantity: 1 }],
+      shippingAddress, customerEmail: 'qr-order@test.invalid', paymentMethod: 'COD', codConfirmedByCustomer: true
+    }
+  });
+  expect(placed.status()).toBe(201);
+  const { order } = await placed.json();
+  const orderPath = `/admin/orders/${order._id}`;
+  await page.goto(orderPath);
+  await expect(page).toHaveURL(/\/admin\/login$/);
+  await expect(page.getByText(shippingAddress.recipientName, { exact: true })).toHaveCount(0);
+  await submitSignIn(page, accounts.admin, true);
+  await expect(page).toHaveURL(new RegExp(`${orderPath}$`));
+  await expect(page.getByRole('heading', { name: `Order ${order.orderNumber}`, exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Delivery details' })).toContainText(shippingAddress.recipientName);
+  await expect(page.getByRole('region', { name: 'Seller packages' })).toContainText('Test Ceylon Spice');
+  const labelDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download receipt QR label' }).click();
+  expect((await labelDownload).suggestedFilename()).toBe(`${order.orderNumber}-S1-RECEIPT-LABEL.pdf`);
+
+  const documents = page.getByRole('region', { name: 'Order documents' });
+  await documents.getByRole('button', { name: 'View invoices & documents' }).click();
+  await documents.getByRole('button', { name: `View ${order.orderNumber}-SUMMARY`, exact: true }).click();
+  const document = page.getByRole('dialog', { name: 'Order document preview' });
+  const image = await document.getByRole('img', { name: 'QR code for this admin order' }).getAttribute('src');
+  const { data, info } = await sharp(Buffer.from(image.split(',')[1], 'base64')).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const scanUrl = decodeQR({ width: info.width, height: info.height, data });
+  expect(scanUrl).toBe(page.url());
+  const orderLink = document.getByRole('link', { name: /Open admin order/ });
+  await expect(orderLink).toHaveAttribute('href', orderPath);
+  await orderLink.click();
+  await expect(document).toBeHidden();
+  await page.getByRole('link', { name: 'Back to Admin Console' }).click();
 }
 
 async function fillAddress(page) {
@@ -234,7 +278,7 @@ test('guest multi-seller checkout creates a confirmed order that can be tracked'
   await page.getByRole('button', { name: /Confirm COD Order/ }).click();
   const response = await created;
   expect(response.status()).toBe(201);
-  const { order, subOrders } = await response.json();
+  const { order, subOrders, guestAccessToken } = await response.json();
   expect(subOrders).toHaveLength(2);
   expect(order.grandTotalLkr).toBe(4200);
   await expect(page.getByRole('heading', { name: new RegExp(order.orderNumber) })).toBeVisible();
@@ -256,6 +300,18 @@ test('guest multi-seller checkout creates a confirmed order that can be tracked'
   for (const subOrder of subOrders) {
     await expect(page.getByText(new RegExp(`^Package [12]: ${subOrder.subOrderNumber}$`))).toBeVisible();
   }
+  await page.goto(`/package-receipt/${subOrders[0]._id}`);
+  await expect(page.getByRole('heading', { name: 'Package receipt' })).toBeVisible();
+  await expect(page.getByText(shippingAddress.recipientName, { exact: true })).toHaveCount(0);
+  await page.getByLabel('Private access code').fill('A'.repeat(43));
+  await page.getByRole('button', { name: 'View package documents' }).click();
+  await expect(page.getByRole('alert')).toContainText('private access code');
+  await page.getByLabel('Private access code').fill(guestAccessToken);
+  await page.getByRole('button', { name: 'View package documents' }).click();
+  await expect(page.getByRole('button', { name: `View ${invoiceNumber}` })).toBeVisible();
+  await expect(page.getByText(subOrders[1].subOrderNumber, { exact: false })).toHaveCount(0);
+  await page.getByRole('button', { name: `View ${invoiceNumber}` }).click();
+  await expect(page.getByRole('dialog')).toContainText('Commercial invoice');
 });
 
 test('checkout failure preserves the cart and a retry can succeed', async ({ page }) => {
@@ -444,8 +500,8 @@ test('seller fulfillment and admin payout are reflected in the settlement ledger
   await expect(page.getByRole('cell', { name: settlement.settlementReference, exact: true })).toBeVisible();
 });
 
-test('administrator security and staff provisioning work on desktop and mobile',async({page,request})=>{
-  await login(page,accounts.admin,true);
+test('administrator QR scan, security and staff provisioning work on desktop and mobile',async({page,request})=>{
+  await checkAdminOrderQr(page,request);
   await expect(page).toHaveURL(/\/admin$/);
   const tab=page.getByRole('button',{name:'Admin Account & Security',exact:true});
   const fitsScreen=await tab.evaluate(element=>{

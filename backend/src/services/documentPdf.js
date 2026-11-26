@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url';
+import { orderQr } from './orderQr.js';
 
 const assets = {
   NotoSans: fileURLToPath(new URL('../assets/fonts/NotoSans.ttf', import.meta.url)),
@@ -10,10 +11,44 @@ const palette = {brand:'#791B20', gold:'#F4BF43', ink:'#172438', muted:'#657184'
 const headings = {invoice:'INVOICE', summary:'ORDER SUMMARY', 'packing-slip':'PACKING SLIP', receipt:'PAYMENT RECEIPT', refund:'REFUND CONFIRMATION', cancellation:'CANCELLATION'};
 const segmenter = new Intl.Segmenter('en', {granularity:'grapheme'});
 
+function drawQr(pdf, matrix, x, y, size) {
+  const unit = size / matrix.length;
+  pdf.rect(x, y, size, size).fill('#FFFFFF');
+  matrix.forEach((row, r) => row.forEach((dark, c) => {
+    if (dark) pdf.rect(x + c * unit, y + r * unit, unit, unit);
+  }));
+  pdf.fill('#000000');
+}
+
+export async function packageReceiptLabelPdf(packageNumber, url) {
+  const [{ default: PDFDocument }, qr] = await Promise.all([import('pdfkit'), orderQr(url, 'raw')]);
+  // 4 × 6 inches fits standard packing label printers and prints on plain paper.
+  const pdf = new PDFDocument({ size: [288, 432], margin: 0, info: { Title: 'Yaans.lk package receipt label' } });
+  const chunks = [];
+  const completed = new Promise((resolve, reject) => {
+    pdf.on('data', chunk => chunks.push(chunk));
+    pdf.on('end', () => resolve(Buffer.concat(chunks)));
+    pdf.on('error', reject);
+  });
+  pdf.font('Helvetica-Bold').fontSize(19).fillColor(palette.ink)
+    .text('Yaans.lk', 18, 48, { width: 252, align: 'center' });
+  pdf.moveTo(28, 87).lineTo(260, 87).lineWidth(0.8).strokeColor(palette.line).stroke();
+  pdf.font('Helvetica-Bold').fontSize(17).fillColor(palette.ink)
+    .text('Scan for your receipt', 18, 112, { width: 252, align: 'center' });
+  pdf.font('Helvetica').fontSize(10).fillColor(palette.muted)
+    .text(packageNumber, 18, 141, { width: 252, align: 'center', height: 25, ellipsis: true });
+  drawQr(pdf, qr, 60, 170, 168);
+  pdf.link(60, 170, 168, 168, url);
+  pdf.fontSize(11).fillColor(palette.ink).text('Sign in or enter the private access code from your order confirmation.', 28, 357, { width: 232, align: 'center' });
+  pdf.end();
+  return completed;
+}
+
 // PDF rendering and local artwork load only after the document access check.
 // All positions and page breaks are bounded here; PDFKit never lays out untrusted HTML.
-export async function documentPdf(doc) {
+export async function documentPdf(doc, { orderUrl } = {}) {
   const {default: PDFDocument} = await import('pdfkit');
+  const qr = orderUrl ? await orderQr(orderUrl, 'raw') : null;
   const pdf = new PDFDocument({size:'A4', margin:0, bufferPages:true, info:{Title:`${doc.title} ${doc.number}`, Author:'Yaans.lk'}});
   const chunks=[];
   const complete=new Promise((resolve,reject)=>{pdf.on('data',chunk=>chunks.push(chunk));pdf.on('end',()=>resolve(Buffer.concat(chunks)));pdf.on('error',reject);});
@@ -86,7 +121,9 @@ export async function documentPdf(doc) {
   text(doc.kind==='invoice'?'COMMERCIAL INVOICE':doc.title.toUpperCase(),220,84,W-M-220,{size:7,color:'#F4BF43',align:'right'});
 
   const meta=[['DOCUMENT DATE',date(doc.issuedAt)],['ORDER NUMBER',doc.orderNumber],['SELLER PACKAGE',doc.packageNumber || 'All seller shipments']];
-  const metaW=CW/3;
+  const qrSize=100, qrY=124, qrX=M+CW-qrSize;
+  const referenceW=qr ? CW-qrSize-16 : CW;
+  const metaW=referenceW/3;
   let metaHeight=0;
   meta.forEach(([label,value],i)=>{
     const x=M+i*metaW;
@@ -98,10 +135,16 @@ export async function documentPdf(doc) {
   const status=doc.kind==='receipt'?'Payment collection recorded':doc.kind==='refund'?'Refund recorded':doc.kind==='cancellation'?'Order package cancelled':packing?'Prepared for seller fulfilment':'Payment pending at order placement - pay on delivery';
   const positive=['receipt','refund'].includes(doc.kind);
   const statusColor=positive?palette.green:doc.kind==='cancellation'?palette.red:palette.brand;
-  box(M,y,CW,32,positive?palette.greenLight:palette.amberLight);
+  box(M,y,referenceW,32,positive?palette.greenLight:palette.amberLight);
   pdf.circle(M+14,y+16,3).fill(statusColor);
-  text(status,M+26,y+9,CW-40,{size:8.5,bold:true,color:statusColor});
+  text(status,M+26,y+9,referenceW-40,{size:8.5,bold:true,color:statusColor});
   y+=51;
+  if(qr){
+    drawQr(pdf,qr,qrX,qrY,qrSize);
+    text('Scan for admin order',qrX,qrY+qrSize,qrSize,{size:7,align:'center',color:palette.muted});
+    pdf.link(qrX,qrY,qrSize,qrSize+11,orderUrl);
+    y=Math.max(y,qrY+qrSize+24);
+  }
   const cardW=(CW-16)/2;
   const issuer=[doc.issuer.name,doc.issuer.address,doc.issuer.phone].filter(Boolean).join('\n');
   const address=doc.customer;

@@ -888,7 +888,7 @@ export default function SellerDashboardPage() {
                   </div>
                 </div>
 
-                <OrderDocuments packageId={sub._id} />
+                <OrderDocuments packageId={sub._id} packageNumber={sub.subOrderNumber} />
                 {/* Order Items */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
                   <div className="flex flex-wrap gap-3 my-3 text-xs"><label>Courier<select aria-label={`Courier for ${sub.subOrderNumber}`} value={sub.courierPartner || ''} onChange={e=>setData(previous=>({...previous,subOrders:previous.subOrders.map(item=>item._id===sub._id?{...item,courierPartner:e.target.value}:item)}))}><option value={sub.courierPartner||''}>{sub.courierPartner||'Choose courier'}</option>{business.references.couriers.filter(courier=>courier.active&&courier.name!==sub.courierPartner).map(courier=><option key={courier.name} value={courier.name}>{courier.name}</option>)}</select></label><label>Tracking code<input aria-label={`Tracking code for ${sub.subOrderNumber}`} className="border p-1" maxLength={120} value={sub.trackingCode||''} onChange={e=>setData(previous=>({...previous,subOrders:previous.subOrders.map(item=>item._id===sub._id?{...item,trackingCode:e.target.value}:item)}))}/></label></div><div className="lg:col-span-7 space-y-2">

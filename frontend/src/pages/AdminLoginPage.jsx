@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { adminOrderPath } from '../../../shared/adminOrderPath.js';
 import { ShieldCheck, Lock, Key, AlertTriangle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { useMarketplace } from '../context/MarketplaceContext.jsx';
 
 export default function AdminLoginPage() {
   const { user, adminLogin, logout, showToast } = useMarketplace();
   const navigate = useNavigate();
+  const { state } = useLocation();
+  const destination = adminOrderPath(state?.orderId) || '/admin';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,9 +20,9 @@ export default function AdminLoginPage() {
 
   useEffect(() => {
     if (user?.role === 'admin') {
-      navigate('/admin', { replace: true });
+      navigate(destination, { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, navigate, destination]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,7 +41,7 @@ export default function AdminLoginPage() {
       setLoading(true);
       const result=await adminLogin(cleanEmail, cleanPassword,challengeToken,code.trim());
       if(result?.requiresMfa){setChallengeToken(result.challengeToken);setPassword('');return;}
-      navigate('/admin', { replace: true });
+      navigate(destination, { replace: true });
     } catch (err) {
       const msg = err.message || 'Invalid administrator credentials.';
       setErrorMsg(msg);

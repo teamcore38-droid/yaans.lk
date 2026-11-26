@@ -7,12 +7,14 @@ export const pageLoaders = {
   cart: () => import('../pages/CartPage.jsx'),
   checkout: () => import('../pages/CheckoutPage.jsx'),
   tracking: () => import('../pages/TrackOrderPage.jsx'),
+  packageReceipt: () => import('../pages/PackageReceiptPage.jsx'),
   store: () => import('../pages/SellerStorefrontPage.jsx'),
   seller: () => import('../pages/SellerDashboardPage.jsx'),
   staff: () => import('../pages/StaffDashboardPage.jsx'),
   staffLogin: () => import('../pages/StaffLoginPage.jsx'),
   admin: () => import('../pages/AdminDashboardPage.jsx'),
   adminLogin: () => import('../pages/AdminLoginPage.jsx'),
+  adminOrder: () => import('../pages/AdminOrderPage.jsx'),
   account: () => import('../pages/AuthAccountPages.jsx'),
   privacy: () => import('../pages/PrivacyPolicyPage.jsx'),
   terms: () => import('../pages/TermsConditionsPage.jsx'),
@@ -39,6 +41,8 @@ export function prefetchPage(href) {
   } else if (pathname === '/products') {
     page = 'products';
     endpoint = productsEndpoint(search);
+  } else if (/^\/package-receipt\/[A-Za-z0-9_-]{1,128}$/.test(pathname)) {
+    page = 'packageReceipt';
   } else if (/^\/product\/[^/]+$/.test(pathname)) {
     page = 'product';
     const district = localStorage.getItem('yaans_district') || 'Colombo';
@@ -54,7 +58,7 @@ export function prefetchPage(href) {
       '/privacy': 'privacy', '/privacy-policy': 'privacy',
       '/terms': 'terms', '/terms-and-conditions': 'terms',
       '/cookies': 'cookies', '/cookies-policy': 'cookies'
-    }[pathname];
+    }[pathname] || (/^\/admin\/orders\/[A-Za-z0-9_-]{1,128}$/.test(pathname) ? 'adminOrder' : undefined);
   }
   if (page) pageLoaders[page]().catch(() => {});
   if (endpoint) apiRequest(endpoint).catch(() => {});

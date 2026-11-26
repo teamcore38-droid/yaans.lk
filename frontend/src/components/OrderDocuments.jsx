@@ -1,22 +1,26 @@
 import React, {useRef,useState} from 'react';
+import {Link} from 'react-router-dom';
+import {adminOrderPath} from '../../../shared/adminOrderPath.js';
 import {apiRequest,formatLkr} from '../utils/api.js';
-import {apiFailure} from '../utils/retryAfter.js';
+import {downloadDocument} from '../utils/downloadDocument.js';
+import PackageReceiptLabel from './PackageReceiptLabel.jsx';
 
-export default function OrderDocuments({orderId,packageId,accessToken=''}) {
-  const [documents,setDocuments]=useState(null),[selected,setSelected]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+export default function OrderDocuments({orderId,packageId,packageNumber,accessToken='',customerReceipt=false,initialDocuments=null}) {
+  const [documents,setDocuments]=useState(initialDocuments),[selected,setSelected]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   const dialog=useRef(null);
-  const endpoint=`/documents/${packageId?'packages':'orders'}/${encodeURIComponent(packageId || orderId)}`;
+  const scope = customerReceipt ? 'package-receipts' : packageId ? 'packages' : 'orders';
+  const endpoint=`/documents/${scope}/${encodeURIComponent(packageId || orderId)}`;
   const headers=accessToken?{'X-Order-Access-Token':accessToken}:{};
   async function load(){setBusy(true);setError('');try{const result=await apiRequest(endpoint,{headers,cache:'no-store'});setDocuments(result.documents);}catch(e){setError(e.message);}finally{setBusy(false);}}
-  async function view(doc){setBusy(true);setError('');try{const result=await apiRequest(`${endpoint}/${encodeURIComponent(doc._id)}`,{headers,cache:'no-store'});setSelected(result.document);dialog.current?.showModal();}catch(e){setError(e.message);}finally{setBusy(false);}}
+  async function view(doc){setBusy(true);setError('');try{const result=await apiRequest(`${endpoint}/${encodeURIComponent(doc._id)}`,{headers,cache:'no-store'});setSelected({...result.document,adminQr:result.adminQr});dialog.current?.showModal();}catch(e){setError(e.message);}finally{setBusy(false);}}
   async function download(doc){setBusy(true);setError('');try{
-    const response=await fetch(`${import.meta.env.VITE_API_URL || '/api'}${endpoint}/${encodeURIComponent(doc._id)}?format=pdf`,{credentials:'same-origin',headers:{'X-Yaans-Client':'browser',...headers}});
-    if(!response.ok){const data=await response.json().catch(()=>({}));throw apiFailure(response,data);}
-    const blob=await response.blob();const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`${doc.number}.pdf`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    await downloadDocument(`${endpoint}/${encodeURIComponent(doc._id)}?format=pdf`,doc.number,headers);
   }catch(e){setError(e.message);}finally{setBusy(false);}}
   return <section aria-label="Order documents" className="border rounded-lg p-3 space-y-3 text-sm">
+    {packageId && !customerReceipt && <PackageReceiptLabel packageId={packageId} packageNumber={packageNumber} />}
     <button type="button" disabled={busy} onClick={load} className="font-bold text-sky-800 underline">{documents?'Refresh documents':'View invoices & documents'}</button>
     {error&&<p role="alert" className="text-red-700">{error}</p>}
+    {customerReceipt && documents && !documents.some(doc=>doc.kind==='receipt') && <p className="text-slate-600">Your invoice is available now. The payment receipt appears after payment is recorded.</p>}
     {documents&&<ul className="space-y-3">{documents.map(doc=><li key={doc._id} className="flex flex-wrap gap-3 items-center"><span>{doc.title} {doc.packageNumber?`· ${doc.packageNumber}`:''}</span><button type="button" disabled={busy} onClick={()=>view(doc)} className="text-sky-800 underline" aria-label={`View ${doc.number}`}>View</button><button type="button" disabled={busy} onClick={()=>download(doc)} className="text-sky-800 underline" aria-label={`Download ${doc.number}`}>Download PDF / Print</button></li>)}</ul>}
     <dialog ref={dialog} onClose={()=>setSelected(null)} aria-label="Order document preview" className="rounded-xl p-0 max-w-3xl w-[95vw] max-h-[85vh] overflow-auto backdrop:bg-black/50">
       {selected&&<article>
@@ -25,7 +29,16 @@ export default function OrderDocuments({orderId,packageId,accessToken=''}) {
           <h2 className="text-xl font-bold mt-4">{selected.title}</h2><p className="text-xs text-white/80 mt-1 break-all">{selected.number}</p>
         </header>
         <div className="p-5 sm:p-7 space-y-5">
-          <div className="flex flex-wrap justify-between gap-3 text-xs text-slate-600"><p>Issued {new Date(selected.issuedAt).toLocaleDateString('en-LK',{timeZone:'Asia/Colombo'})}</p><p>Order {selected.orderNumber}</p></div>
+          <div className="flex flex-wrap items-start justify-between gap-3 text-xs text-slate-600">
+            <div className="space-y-1">
+              <p>Issued {new Date(selected.issuedAt).toLocaleDateString('en-LK',{timeZone:'Asia/Colombo'})}</p>
+              <p>Order {selected.orderNumber}</p>
+            </div>
+            {selected.adminQr && adminOrderPath(selected.orderId) && <Link to={adminOrderPath(selected.orderId)} onClick={() => dialog.current?.close()} className="inline-flex flex-col items-center font-semibold text-sky-800 underline">
+              <img src={selected.adminQr} alt="QR code for this admin order" width="120" height="120" className="bg-white [image-rendering:pixelated]" />
+              Open admin order
+            </Link>}
+          </div>
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="bg-slate-50 rounded-lg p-4"><h3 className="text-xs font-bold uppercase text-[#791B20] mb-2">Issued by / seller</h3><p className="font-semibold">{selected.issuer.name}</p><p className="whitespace-pre-line text-slate-600">{selected.issuer.address}</p>{selected.issuer.phone&&<p className="text-slate-600">{selected.issuer.phone}</p>}</div>
             <div className="bg-slate-50 rounded-lg p-4"><h3 className="text-xs font-bold uppercase text-[#791B20] mb-2">Deliver to / customer</h3><p className="font-semibold">{selected.customer.recipientName}</p><p className="text-slate-600">{[selected.customer.addressLine1,selected.customer.addressLine2,selected.customer.city,selected.customer.district,selected.customer.postalCode].filter(Boolean).join(', ')}</p><p className="text-slate-600">{selected.customer.phone}</p></div>

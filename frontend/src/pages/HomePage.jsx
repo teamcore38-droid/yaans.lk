@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useCatalogResource } from '../hooks/useCatalogResource.js';
 import { useMarketplace } from '../context/MarketplaceContext.jsx';
-import CategoryQuadCard from '../components/CategoryQuadCard.jsx';
+import ExploreCategoriesSection from '../components/ExploreCategoriesSection.jsx';
 import ProductCard from '../components/ProductCard.jsx';
 import { imageUrl, imageSrcSet } from '../utils/images.js';
 import { apiRequest } from '../utils/api.js';
@@ -172,10 +172,13 @@ export default function HomePage() {
     return (
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-6 space-y-6">
         <div className="h-48 sm:h-64 bg-white rounded-xl border border-slate-200 animate-pulse" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          {[1, 2, 3, 4, 5, 6].map((n) => (
-            <div key={n} className="h-80 bg-white rounded-xl border border-slate-200 animate-pulse" />
-          ))}
+        <div className="space-y-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            <div className="h-64 sm:h-80 bg-white rounded-xl border border-slate-200 animate-pulse" />
+            <div className="hidden sm:block h-80 bg-white rounded-xl border border-slate-200 animate-pulse" />
+            <div className="hidden lg:block h-80 bg-white rounded-xl border border-slate-200 animate-pulse" />
+          </div>
+          <div className="h-10 w-full sm:w-80 sm:mx-auto bg-white rounded-full border border-slate-200 animate-pulse" />
         </div>
       </div>
     );
@@ -313,32 +316,12 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* 2x2 Category Quad Cards (Mobile-First Reference Layout) */}
-      <section aria-label="Shop by Category" className="!mt-2 sm:!mt-2.5" hidden={!business.home.categories.enabled} data-home-section="categories">
-        <div className="flex items-center justify-between gap-2 mb-2 sm:mb-1.5">
-          <div>
-            <h2 className="text-base sm:text-lg font-extrabold text-slate-900 leading-tight">
-              {business.home.categories.title}
-            </h2>
-            <p className="hidden sm:block text-xs text-slate-500 mt-0.5">
-              {business.home.categories.subtitle}
-            </p>
-          </div>
-          <Link
-            to="/products"
-            aria-label="View All Departments"
-            className="shrink-0 whitespace-nowrap text-xs font-semibold text-sky-700 hover:text-sky-800 inline-flex items-center gap-0.5"
-          >
-            <span className="sm:hidden">View all</span><span className="hidden sm:inline">View All Departments</span> <ChevronRight className="w-4 h-4" />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          {categories.slice(0,business.home.categories.limit).map((cat) => (
-            <CategoryQuadCard key={cat._id} category={cat} />
-          ))}
-        </div>
-      </section>
+      {/* Collapsible Category Quad Cards (Mobile-First Reference Layout) */}
+      <ExploreCategoriesSection
+        data-home-section="categories"
+        categories={categories}
+        section={business.home.categories}
+      />
 
       {/* Authentic Sri Lankan Homemade Products Section */}
       <section className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5 shadow-sm" hidden={!business.home.homemade.enabled} data-home-section="homemade">

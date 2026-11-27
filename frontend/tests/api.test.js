@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 import { apiRequest, getCachedApiResponse, invalidateCatalogCache, clearRequestCooldowns } from '../src/utils/api.js';
-import { imageUrl, imageSrcSet } from '../src/utils/images.js';
+import { imageUrl, imageSrcSet, isSafeImageUrl } from '../src/utils/images.js';
 
 const originalFetch = globalThis.fetch;
 const originalNow = Date.now;
@@ -163,5 +163,14 @@ test('image sizing preserves other hosts, existing crops and signed URLs', () =>
   for (const unchanged of ['/local.jpg', 'https://images.unsplash.com/photo?w=600', source.replace('/v123/', '/c_crop/v123/'), source.replace('/v123/', '/s--signature--/v123/')]) {
     assert.equal(imageUrl(unchanged, 640), unchanged);
     assert.equal(imageSrcSet(unchanged), undefined);
+  }
+});
+
+test('image URL validator allows only safe internal paths and credential-free HTTPS URLs', () => {
+  for (const allowed of ['/brand/yaans-mark-dark.png', 'https://res.cloudinary.com/example/image/upload/v1/cat.webp', 'https://images.unsplash.com/photo-1?w=400']) {
+    assert.equal(isSafeImageUrl(allowed), true);
+  }
+  for (const blocked of ['', '   ', null, undefined, 'javascript:alert(1)', 'data:image/svg+xml,<svg/>', 'http://example.com/a.jpg', '//evil.example/a.jpg', 'https://user:pass@evil.example/a.jpg', '/%2fevil.example/a.jpg']) {
+    assert.equal(isSafeImageUrl(blocked), false);
   }
 });
